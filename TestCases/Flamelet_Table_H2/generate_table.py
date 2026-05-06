@@ -39,8 +39,12 @@ Tgen.SetNCores(4)
 Tgen.SetMixtureFractionLimits(mix_frac_max=0.02, mix_frac_min=0.009392)
 
 # Use 50 table levels and approximately 2k nodes per table level.
-Tgen.SetNTableLevels(50)
-Tgen.SetNnodes_Target(2000)
+Tgen.SetNTableLevels(10)
+Tgen.SetNnodes_Target(5000)
+Tgen.ConditionalRefinement("Temperature", lowerbound=600,upperbound=700, coef=0.5)
+Tgen.RefineReactants(0.1)
+# Tgen.ConditionalRefinement("Temperature", lowerbound=1000, coef=0.2)
+
 
 # Insert mixture fraction level at equivalence ratio of 0.5.
 cv_target = Config.GetUnburntScalars(equivalence_ratio=0.5, temperature=300.0)

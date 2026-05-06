@@ -30,7 +30,7 @@ Config = Config_FGM("TableGeneration.cfg")
 
 # Interpolate 200 points per flamelet
 Concat = FlameletConcatenator(Config)
-Concat.SetNFlameletNodes(200)
+#Concat.SetNFlameletNodes(200)
 
 # Read and concatenate flamelet data
 Concat.ConcatenateFlameletData()

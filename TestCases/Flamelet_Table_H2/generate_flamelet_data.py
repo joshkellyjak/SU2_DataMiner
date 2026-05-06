@@ -30,4 +30,4 @@ from Data_Generation.DataGenerator_FGM import ComputeFlameletData
 Config = Config_FGM("TableGeneration.cfg")
 
 # Distribute flamelet data generation process.
-ComputeFlameletData(Config, run_parallel=True, N_processors=4)
+ComputeFlameletData(Config, run_parallel=True, N_processors=6)

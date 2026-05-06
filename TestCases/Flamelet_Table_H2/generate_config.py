@@ -33,10 +33,10 @@ Config.SetConfigName("TableGeneration")
 # Hydrogen-air flamelets with equivalence ratio between 0.3 and 1.0
 Config.SetFuelDefinition(fuel_species=["H2"],fuel_weights=[1.0])
 Config.SetReactionMechanism('h2o2.yaml')
-Config.SetMixtureBounds(0.3, 1.0)
-Config.SetNpMix(30)
+Config.SetMixtureBounds(0.25, 2.0)
+Config.SetNpMix(100)
 Config.SetUnbTempBounds(300, 800)
-Config.SetNpTemp(30)
+Config.SetNpTemp(100)
 
 # Enable preferential diffusion through selecting the "multicomponent" transport model.
 Config.SetTransportModel('multicomponent')
