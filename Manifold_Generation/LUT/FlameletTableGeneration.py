@@ -124,7 +124,7 @@ class SU2TableGenerator_Base:
         full_data_file = self._Config.GetOutputDir()+"/LUT_data_full.csv"
         with open(full_data_file,'r') as fid:
             self._manifold_variables = fid.readline().strip().split(',')
-        #D_full = np.loadtxt(full_data_file,delimiter=',',skiprows=1)
+
         self._control_var_scaler = MinMaxScaler()
         CV_full, D_full = GetReferenceData(full_data_file, self._controlling_variables, self._manifold_variables)
         data_scaler = MinMaxScaler()
@@ -160,6 +160,7 @@ class SU2TableGenerator_Base:
                 rms_local = np.average(np.power(PPV_predicted - D_test_scaled, 2))
                 RMS_ppv[i,j] = rms_local 
         [imin,jmin] = divmod(RMS_ppv.argmin(), RMS_ppv.shape[1])
+        print(min(RMS_ppv))
         self._n_near = n_near_range[imin]
         self._p_fac = p_range[jmin]
         print("Done!")
@@ -234,7 +235,7 @@ class SU2TableGenerator_FGM:
                                       DefaultSettings_FGM.name_enth,\
                                       DefaultSettings_FGM.name_mixfrac]  # FGM controlling variables
     _lookup_tree:Invdisttree = None     # KD tree with inverse distance weighted interpolation for flamelet data interpolation.
-    _flamelet_data_scaler:MinMaxScaler = None   # Scaler for flamelet data controlling variables.
+    _scaler:MinMaxScaler = None
     _n_near:int = 14     # Number of nearest neighbors from which to evaluate flamelet data.
     _p_fac:int = 3      # Power by which to weigh distances from query point.
     _custom_KDtreeparams:bool = False 
@@ -459,12 +460,13 @@ class SU2TableGenerator_FGM:
 
         print("Loading flamelet data...")
         # Define scaler for FGM controlling variables.
-        full_data_file = self._Config.GetOutputDir()+"/"+self._Config.GetConcatenationFileHeader()+"_full.csv"
+        full_data_file = "/".join((self._Config.GetOutputDir(), "%s_full.csv" % self._Config.GetConcatenationFileHeader()))
+
         with open(full_data_file,'r') as fid:
             self._Flamelet_Variables = fid.readline().strip().split(',')
         D_full = np.loadtxt(full_data_file,delimiter=',',skiprows=1)
         self._scaler = MinMaxScaler()
-        CV_full = D_full[:,:3]
+        CV_full = D_full[:,[self._Flamelet_Variables.index(cv) for cv in self._Config.GetControllingVariables()]]
         self.__min_CV, self.__max_CV = np.min(CV_full,axis=0), np.max(CV_full,axis=0)
 
         min_mixfrac_dataset = self.__min_CV[2]
@@ -476,8 +478,8 @@ class SU2TableGenerator_FGM:
         CV_full_scaled = self._scaler.fit_transform(CV_full)
 
         # Exctract train and test data
-        train_data_file = self._Config.GetOutputDir()+"/"+self._Config.GetConcatenationFileHeader()+"_train.csv"
-        test_data_file = self._Config.GetOutputDir()+"/"+self._Config.GetConcatenationFileHeader()+"_test.csv"
+        train_data_file = "/".join((self._Config.GetOutputDir(), "%s_train.csv" % self._Config.GetConcatenationFileHeader()))
+        test_data_file = "/".join((self._Config.GetOutputDir(), "%s_test.csv" % self._Config.GetConcatenationFileHeader()))
         
         var_to_test_for = "ProdRateTot_PV"
         
@@ -497,12 +499,11 @@ class SU2TableGenerator_FGM:
         print("Done!")
         
         if not self._custom_KDtreeparams:
-            print("Search for best tree parameters...")
             # Do brute-force search to get the optimum number of nearest neighbors and distance power.
-            n_near_range = range(1, 25)
+            n_near_range = range(2, 30)
             p_range = range(1, 6)
             RMS_ppv = np.zeros([len(n_near_range), len(p_range)])
-            for i in tqdm(range(len(n_near_range))):
+            for i in tqdm(range(len(n_near_range)), desc="Searching for best tree parameters"):
                 for j in range(len(p_range)):
                     PPV_predicted = self._lookup_tree(q=CV_test_scaled, nnear=n_near_range[i], p=p_range[j])[:, self._Flamelet_Variables.index(var_to_test_for)]
                     rms_local = np.average(np.power(PPV_predicted - PPV_test, 2))
@@ -685,9 +686,8 @@ class SU2TableGenerator_FGM:
 
         fid.write("</Header>\n\n")
 
-        print("Writing table data...")
         fid.write("<Data>\n")
-        for iLevel in tqdm(range(len(self._table_nodes))):
+        for iLevel in tqdm(range(len(self._table_nodes)), desc="Writing table data"):
             fid.write("<Level>\n")
             Np = np.shape(self._table_nodes[iLevel])[0]
             for iNode in range(Np):
@@ -700,9 +700,8 @@ class SU2TableGenerator_FGM:
         fid.write("</Data>\n\n")
         print("Done!")
 
-        print("Writing table connectivity...")
         fid.write("<Connectivity>\n")
-        for iLevel in tqdm(range(len(self._table_connectivity))):
+        for iLevel in tqdm(range(len(self._table_connectivity)),desc="Writing table connectivity"):
             fid.write("<Level>\n")
             for iCell in range(len(self._table_connectivity[iLevel])):
                 fid.write("\t".join("%i" % c for c in self._table_connectivity[iLevel][iCell, :]+1) + "\n")
@@ -710,9 +709,8 @@ class SU2TableGenerator_FGM:
         fid.write("</Connectivity>\n\n")
         print("Done!")
 
-        print("Writing hull nodes...")
         fid.write("<Hull>\n")
-        for iLevel in tqdm(range(len(self._table_hullnodes))):
+        for iLevel in tqdm(range(len(self._table_hullnodes)),desc="Writing hull nodes"):
             fid.write("<Level>\n")
             for iCell in range(len(self._table_hullnodes[iLevel])):
                 fid.write(("%i" % (self._table_hullnodes[iLevel][iCell]+1)) + "\n")
