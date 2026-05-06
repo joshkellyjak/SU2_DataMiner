@@ -214,6 +214,13 @@ class SU2TableGenerator_FGM:
     _curvature_threshold:float = 0.3    # Curvature threshold above which refinement is applied.
     __Np_target:int=3000    # Target number of nodes per table level.
 
+    _conditional_refinement_vars:list[str] = []     # Thermochemical state variables for which to refine mesh
+    _conditional_lower_bound:list[float] = []       # Lower bounds of refinement zones
+    _conditional_upper_bound:list[float] = []       # Upper bounds of refinement zones
+    _conditional_refinement_factor:list[float] = [] # Refinement factors to apply.
+    _reactant_refinement_factor:float = 1.0         # Refinement factor applied to premixed reactants.
+    _product_refinement_factor:float=1.0            # Refinement factor applied to products.
+
     __target_node_count:bool=False  # Refine grid based on target number of nodes.
 
     _table_nodes = []       # Progress variable, total enthalpy, and mixture fraction node values for each table level.
@@ -393,6 +400,57 @@ class SU2TableGenerator_FGM:
             raise Exception("Number of cores should be at least one.")
         self.__Np_cores = n_cores 
         self.__run_parallel = True 
+        return 
+    
+    def ConditionalRefinement(self, varname:str, lowerbound:float=-np.inf, upperbound:float=np.inf, coef:float=0.5):
+        """Specify conditional refinement based on interpolated thermochemical state data. Cell sizes are reduced by a factor "coef" where the table data lies between the specified lower bound and upper bound (inclusive). 
+
+        :param varname: thermochemical state variable name.
+        :type varname: str
+        :param lowerbound: lower bound above which refinement is applied, defaults to -np.inf
+        :type lowerbound: float, optional
+        :param upperbound: upper bound below which refinement is applied, defaults to np.inf
+        :type upperbound: float, optional
+        :param coef: mesh refinement factor, defaults to 0.5
+        :type coef: float, optional
+        :raises Exception: if variable is not in the set of flamelet thermochemical state variables.
+        :raises Exception: if lower bound value exceeds upper bound value.
+        :raises Exception: if the coefficient value is negative.
+        """
+        if varname not in self._Flamelet_Variables:
+            raise Exception("%s is not in the list of available thermochemical state variables" % varname)
+        if lowerbound > upperbound:
+            raise Exception("Upper bound value should exceed lower bound value")
+        if coef <= 0:
+            raise Exception("Refinement coeffcient should be positive")
+        self._conditional_refinement_vars.append(varname)
+        self._conditional_lower_bound.append(lowerbound)
+        self._conditional_upper_bound.append(upperbound)
+        self._conditional_refinement_factor.append(coef)
+        return 
+    
+    def RefineReactants(self, fac:float=1.0):
+        """Apply refinement to each table level on the side of the premixed reactants.
+
+        :param fac: mesh refinement factor, defaults to 1.0
+        :type fac: float, optional
+        :raises Exception: if refinement factor is negative.
+        """
+        if fac <= 0:
+            raise Exception("Refinement coefficient should be positive")
+        self._reactant_refinement_factor = fac
+        return 
+    
+    def RefineProducts(self, fac:float=1.0):
+        """Apply refinement to each table level on the side of the reaction products.
+
+        :param fac: mesh refinement factor, defaults to 1.0
+        :type fac: float, optional
+        :raises Exception: if refinement factor is negative.
+        """
+        if fac <= 0:
+            raise Exception("Refinement coefficient should be positive")
+        self._product_refinement_factor=fac
         return 
     
     def __DefineFlameletDataInterpolator(self):
