@@ -766,13 +766,14 @@ class SU2TableGenerator_FGM:
         :rtype Connecivity: NDarray
         :return MeshNodes: 
         """
-        Coord_refinement, Coord_hull, hull_area,z_norm, CV_mesh, table_level_data  = self.__ComputeCurvature(val_mix_frac)
-        MeshNodes_Norm, connectivity, HullNodes, table_level_data= self.__Compute2DMesh(XY_hull=Coord_hull, XY_refinement=Coord_refinement,val_mixfrac_norm=z_norm, level_area=hull_area)
+
+        Coord_hull, hull_area  = self.__TableLevelOutline(val_mix_frac)
+        MeshNodes_Norm, connectivity, HullNodes, table_level_data= self.__Compute2DMesh(CV_hull=Coord_hull,level_area=hull_area)
         
         MeshNodes_dim = self._scaler.inverse_transform(MeshNodes_Norm)
         return connectivity, MeshNodes_dim, HullNodes, table_level_data
     
-    def __ComputeCurvature(self, val_mix_frac:float):
+    def __TableLevelOutline(self, val_mix_frac:float):
         """
         Compute the curvature of the reaction rate surface at a constant mixture fraction level. Identify the locations of high curvature where table refinement is required.
 
@@ -811,7 +812,7 @@ class SU2TableGenerator_FGM:
         zgrid = val_mix_frac*np.ones(np.shape(xgrid))
 
         # 2: Locate nodes that are above the burner-stabilized enthalpy line
-        CV_grid_init = np.vstack((xgrid.flatten(), ygrid.flatten(), zgrid.flatten())).transpose()
+        CV_grid_init = np.column_stack((xgrid.flatten(), ygrid.flatten(), zgrid.flatten()))
         pv_grid = CV_grid_init[:,0]
         h_grid = CV_grid_init[:,1]
 
@@ -825,25 +826,10 @@ class SU2TableGenerator_FGM:
 
         # 3: Generate convex hull on initial pv-h grid
         hull = ConvexHull(CV_grid_norm[:, :2])
-        x_hull = CV_grid_norm[hull.vertices, 0]
-        y_hull = CV_grid_norm[hull.vertices, 1]
-
-        # 4: Locate refinement locations based on pv source term curvature
-        Q_interp = self.__EvaluateFlameletInterpolator(CV_unscaled=CV_grid_init)
-        ppv_grid = Q_interp[:, self._Flamelet_Variables.index("ProdRateTot_PV")]
-        ppv_grid = np.reshape(ppv_grid, np.shape(xgrid))
-        idx_ref = self.__ComputeSourceTermCurvature(ppv_grid)
-
-        x_refinement = CV_grid_norm_init[idx_ref, 0]
-        y_refinement = CV_grid_norm_init[idx_ref, 1]
-    
-        XY_refinement = np.vstack((x_refinement, y_refinement)).T
-        XY_hull = np.vstack((x_hull, y_hull)).T
-
-        val_mix_frac_norm = CV_grid_norm[0, -1]
+        CV_hull = CV_grid_norm[hull.vertices, :]
+        level_area = hull.area
         
-
-        return XY_refinement, XY_hull, hull.area, val_mix_frac_norm, CV_grid, Q_interp
+        return CV_hull, level_area
     
     def __ComputeSourceTermCurvature(self, PPV_interp:np.ndarray[float]):
         Q_norm = (PPV_interp - np.min(PPV_interp))/(np.max(PPV_interp) - np.min(PPV_interp))
@@ -872,8 +858,7 @@ class SU2TableGenerator_FGM:
         :rtype: tuple
         """
 
-        def meshgeom(base_cell_size:float, refined_cell_size:float, refinement_radius:float):
-            any_ref_pts = len(XY_refinement)>0
+        def meshgeom(base_cell_size:float, CV_outline:np.ndarray[float]):
             gmsh.initialize() 
             gmsh.option.setNumber("General.Terminal", 0)
             gmsh.option.setNumber("General.Verbosity", 1)
@@ -882,9 +867,11 @@ class SU2TableGenerator_FGM:
             factory = gmsh.model.geo
 
             # Generate hull points and create a physical surface.
+            if np.shape(CV_outline)[1] < 3:
+                CV_outline = np.hstack((CV_outline, np.zeros([len(CV_outline),1])))
             hull_pts = []
-            for xy in XY_hull:
-                hull_pts.append(factory.addPoint(xy[0],xy[1],0))
+            for cv in CV_outline:
+                hull_pts.append(factory.addPoint(cv[0],cv[1],cv[2]))
             hull_lines = []
             for i in range(len(hull_pts)):
                 j = (i+1) % (len(hull_pts))
@@ -892,31 +879,22 @@ class SU2TableGenerator_FGM:
             crvloop = factory.addCurveLoop(hull_lines, reorient=True)
             surf = factory.addPlaneSurface([crvloop])
 
-            if any_ref_pts:
-                embed_pts = []
-                for i in range(len(XY_refinement)):
-                    pt_idx = factory.addPoint(XY_refinement[i, 0], XY_refinement[i, 1], 0)
-                    embed_pts.append(pt_idx)
-
             gmsh.model.addPhysicalGroup(2, [surf], name="table_level")
             factory.synchronize()
             
-            # Mesh rules for adaptive refinement
-            if any_ref_pts:
-                d_field = gmsh.model.mesh.field.add("Distance")
-                gmsh.model.mesh.field.setNumbers(d_field, "PointsList", embed_pts)
-                t_field = gmsh.model.mesh.field.add("Threshold")
-                gmsh.model.mesh.field.setNumber(t_field, "InField", d_field)
-                m_field = gmsh.model.mesh.field.add("Min")
-                gmsh.model.mesh.field.setNumbers(m_field, "FieldsList", [t_field])
-                gmsh.model.mesh.field.setNumber(t_field, "SizeMin", refined_cell_size)
-                gmsh.model.mesh.field.setNumber(t_field, "SizeMax", base_cell_size)
-                gmsh.model.mesh.field.setNumber(t_field, "DistMin", refinement_radius)
-                gmsh.model.mesh.field.setNumber(t_field, "DistMax", 1.5*refinement_radius)
-                gmsh.model.mesh.field.setAsBackgroundMesh(m_field)
-
             gmsh.option.setNumber("Mesh.MeshSizeMax", base_cell_size)
-            gmsh.option.setNumber("Mesh.MeshSizeMin", refined_cell_size)
+            pv_scaled_unb = min(CV_outline[:,0])
+            pv_scaled_b = max(CV_outline[:,0])
+            def meshSizeCallback(dim,tag,x,y,z,lc):
+                fac = self.__refinelocation(x, y, z)
+                if x <= pv_scaled_unb + 1e-2*(pv_scaled_b - pv_scaled_unb):
+                    fac = min(fac, self._reactant_refinement_factor)
+                if x >= pv_scaled_b - 1e-2*(pv_scaled_b - pv_scaled_unb):
+                    fac = min(fac, self._product_refinement_factor)
+                return base_cell_size * fac
+            
+            gmsh.model.mesh.setSizeCallback(meshSizeCallback)
+
             gmsh.model.mesh.generate(2)
             nodeTags, nodes, _ = gmsh.model.mesh.getNodes(includeBoundary=True,tag=surf,dim=2)  
             nodes = np.asarray(nodes, dtype=float).reshape(-1, 3)
@@ -977,15 +955,7 @@ class SU2TableGenerator_FGM:
         # Interpolate flamelet data onto table nodes
         MeshPoints = nodes
 
-        pv_norm, enth_norm = MeshPoints[:, 0], MeshPoints[:, 1]
-        mixfrac_norm = val_mixfrac_norm*np.ones(np.shape(pv_norm))
-        CV_level_norm = np.column_stack((pv_norm, enth_norm, mixfrac_norm))
-        CV_level_dim = self._scaler.inverse_transform(CV_level_norm)
-
-        MeshPoints = np.zeros([np.shape(MeshPoints)[0], 3])
-        MeshPoints[:, 0] = pv_norm 
-        MeshPoints[:, 1] = enth_norm 
-        MeshPoints[:, 2] = mixfrac_norm
+        CV_level_dim = self._scaler.inverse_transform(MeshPoints)
 
         table_level_data = self.__EvaluateFlameletInterpolator(CV_level_dim)
 
