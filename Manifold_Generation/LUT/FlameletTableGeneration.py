@@ -843,7 +843,21 @@ class SU2TableGenerator_FGM:
         idx_ref = np.where(d2Q_norm > self._curvature_threshold)
         return idx_ref 
     
-    def __Compute2DMesh(self, XY_hull:np.ndarray, XY_refinement:np.ndarray, val_mixfrac_norm:float, level_area:float):
+    def __refinelocation(self, x:float,y:float,z:float):
+        CV_norm = np.array([[x,y,z]])
+        CV_dim = self._scaler.inverse_transform(CV_norm)
+        data_interp = self.__EvaluateFlameletInterpolator(CV_dim)[0]
+        refine_fac = 1.0
+        for var, lower, upper, c in zip(self._conditional_refinement_vars, self._conditional_lower_bound, self._conditional_upper_bound, self._conditional_refinement_factor):
+            test_val = data_interp[self._Flamelet_Variables.index(var)]
+            if (test_val >= lower) and (test_val <= upper):
+                refine_fac = min(refine_fac, c)
+        
+
+        return refine_fac
+    
+
+    def __Compute2DMesh(self, CV_hull:np.ndarray, level_area:float):
         """Generate 2D mesh of thermochemical state space for a table level.
 
         :param XY_hull: Progress variable-total enthalpy locations of the table level outline.
@@ -925,32 +939,25 @@ class SU2TableGenerator_FGM:
             sufficient_refinement = False 
             niter_max = 20
             iter = 0
+            relaxation = 0.5
 
             # Initial guess
             f_refinement = 0.3
             base_cell_size = 50*level_area / self.__Np_target
-            refined_cell_size = f_refinement*base_cell_size
-            refinement_radius = base_cell_size
-            
             while not sufficient_refinement and iter < niter_max:
-
-                nodes, tris, hulltags = meshgeom(base_cell_size, refined_cell_size, refinement_radius)
+                nodes, tris, hulltags = meshgeom(base_cell_size,  CV_hull)
                 n_nodes = len(nodes)
                 rel_diff = abs(float(n_nodes - self.__Np_target)/self.__Np_target)
 
-                # Terminate if relative difference is less than 5%
-                if rel_diff > 0.05:
-                    base_cell_size /= float(self.__Np_target / n_nodes)
-                    refined_cell_size = f_refinement*base_cell_size
-                    refinement_radius = base_cell_size
+                # Terminate if relative difference is less than 1%
+                if rel_diff > 0.01:
+                    base_cell_size *= (1 + relaxation * (float(n_nodes / self.__Np_target) - 1))
                 else:
                     sufficient_refinement = True 
                 iter += 1
         else:
             base_cell_size = level_area * self._base_cell_size
-            refined_cell_size = level_area * self._refined_cell_size
-            refinement_radius = np.sqrt(level_area) * self._refinement_radius
-            nodes, tris,hulltags = meshgeom(base_cell_size, refined_cell_size, refinement_radius)
+            nodes, tris,hulltags = meshgeom(base_cell_size,  CV_hull)
 
         # Interpolate flamelet data onto table nodes
         MeshPoints = nodes
