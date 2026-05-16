@@ -22,17 +22,17 @@
 #                                                                                             |
 #=============================================================================================#
 
-import numpy as np 
+import numpy as np
 from Common.Properties import EntropicVars,DefaultSettings_NICFD
 from su2dataminer.generate_data import DataGenerator_CoolProp
 from scipy.spatial import Delaunay
 from sklearn.preprocessing import MinMaxScaler
 from tqdm import tqdm
 from Common.DataDrivenConfig import Config_NICFD
-import gmsh 
+import gmsh
 from concave_hull import concave_hull, concave_hull_indexes
 import meshio
-import matplotlib.pyplot as plt 
+import matplotlib.pyplot as plt
 
 def shoelace(XY:np.ndarray[float]):
     """Shoelace algorithm for area computations
@@ -69,9 +69,9 @@ def FiniteDifferenceDerivative(y:np.ndarray[float], x:np.ndarray[float]):
         x_m = x[i-1]
         x_p = x[i+1]
         x_0 = x[i]
-        dx_1 = x_p - x_0 
-        dx_2 = x_0 - x_m 
-        dx2_1 = dx_1*dx_1 
+        dx_1 = x_p - x_0
+        dx_2 = x_0 - x_m
+        dx2_1 = dx_1*dx_1
         dx2_2 = dx_2*dx_2
         if (dx_1==0) or (dx_2==0):
             dydx[i] = 0.0
@@ -79,8 +79,8 @@ def FiniteDifferenceDerivative(y:np.ndarray[float], x:np.ndarray[float]):
             dydx[i] = (dx2_2 * y_p + (dx2_1 - dx2_2)*y_0 - dx2_1*y_m)/(dx_1*dx_2*(dx_1+dx_2))
     dx_1 = x[1] - x[0]
     dx_2 = x[2] - x[0]
-    dx2_1 = dx_1*dx_1 
-    dx2_2 = dx_2*dx_2 
+    dx2_1 = dx_1*dx_1
+    dx2_2 = dx_2*dx_2
     y_0 = y[0]
     y_p = y[1]
     y_pp = y[2]
@@ -91,8 +91,8 @@ def FiniteDifferenceDerivative(y:np.ndarray[float], x:np.ndarray[float]):
 
     dx_1 = x[-2] - x[-1]
     dx_2 = x[-3] - x[-1]
-    dx2_1 = dx_1*dx_1 
-    dx2_2 = dx_2*dx_2 
+    dx2_1 = dx_1*dx_1
+    dx2_2 = dx_2*dx_2
     y_0 = y[-1]
     y_p = y[-2]
     y_pp = y[-3]
@@ -100,11 +100,11 @@ def FiniteDifferenceDerivative(y:np.ndarray[float], x:np.ndarray[float]):
         dydx[-1] = 0.0
     else:
         dydx[-1] = (dx2_1 * y_pp + (dx2_2 - dx2_1)*y_0 - dx2_2*y_p)/(dx_1*dx_2*(dx_1 - dx_2))
-    return dydx 
+    return dydx
 
 class SU2TableGenerator_NICFD:
     _Config:Config_NICFD = None # Config_FGM class from which to read settings.
-    _DataGenerator:DataGenerator_CoolProp = None 
+    _DataGenerator:DataGenerator_CoolProp = None
     _savedir:str
 
     _base_cell_size:float = 2e-2      # Table level base cell size.
@@ -131,7 +131,7 @@ class SU2TableGenerator_NICFD:
         :param Config: Config_FGM object.
         :type Config: Config_FGM
         """
-        self._Config = Config 
+        self._Config = Config
         self._controlling_variables= [c for c in self._Config.GetControllingVariables()]
 
         self._DataGenerator = DataGenerator_CoolProp(self._Config)
@@ -141,8 +141,8 @@ class SU2TableGenerator_NICFD:
             self._table_vars.remove(EntropicVars.VaporQuality.name)
         if not self._Config.CalcTransportProperties():
             self._table_vars.remove(EntropicVars.ViscosityDyn.name)
-            self._table_vars.remove(EntropicVars.Conductivity.name)   
-        return 
+            self._table_vars.remove(EntropicVars.Conductivity.name)
+        return
     
     def SetFDStepSize(self, val_step_size:float=3e-7):
         """Set the relative step size for density and static energy for evaluating fluid properties in the two-phase region.
@@ -154,7 +154,7 @@ class SU2TableGenerator_NICFD:
         if val_step_size <= 0:
             raise Exception("Relative step size for finite-differences should be positive.")
         self._DataGenerator.SetFDStepSizes(val_step_size,val_step_size)
-        return 
+        return
 
     def SetNpDensity(self, Np_x:int=DefaultSettings_NICFD.Np_p):
         """Specify the number of table nodes in the x-direction of the Cartesian table.
@@ -185,7 +185,7 @@ class SU2TableGenerator_NICFD:
         """
         self._DataGenerator.UseAutoRange(False)
         self._DataGenerator.SetDensityBounds(Rho_lower, Rho_upper)
-        return 
+        return
     
     def SetEnergyBounds(self, E_lower:float=DefaultSettings_NICFD.Energy_min, E_upper:float=DefaultSettings_NICFD.Energy_max):
         """Define the internal energy bounds of the density-energy based fluid data grid.
@@ -198,7 +198,7 @@ class SU2TableGenerator_NICFD:
         """
         self._DataGenerator.UseAutoRange(False)
         self._DataGenerator.SetEnergyBounds(E_lower, E_upper)
-        return 
+        return
     def SetCellSize_Coarse(self, cell_size_coarse:float=1e-2):
         """Specify the coarse level cell size of the table
 
@@ -208,8 +208,8 @@ class SU2TableGenerator_NICFD:
         """
         if cell_size_coarse <= 0:
             raise Exception("Cell size value should be positive")
-        self._base_cell_size = cell_size_coarse 
-        return 
+        self._base_cell_size = cell_size_coarse
+        return
     
     def SetCellSize_Refined(self, cell_size_ref:float=5e-3):
         """Specify the refined level cell size of the table
@@ -220,8 +220,8 @@ class SU2TableGenerator_NICFD:
         """
         if cell_size_ref <= 0:
             raise Exception("Cell size value should be positive")
-        self._refined_cell_size = cell_size_ref 
-        return 
+        self._refined_cell_size = cell_size_ref
+        return
     
     def SetRefinement_Radius(self, refinement_radius:float=1e-2):
         """Specify the radius around each refinement point within which the refined cell size is applied
@@ -233,7 +233,7 @@ class SU2TableGenerator_NICFD:
         if refinement_radius <= 0:
             raise Exception("Refinement radius should be positive")
         self._refinement_radius = refinement_radius
-        return 
+        return
     
     def SetTableDiscretization(self, method:str=DefaultSettings_NICFD.tabulation_method):
         """Overwrite the thermodynamic state space discretization method from the configuration.
@@ -242,7 +242,7 @@ class SU2TableGenerator_NICFD:
         :type method: str, optional
         """
         self._Config.SetTableDiscretization(method)
-        return 
+        return
     
     def SetTableVars(self, table_vars_in:list[str]):
         """Specify the thermophysical variables to be included in the table file. All quantities are included by default. The list shoud at least contain "Density" and "Energy".
@@ -270,7 +270,7 @@ class SU2TableGenerator_NICFD:
             if EntropicVars.ViscosityDyn.name in table_vars_in:
                 print("Table generator not configured for transport properties, ignoring viscosity data")
             
-        valid_vars = True 
+        valid_vars = True
         for v in table_vars_in:
             found_var = False
             for q in EntropicVars:
@@ -279,10 +279,10 @@ class SU2TableGenerator_NICFD:
                     self._table_vars.append(q.name)
             if not found_var:
                 print("Error, \"%s\" is not supported by SU2 DataMiner" % v)
-                valid_vars = False 
+                valid_vars = False
         if not valid_vars:
             raise Exception("Some specified thermophysical variables are not supported.")
-        return 
+        return
     
     def __Compute2DMesh(self, points:np.ndarray[float], ref_pts:np.ndarray[float]=[],show:bool=False,sat_curve_pts:np.ndarray[float]=[]):
         """Populate two-dimensional thermodynamic state space with table nodes according to refinement settings.
@@ -308,11 +308,11 @@ class SU2TableGenerator_NICFD:
         hull_indices = [i]
         while i < (len(XY_hull)-1):
             i_next = i+1
-            found_next_pt = False 
+            found_next_pt = False
             while not found_next_pt:
                 dist = np.sqrt(np.sum(np.power(XY_hull[i_next, :] - XY_hull[i, :], 2)))
                 if (dist >= self._base_cell_size) or (i_next == len(XY_hull)-1):
-                    found_next_pt = True 
+                    found_next_pt = True
                 else:
                     i_next += 1
             i = i_next
@@ -320,7 +320,7 @@ class SU2TableGenerator_NICFD:
         XY_hull = XY_hull[hull_indices, :]
         
         # Initiate gmsh
-        gmsh.initialize() 
+        gmsh.initialize()
         gmsh.model.add("table_level")
         gmsh.option.setNumber("General.Verbosity", 0)
         factory = gmsh.model.geo
@@ -403,10 +403,10 @@ class SU2TableGenerator_NICFD:
             while j < len(sat_curve_pts):
                 dist = np.sqrt(np.sum(np.power(sat_curve_pts[j,:] - sat_curve_pts[i,:],2)))
                 if dist < 0.6*self._refined_cell_size:
-                    j += 1 
+                    j += 1
                 else:
-                    i = j 
-                    j += 1 
+                    i = j
+                    j += 1
                     dists.append(dist)
                     sat_curve_upper_pts.append(factory.addPoint(sat_curve_pts[i,0] + dx*norm_vector[i, 0],\
                                                                 sat_curve_pts[i,1] + dx*norm_vector[i, 1],0))
@@ -484,7 +484,7 @@ class SU2TableGenerator_NICFD:
         if show:
             gmsh.fltk.run()
         # Global nodes
-        nodeTags, coords, _ = gmsh.model.mesh.getNodes()  
+        nodeTags, coords, _ = gmsh.model.mesh.getNodes()
         nodeTags = np.asarray(nodeTags, dtype=np.int64)
         MeshPoints = np.asarray(coords, dtype=float).reshape(-1, 3)[:, :2]
 
@@ -602,14 +602,14 @@ class SU2TableGenerator_NICFD:
                 self._DataGenerator.UpdateFluid(rho, e)
                 state_data, correct_phase = self._DataGenerator.GetStateVector()
                 if correct_phase:
-                    self.state_data[idx_2d[0], idx_2d[1], :] = state_data 
+                    self.state_data[idx_2d[0], idx_2d[1], :] = state_data
                     success_count += 1
                     self.valid_mask[idx_2d] = True
                 else:
                     self.state_data[idx_2d[0], idx_2d[1], :] = None
             except:
                 self.state_data[idx_2d[0], idx_2d[1], :] = None
-        return 
+        return
     
     def __CartesianTriangulation(self):
         """
@@ -646,7 +646,7 @@ class SU2TableGenerator_NICFD:
         print(f"  Triangles: {len(self._table_connectivity):,}")
         print(f"  Hull nodes: {len(self._table_hullnodes):,}")
         print()
-        return 
+        return
 
     def __CreateSaturationCurve(self):
         rhoe_sat_curve = self._DataGenerator.ComputeSaturationCurve()
@@ -721,12 +721,12 @@ class SU2TableGenerator_NICFD:
             DT = Delaunay(fluid_data_norm_ref[:, [EntropicVars.Density.value,EntropicVars.Energy.value]])
 
             # Extract triangulation, hull nodes, and table data
-            Tria = DT.simplices 
+            Tria = DT.simplices
             HullNodes = concave_hull_indexes(fluid_data_norm_ref[:, [EntropicVars.Density.value,EntropicVars.Energy.value]])
             #plt.triplot(DT.points[:,0],DT.points[:,1], Tria)
             #plt.show()
-            self._table_nodes = fluid_data_ref 
-            self._table_connectivity = Tria 
+            self._table_nodes = fluid_data_ref
+            self._table_connectivity = Tria
             self._table_hullnodes = HullNodes
 
         return
@@ -766,7 +766,7 @@ class SU2TableGenerator_NICFD:
 
         point_data = {}
         for var in self._table_vars:
-            ivar = EntropicVars[var].value 
+            ivar = EntropicVars[var].value
             point_data[var] = np.asarray(self._table_nodes[:, ivar])
 
         mesh = meshio.Mesh(
@@ -795,7 +795,7 @@ class SU2TableGenerator_NICFD:
         self.__refinement_vars.append(TD_variable)
         self.__refinement_norm_min.append(norm_val_min)
         self.__refinement_norm_max.append(norm_val_max)
-        return 
+        return
     
     def __ApplyRefinement(self, fluid_data_norm_ref:np.ndarray[float]):
         ix_ref = np.array([],dtype=np.int64)
@@ -855,7 +855,7 @@ class SU2TableGenerator_NICFD:
         fid.write("<Data>\n")
         for iNode in range(len(self._table_nodes)):
             for var in self._table_vars:
-                ivar = EntropicVars[var].value 
+                ivar = EntropicVars[var].value
                 fid.write("\t%+.14e" % self._table_nodes[iNode, ivar])
             fid.write("\n")
         fid.write("</Data>\n\n")

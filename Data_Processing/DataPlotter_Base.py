@@ -24,14 +24,14 @@
 #=============================================================================================#
 
 
-import matplotlib.pyplot as plt 
+import matplotlib.pyplot as plt
 from matplotlib import ticker
-import os 
+import os
 
-from Common.Config_base import Config 
+from Common.Config_base import Config
 
 class DataPlotter_Base:
-    _Config:Config = None 
+    _Config:Config = None
 
     __plot_title:str = ""
     _x_variable:str = ""
@@ -40,19 +40,19 @@ class DataPlotter_Base:
 
     _plot_label_default_x:str = ""
     __plot_label_custom_x:str = ""
-    _custom_plot_label_x_set:bool = False 
+    _custom_plot_label_x_set:bool = False
 
     _plot_label_default_y:str = ""
     __plot_label_custom_y:str = ""
-    _custom_plot_label_y_set:bool = False 
+    _custom_plot_label_y_set:bool = False
 
     _plot_label_default_z:str = ""
     __plot_label_custom_z:str = ""
-    _custom_plot_label_z_set:bool = False 
+    _custom_plot_label_z_set:bool = False
 
     __save_images:bool = False
     __fig_format:str = "png"
-    __fig_window:plt.figure = None 
+    __fig_window:plt.figure = None
     _ax:plt.axes = None
     __nDim_plot:int = 2
     _label_map = {}
@@ -77,9 +77,9 @@ class DataPlotter_Base:
         :param input: custom x-axis label for the current plot.
         :type input: str
         """
-        self.__plot_label_custom_x = input 
-        self._custom_plot_label_x_set = True 
-        return 
+        self.__plot_label_custom_x = input
+        self._custom_plot_label_x_set = True
+        return
     
     def SetPlotLabelY(self, input:str):
         """Set a custom y-axis label.
@@ -87,8 +87,8 @@ class DataPlotter_Base:
         :param input: custom y-axis label for the current plot.
         :type input: str
         """
-        self.__plot_label_custom_y = input 
-        self._custom_plot_label_y_set = True 
+        self.__plot_label_custom_y = input
+        self._custom_plot_label_y_set = True
         return
     
     def SetPlotLabelZ(self, input:str):
@@ -97,8 +97,8 @@ class DataPlotter_Base:
         :param input: custom z-axis label for the current plot.
         :type input: str
         """
-        self.__plot_label_custom_z = input 
-        self._custom_plot_label_z_set = True 
+        self.__plot_label_custom_z = input
+        self._custom_plot_label_z_set = True
         return
     
     def SaveImages(self, save:bool):
@@ -121,19 +121,19 @@ class DataPlotter_Base:
     
     def SetOutputDir(self, output_dir:str):
         self._Config.SetOutputDir(output_dir)
-        return 
+        return
     
 
     
     def _Initiate2DPlot(self):
         self.__fig_window= plt.figure(figsize=[10,10])
         self._ax = plt.axes()
-        return 
+        return
     
     def _Initiate3DPlot(self):
         self.__fig_window= plt.figure(figsize=[10,10])
         self._ax = plt.axes(projection='3d')
-        return 
+        return
     
     def _FinalizePlot(self, fig_title:str, show:bool=True):
         val_pad = self.__val_pad
@@ -180,10 +180,10 @@ class DataPlotter_Base:
             self.__fig_window.savefig(self._Config.GetOutputDir()+"/Plots/"+fig_title+"."+self.__fig_format, format=self.__fig_format, bbox_inches='tight')
         if show:
             plt.tight_layout()
-            plt.show() 
+            plt.show()
         else:
             plt.close(self.__fig_window)
-        return 
+        return
     
     def _PlotBody(self, plot_variables:list[str]):
         plot_3D = (len(plot_variables) == 3)

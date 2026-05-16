@@ -1,8 +1,8 @@
 ###############################################################################################
-#       #      _____ __  _____      ____        __        __  ____                   #        #  
-#       #     / ___// / / /__ \    / __ \____ _/ /_____ _/  |/  (_)___  ___  _____   #        #  
-#       #     \__ \/ / / /__/ /   / / / / __ `/ __/ __ `/ /|_/ / / __ \/ _ \/ ___/   #        #      
-#       #    ___/ / /_/ // __/   / /_/ / /_/ / /_/ /_/ / /  / / / / / /  __/ /       #        #  
+#       #      _____ __  _____      ____        __        __  ____                   #        #
+#       #     / ___// / / /__ \    / __ \____ _/ /_____ _/  |/  (_)___  ___  _____   #        #
+#       #     \__ \/ / / /__/ /   / / / / __ `/ __/ __ `/ /|_/ / / __ \/ _ \/ ___/   #        #
+#       #    ___/ / /_/ // __/   / /_/ / /_/ / /_/ /_/ / /  / / / / / /  __/ /       #        #
 #       #   /____/\____//____/  /_____/\__,_/\__/\__,_/_/  /_/_/_/ /_/\___/_/        #        #
 #       #                                                                            #        #
 ###############################################################################################
@@ -17,19 +17,19 @@
 #                                                                                             |
 #                                                                                             |
 # Description:                                                                                |
-#  Base class for generating fluid data for data mining purposes.                             |                                                               
-#                                                                                             |  
+#  Base class for generating fluid data for data mining purposes.                             |
+#                                                                                             |
 # Version: 3.1.0                                                                              |
 #                                                                                             |
 #=============================================================================================#
 
-import os 
+import os
 
 #---------------------------------------------------------------------------------------------#
 # Importing DataMiner classes and functions
 #---------------------------------------------------------------------------------------------#
-from Common.Properties import DefaultProperties 
-from Common.Config_base import Config 
+from Common.Properties import DefaultProperties
+from Common.Config_base import Config
 
 
 class DataGenerator_Base:
@@ -63,7 +63,7 @@ class DataGenerator_Base:
         self.__output_dir = self._Config.GetOutputDir()
         self.__output_file_header = self._Config.GetConcatenationFileHeader()
 
-        return 
+        return
     
     def SetOutputDir(self, output_dir:str):
         """
@@ -79,7 +79,7 @@ class DataGenerator_Base:
         else:
             self.__output_dir = output_dir
 
-        return 
+        return
     
     def GetOutputDir(self):
         """
@@ -102,8 +102,8 @@ class DataGenerator_Base:
         :param header: file name header.
         :type header: str
         """
-        self.__output_file_header = header 
-        return 
+        self.__output_file_header = header
+        return
     
     def GetConcatenationFileHeader(self):
         """Get fluid data output file header.
@@ -111,7 +111,7 @@ class DataGenerator_Base:
         :return: output file header.
         :rtype: str
         """
-        return self.__output_file_header 
+        return self.__output_file_header
     
 
     def SetTrainFraction(self, input:float=DefaultProperties.train_fraction):
@@ -124,8 +124,8 @@ class DataGenerator_Base:
         """
         if input >= 1 or input <=0:
             raise Exception("Training data fraction should be between zero and one.")
-        self.__train_fraction = input 
-        return 
+        self.__train_fraction = input
+        return
     
     def SetTestFraction(self, input:float=DefaultProperties.test_fraction):
         """
@@ -138,8 +138,8 @@ class DataGenerator_Base:
         """
         if input >= 1 or input <=0:
             raise Exception("Test data fraction should be between zero and one.")
-        self.__test_fraction = input 
-        return 
+        self.__test_fraction = input
+        return
     
     def GetTrainFraction(self):
         """
@@ -161,9 +161,9 @@ class DataGenerator_Base:
     
     def ComputeData(self):
         print("Initiating data generation proces...")
-        return 
+        return
     
     def SaveData(self):
         print("Saving fluid data...")
-        return 
+        return
     

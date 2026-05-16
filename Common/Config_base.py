@@ -23,10 +23,10 @@
 #                                                                                             |
 #=============================================================================================#
 
-import os 
+import os
 import pyfiglet
 import pickle
-import numpy as np 
+import numpy as np
 
 from Common.Properties import DefaultProperties, ActivationFunctionOptions
 from Common.CommonMethods import write_SU2_MLP
@@ -65,7 +65,7 @@ class Config:
     
     def __init__(self):
         self._output_dir = os.getcwd()
-        return 
+        return
     
     def PrintBanner(self):
         """Print the main banner for the SU2 DataMiner configuration in the terminal.
@@ -74,7 +74,7 @@ class Config:
         customfig = pyfiglet.Figlet(font="slant")
         print(customfig.renderText(self.__banner_header))
 
-        return 
+        return
     
     def SetOutputDir(self, output_dir:str):
         """Define the output directory where all raw and processed fluid data and manifold data are saved.
@@ -88,7 +88,7 @@ class Config:
         
         self._output_dir = output_dir
 
-        return 
+        return
     
     def GetOutputDir(self):
         """Get the output directory where raw and processed fluid data and manifold data are stored.
@@ -110,9 +110,9 @@ class Config:
         :type header: str, optional
         """
 
-        self.__concatenated_file_header = header 
+        self.__concatenated_file_header = header
 
-        return 
+        return
     
     def GetConcatenationFileHeader(self):
         """Get the file name header of the processed fluid manifold data.
@@ -130,9 +130,9 @@ class Config:
         :type config_name: str
         """
 
-        self._config_name = config_name 
+        self._config_name = config_name
 
-        return 
+        return
     
     def GetConfigName(self):
         """Get the name of the current SU2 DataMiner configuration.
@@ -140,7 +140,7 @@ class Config:
         :return: SU2 DataMiner configuration name.
         :rtype: str
         """
-        return self._config_name 
+        return self._config_name
     
     def SetControllingVariables(self, names_cv:list[str]):
         """Define the set of controlling variable names used as inputs for the networks of the data-driven fluid model.
@@ -153,7 +153,7 @@ class Config:
         for c in names_cv:
             self._controlling_variables.append(c)
 
-        return 
+        return
     
     def GetControllingVariables(self):
         """Retrieve the set of controlling variable names used as inputs for the networks of the data-driven fluid model.
@@ -174,9 +174,9 @@ class Config:
 
         if input >= 1 or input <=0:
             raise Exception("Training data fraction should be between zero and one.")
-        self.__train_fraction = input 
+        self.__train_fraction = input
 
-        return 
+        return
     
     def SetTestFraction(self, input:float=DefaultProperties.test_fraction):
         """Define the fraction of fluid data used for MLP prediction accuracy evaluation.
@@ -188,9 +188,9 @@ class Config:
 
         if input >= 1 or input <=0:
             raise Exception("Test data fraction should be between zero and one.")
-        self.__test_fraction = input 
+        self.__test_fraction = input
 
-        return 
+        return
     
     def GetTrainFraction(self):
         """Get the fraction of fluid data used for MLP training.
@@ -229,7 +229,7 @@ class Config:
         if alpha_expo_in >= 0:
             raise Exception("Initial learning rate exponent should be negative.")
         self._alpha_expo = alpha_expo_in
-        return 
+        return
     
     def GetLRDecay(self):
         """Get the exponential learning rate decay parameter for MLP training.
@@ -250,7 +250,7 @@ class Config:
         if lr_decay_in <= 0 or lr_decay_in > 1.0:
             raise Exception("Learning rate decay parameter should be between zero and one.")
         self._lr_decay = lr_decay_in
-        return 
+        return
     
     def SetNEpochs(self, n_epochs_in:int=DefaultProperties.N_epochs):
         """Specify the maximum number of epochs for training of the networks.
@@ -263,7 +263,7 @@ class Config:
             raise Exception("Number of epochs should be higher than 1")
         
         self._n_epochs = int(n_epochs_in)
-        return 
+        return
     
     def GetNEpochs(self):
         """Retrieve the maximum number of epochs the networks are trained for.
@@ -284,7 +284,7 @@ class Config:
         if batch_expo_in <= 0:
             raise Exception("Mini-batch size exponent should be positive.")
         self._batch_expo = int(batch_expo_in)
-        return 
+        return
     
     def GetBatchExpo(self):
         """Get the MLP training mini-batch size exponent.
@@ -292,7 +292,7 @@ class Config:
         :return: mini-batch size exponent (base 2)
         :rtype: int
         """
-        return self._batch_expo 
+        return self._batch_expo
     
     def __HiddenLayerChecks(self,hidden_layer_architecture:list[int]):
         if not hidden_layer_architecture:
@@ -302,7 +302,7 @@ class Config:
                 raise Exception("Number of nodes in the hidden layers should be positive.")
             if type(h) is not int:
                 raise Exception("Nodes in the hidden layers should be integers.")
-        return 
+        return
     
     def SetHiddenLayerArchitecture(self, hidden_layer_architecture:list[int]=DefaultProperties.hidden_layer_architecture):
         """
@@ -318,7 +318,7 @@ class Config:
         self._hidden_layer_architecture = []
         for n in hidden_layer_architecture:
             self._hidden_layer_architecture.append(n)
-        return 
+        return
     
     def GetHiddenLayerArchitecture(self):
         """Get the hidden layer architecture of the multi-layer perceptron used for the MLP-based manifold.
@@ -336,7 +336,7 @@ class Config:
             w_ip = weights[i+1]
             if np.shape(w_i)[1] != np.shape(w_ip)[0]:
                 raise Exception("Weight arrays are improperly formatted. Check rows and columns.")
-        return 
+        return
     
         
     def SetWeights(self, weights:list[np.ndarray[float]]):
@@ -351,7 +351,7 @@ class Config:
         self._MLP_weights = []
         for w in weights:
             self._MLP_weights.append(w)
-        return 
+        return
     
     def __BiasesCheck(self, biases:list[np.ndarray[float]]):
         if not biases:
@@ -359,7 +359,7 @@ class Config:
         for b in biases:
             if b.size == 0:
                 raise Exception("Biases for hidden layers should contain at least one value.")
-        return 
+        return
     
     def SetBiases(self, biases:list[np.ndarray[float]]):
         """Store the bias values of the neural network.
@@ -373,7 +373,7 @@ class Config:
         self._MLP_biases = []
         for w in biases:
             self._MLP_biases.append(w)
-        return 
+        return
     
     def SetActivationFunction(self, activation_function_in:str=DefaultProperties.activation_function):
         """Define the hidden layer activation function for the MLP-based manifold. See Common.Properties.ActivationFunctionOptions for the supported options.
@@ -384,8 +384,8 @@ class Config:
         """
         if activation_function_in not in ActivationFunctionOptions.keys():
             raise Exception("Activation function " + activation_function_in + " not in available options.")
-        self._activation_function = activation_function_in 
-        return 
+        self._activation_function = activation_function_in
+        return
     
     def GetActivationFunction(self):
         """Get the hidden layer activation function name.
@@ -418,7 +418,7 @@ class Config:
         self._MLP_biases = trainer.GetBiases().copy()
         self._hidden_layer_architecture =[h for h in trainer.architecture]
         
-        return 
+        return
     
     def GetWeightsBiases(self):
         """Return values for weights and biases for the hidden layers in the MLP.
@@ -453,5 +453,5 @@ class Config:
         file = open(self._config_name+'.cfg','wb')
         pickle.dump(self, file)
         file.close()
-        return 
+        return
     

@@ -24,7 +24,7 @@
 #=============================================================================================#
 
 import numpy as np
-import cantera as ct 
+import cantera as ct
 
 
 def ComputeLewisNumber(flame:ct.Solution):
@@ -33,11 +33,11 @@ def ComputeLewisNumber(flame:ct.Solution):
 
 def avg_Le_start_end(Le_sp:np.ndarray):
     Le_av = 0.5*(Le_sp[0] + Le_sp[-1])
-    return Le_av 
+    return Le_av
 
 def avg_Le_arythmic(Le_sp:np.ndarray):
     Le_av = np.average(Le_sp)
-    return Le_av 
+    return Le_av
 
 def avg_Le_min_max(Le_sp:np.ndarray):
     Le_av = 0.5*(np.min(Le_sp)+np.max(Le_sp))
@@ -49,7 +49,7 @@ def avg_Le_unity(Le_sp:np.ndarray):
 
 def avg_Le_const(Le_sp:np.ndarray, Le_const:float):
     Le_av = Le_const * np.ones(np.shape(Le_sp))
-    return Le_av 
+    return Le_av
 
 def avg_Le_local(Le_sp:np.ndarray):
     return Le_sp
@@ -188,4 +188,4 @@ def write_SU2_MLP(file_out:str, weights:list[np.ndarray], biases:list[np.ndarray
         fid.write("\t".join("%+.16e" % float(b) for b in B) + "\n")
 
     fid.close()
-    return 
+    return

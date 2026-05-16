@@ -1,9 +1,9 @@
-from TestCase import TestCase 
-import sys 
+from TestCase import TestCase
+import sys
 
 def main():
     
-    test_list_NICFD:list[TestCase] = [] 
+    test_list_NICFD:list[TestCase] = []
     test_list_FGM:list[TestCase] = []
 
     fluid_air = TestCase("Fluid_Air")
