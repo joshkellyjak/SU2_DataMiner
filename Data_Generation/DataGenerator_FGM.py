@@ -26,11 +26,12 @@
 #---------------------------------------------------------------------------------------------#
 # Importing general packages
 #---------------------------------------------------------------------------------------------#
-import cantera as ct 
-import numpy as np 
-import csv 
+import cantera as ct
+import numpy as np
+import csv
 from os import path, mkdir
 from joblib import Parallel, delayed
+from threadpoolctl import threadpool_limits
 
 #---------------------------------------------------------------------------------------------#
 # Importing DataMiner classes and functions
@@ -56,21 +57,24 @@ class DataGenerator_Cantera(DataGenerator_Base):
     __oxidizer_string:str = ''
 
     __n_flamelets:int = DefaultSettings_FGM.Np_temp       # Number of adiabatic and burner flame computations per mixture fraction
+    __n_mdot_extra_flamelets:int = 20                       # Number of interpolation steps for extra interpolated burner-stabilized flamelets
     __T_unburnt_upper:float = DefaultSettings_FGM.T_max   # Highest unburnt reactant temperature
     __T_unburnt_lower:float = DefaultSettings_FGM.T_min   # Lowest unburnt reactant temperature
 
     __reaction_mechanism:str = DefaultSettings_FGM.reaction_mechanism   # Cantera reaction mechanism
     __transport_model:str = DefaultSettings_FGM.transport_model
 
-    __initial_grid_length:float = 1e-2  # Flamelet grid width
+    __initial_grid_length:float = 0.2  # Flamelet grid width
+    __loglevel:int = 0  # Cantera solver verbosity level (0=silent)
     __initial_grid_Np:int = 30          # Number of initial grid nodes.
 
     __define_equivalence_ratio:bool = not DefaultSettings_FGM.run_mixture_fraction # Define unburnt mixture via the equivalence ratio
-    __unb_mixture_status:list[float] = [] 
+    __unb_mixture_status:list[float] = []
 
     __translate_to_matlab:bool = False # Save a copy of the flamelet data file in Matlab table generator format
 
     __run_freeflames:bool = DefaultSettings_FGM.include_freeflames      # Run adiabatic flame computations
+    __run_extra_interpolated_burnerflames:bool = True       # Run extra interpolated burner-stabilized flame computations
     __run_burnerflames:bool = DefaultSettings_FGM.include_burnerflames    # Run burner stabilized flame computations
     __run_equilibrium:bool = DefaultSettings_FGM.include_equilibrium    # Run chemical equilibrium computations
     __run_counterflames:bool = DefaultSettings_FGM.include_counterflames   # Run counter-flow diffusion flamelet simulations.
@@ -93,30 +97,34 @@ class DataGenerator_Cantera(DataGenerator_Base):
         else:
             print("Initializing flamelet generator from Config_FGM with name " + self._Config.GetConfigName())
             self.__SynchronizeSettings()
-        
-        return 
-    
+
+        return
+
     def __SynchronizeSettings(self):
         """Update settings from configuration
         """
         self.__fuel_string = self._Config.GetFuelString()
         self.__oxidizer_string = self._Config.GetOxidizerString()
-        
+
         self.__reaction_mechanism = self._Config.GetReactionMechanism()
         self.__transport_model = self._Config.GetTransportModel()
 
         self.gas = ct.Solution(self._Config.GetReactionMechanism())
 
         self.__n_flamelets = self._Config.GetNpTemp()
+        self.__n_mdot_flamelets = self._Config.GetNpMdot()
+        self.__n_mdot_extra_flamelets = self._Config.GetNpMdotExtra()
+        self.__initial_grid_length = self._Config.GetInitialGridLength()
         [self.__T_unburnt_lower, self.__T_unburnt_upper] = self._Config.GetUnbTempBounds()
 
         self.__define_equivalence_ratio = (not self._Config.GetMixtureStatus())
         self.__unb_mixture_status = np.linspace(self._Config.GetMixtureBounds()[0], self._Config.GetMixtureBounds()[1], self._Config.GetNpMix())
         self.__run_freeflames = self._Config.GenerateFreeFlames()
+        self.__run_extra_interpolated_burnerflames = self._Config.GenerateExtraInterpolatedBurnerFlames()
         self.__run_burnerflames = self._Config.GenerateBurnerFlames()
         self.__run_equilibrium = self._Config.GenerateEquilibrium()
         self.__run_counterflames = self._Config.GenerateCounterFlames()
-        
+
         self.__PrepareOutputDirectories()
         self.__translate_to_matlab = self._Config.WriteMatlabFiles()
         if self.__translate_to_matlab:
@@ -124,8 +132,16 @@ class DataGenerator_Cantera(DataGenerator_Base):
         self._Config.ComputeMixFracConstants()
         self.z_i = self._Config.GetMixtureFractionCoefficients()
         self.c = self._Config.GetMixtureFractionConstant()
-        return 
-    
+        return
+
+    def SetLoglevel(self, loglevel:int=0):
+        """Set Cantera solver verbosity level (0=silent)."""
+        self.__loglevel = loglevel
+
+    def SetInitialGridLength(self, length:float):
+        """Set the initial domain length (in metres) for new flamelet grids."""
+        self.__initial_grid_length = length
+
     def SetFuelDefinition(self, fuel_species:list[str], fuel_weights:list[float]):
         """Manually define the fuel composition
 
@@ -138,9 +154,9 @@ class DataGenerator_Cantera(DataGenerator_Base):
         """
         self._Config.SetFuelDefinition(fuel_species, fuel_weights)
         self.__SynchronizeSettings()
-        
-        return 
-    
+
+        return
+
     def SetOxidizerDefinition(self, oxidizer_species:list[str], oxidizer_weights:list[float]):
         """Manually define the oxidizer composition
 
@@ -153,9 +169,9 @@ class DataGenerator_Cantera(DataGenerator_Base):
         """
         self._Config.SetOxidizerDefinition(oxidizer_species, oxidizer_weights)
         self.__SynchronizeSettings()
-        
-        return 
-    
+
+        return
+
     def SetNpTemp(self, n_flamelets_new:int):
         """Set the number of flamelets generated between the minimum and maximum reactant temperature manually.
 
@@ -166,8 +182,8 @@ class DataGenerator_Cantera(DataGenerator_Base):
         if n_flamelets_new < 1:
             raise Exception("Number of flamelets should be higher than one.")
         self.__n_flamelets = n_flamelets_new
-        return 
-    
+        return
+
     def SetUnbTempBounds(self, T_unb_lower:float, T_unb_upper:float):
         """
         Define lower and upper reactant temperature for flamelet data generation.
@@ -185,20 +201,20 @@ class DataGenerator_Cantera(DataGenerator_Base):
         else:
             self.__T_unburnt_upper = T_unb_upper
             self.__T_unburnt_lower = T_unb_lower
-        return 
-    
+        return
+
     def RunMixtureFraction(self):
         """Define the mixture status as mixture fraction instead of equivalence ratio.
         """
-        self.__define_equivalence_ratio = False 
-        return 
-    
+        self.__define_equivalence_ratio = False
+        return
+
     def RunEquivalenceRatio(self):
         """Define the mixture status as equivalence ratio instead of mixture fraction.
         """
         self.__define_equivalence_ratio = True
-        return 
-    
+        return
+
     def RunFreeFlames(self, input:bool=True):
         """Include adiabatic free-flame data in the manifold.
 
@@ -206,8 +222,8 @@ class DataGenerator_Cantera(DataGenerator_Base):
         :type input: bool
         """
         self.__run_freeflames = input
-        return 
-    
+        return
+
     def RunBurnerFlames(self, input:bool=True):
         """Include burner-stabilized flame data in the manifold.
 
@@ -215,17 +231,17 @@ class DataGenerator_Cantera(DataGenerator_Base):
         :type input: bool
         """
         self.__run_burnerflames = input
-        return 
-    
+        return
+
     def RunEquilibrium(self, input:bool=True):
         """Include chemical equilibrium data in the manifold.
 
         :param input: Generate chemical equilibrium data.
         :type input: bool
         """
-        self.__run_equilibrium = input 
+        self.__run_equilibrium = input
         return
-    
+
     def RunCounterFlowFlames(self, input:bool=True):
         """Include counter-flow diffusion flame data in the manifold.
 
@@ -233,8 +249,29 @@ class DataGenerator_Cantera(DataGenerator_Base):
         :type input: bool
         """
         self.__run_counterflames = input
-        return 
-    
+        return
+
+    def RunExtraInterpolatedBurnerFlames(self, input:bool=True):
+        """Include extra interpolated burner-stabilized flame data in the manifold.
+
+        :param input: Generate extra interpolated burner-stabilized flamelet data.
+        :type input: bool
+        """
+        self.__run_extra_interpolated_burnerflames = input
+        return
+
+    def SetNpMdotExtra(self, n_extra:int):
+        """Set the number of interpolation steps for extra interpolated burner-stabilized flamelets.
+
+        :param n_extra: Number of interpolated steps between the lowest-mdot burner flame and equilibrium.
+        :type n_extra: int
+        :raises Exception: if the provided number is lower than one.
+        """
+        if n_extra < 1:
+            raise Exception("Number of extra interpolated mdot flamelets should be higher than one.")
+        self.__n_mdot_extra_flamelets = n_extra
+        return
+
     def SetMixtureValues(self, mixture_values:list[float]):
         """Set the reactant mixture status values manually.
 
@@ -247,8 +284,8 @@ class DataGenerator_Cantera(DataGenerator_Base):
         self.__unb_mixture_status = []
         for phi in mixture_values:
             self.__unb_mixture_status.append(phi)
-        return 
-    
+        return
+
     def SetReactionMechanism(self, reaction_mechanism:str):
         """Define the reaction mechanism manually.
 
@@ -257,8 +294,8 @@ class DataGenerator_Cantera(DataGenerator_Base):
         """
         self._Config.SetReactionMechanism(reaction_mechanism)
         self.__SynchronizeSettings()
-        return 
-    
+        return
+
     def SetTransportModel(self, transport_model:str):
         """Overwrite the transport mechanism from the loaded configuration.
 
@@ -268,14 +305,14 @@ class DataGenerator_Cantera(DataGenerator_Base):
 
         self._Config.SetTransportModel(transport_model)
         self.__SynchronizeSettings()
-        return 
-    
+        return
+
     def TranslateToMatlab(self):
         """Save a copy of the flamelet data in Matlab TableMaster format.
         """
-        self.__translate_to_matlab = True 
+        self.__translate_to_matlab = True
         return
-    
+
     def SetOutputDir(self, output_dir_new:str):
         """Define the flamelet data output directory manually.
 
@@ -286,14 +323,14 @@ class DataGenerator_Cantera(DataGenerator_Base):
         self._Config.SetOutputDir(output_dir=output_dir_new)
         self.__SynchronizeSettings()
         return
-    
+
     def SetMatlabOutputDir(self, output_dir_new):
         self.__matlab__output_dir = output_dir_new
         self.__PrepareOutputDirectories_Matlab()
 
-    def __PrepareOutputDirectories(self): 
+    def __PrepareOutputDirectories(self):
         """Create sub-directories for the different types of flamelet data.
-        """  
+        """
         if (not path.isdir(self.GetOutputDir()+'/freeflame_data')) and self.__run_freeflames:
             mkdir(self.GetOutputDir()+'/freeflame_data')
         if (not path.isdir(self.GetOutputDir()+'/burnerflame_data')) and self.__run_burnerflames:
@@ -302,8 +339,8 @@ class DataGenerator_Cantera(DataGenerator_Base):
             mkdir(self.GetOutputDir()+'/equilibrium_data')
         if (not path.isdir(self.GetOutputDir()+'/counterflame_data')) and self.__run_counterflames:
             mkdir(self.GetOutputDir()+'/counterflame_data')
-        return 
-    
+        return
+
     def __PrepareOutputDirectories_Matlab(self):
         if (not path.isdir(self.__matlab__output_dir+'freeflame_data_MATLAB')) and self.__run_freeflames:
             mkdir(self.__matlab__output_dir+'freeflame_data_MATLAB')
@@ -313,10 +350,10 @@ class DataGenerator_Cantera(DataGenerator_Base):
             mkdir(self.__matlab__output_dir+'equilibrium_data_MATLAB')
         if (not path.isdir(self.__matlab__output_dir+'counterflame_data_MATLAB')) and self.__run_counterflames:
             mkdir(self.__matlab__output_dir+'counterflame_data_MATLAB')
-        return 
+        return
 
 
-    def ComputeFreeFlames(self, mix_status:float, T_ub:float, i_freeflame:int=0):
+    def ComputeFreeFlames(self, mix_status:float, T_ub:float, i_freeflame:int=0, prev_flame:ct.FreeFlame=None):
         """Generate adiabatic free-flamelet data for a specific mixture fraction or equivalence ratio and reactant temperature.
 
         :param mix_status: Equivalence ratio or mixture fraction value.
@@ -325,6 +362,10 @@ class DataGenerator_Cantera(DataGenerator_Base):
         :type T_ub: float
         :param i_freeflame: Solution index, defaults to 0
         :type i_freeflame: int, optional
+        :param prev_flame: Converged FreeFlame from the previous temperature step to restart from, defaults to None.
+        :type prev_flame: ct.FreeFlame, optional
+        :return: Converged FreeFlame object on success, None on failure.
+        :rtype: ct.FreeFlame or None
         """
         if self.__define_equivalence_ratio:
             folder_header = "phi"
@@ -338,26 +379,31 @@ class DataGenerator_Cantera(DataGenerator_Base):
         else:
             self.gas.set_mixture_fraction(mix_status, self.__fuel_string, self.__oxidizer_string)
 
-        # Define Cantera adiabatic flame object.
-        initialgrid = np.linspace(0, self.__initial_grid_length, self.__initial_grid_Np)
-        flame:ct.FreeFlame = ct.FreeFlame(self.gas, grid=initialgrid)
-        flame.set_refine_criteria(ratio=2, slope=0.025, curve=0.025)
-
-        # Multi-component diffusion for differential diffusion effects.
-        flame.transport_model = self.__transport_model
+        if prev_flame is None:
+            # First flame: create a new object from scratch.
+            initialgrid = np.linspace(0, self.__initial_grid_length, self.__initial_grid_Np)
+            flame = ct.FreeFlame(self.gas, grid=initialgrid)
+            flame.set_refine_criteria(ratio=3, slope=0.03, curve=0.03, prune=0.01)
+            flame.transport_model = self.__transport_model
+            flame.set_initial_guess(locs=[0.0, 0.3, 0.5, 1.0])
+        else:
+            # Subsequent flames: reuse the previous flame object directly.
+            flame = prev_flame
+            flame.inlet.T = T_ub
+            flame.inlet.Y = self.gas.Y
 
         # Try to solve the flamelet solution. If solution diverges, move on to next flamelet.
         try:
-            flame.solve(loglevel=0, refine_grid=True, auto=True)
-            
+            flame.solve(loglevel=self.__loglevel, refine_grid=True, auto=False)
+
             # Computing mass flow rate for later burner flame evaluation
             self.m_dot_free_flame = flame.velocity[0]*flame.density[0]
-            
+
             # Check if mixture is burning
             if np.max(flame.T) <= DefaultSettings_FGM.T_threshold:
                 print("Flamelet at %s %.3e, Tu %.3f is not burning" % (folder_header, mix_status, T_ub))
-                return 
-            
+                return None
+
             variables, data_calc = self.__SaveFlameletData(flame, self.gas)
 
             # Generate sub-directory if it's not there.
@@ -366,31 +412,30 @@ class DataGenerator_Cantera(DataGenerator_Base):
             if not path.isdir(self.GetOutputDir()+'/freeflame_data/'+folder_header+'_'+str(round(mix_status, 6))):
                 mkdir(self.GetOutputDir()+'/freeflame_data/'+folder_header+'_'+str(round(mix_status, 6)))
 
-            if max(flame.grid) < 1.0:
-                freeflame_filename = "freeflamelet_"+folder_header+str(round(mix_status,6))+"_Tu"+str(round(T_ub, 4))+".csv"
-                filename_plus_folder = self.GetOutputDir()+"/freeflame_data/"+folder_header+'_'+str(round(mix_status, 6)) + "/"+freeflame_filename
-                fid = open(filename_plus_folder, 'w+')
-                fid.write(variables + "\n")
-                csvWriter = csv.writer(fid)
-                csvWriter.writerows(data_calc)
-                fid.close()
+            freeflame_filename = "freeflamelet_"+folder_header+str(round(mix_status,6))+"_Tu"+str(round(T_ub, 4))+".csv"
+            filename_plus_folder = self.GetOutputDir()+"/freeflame_data/"+folder_header+'_'+str(round(mix_status, 6)) + "/"+freeflame_filename
+            fid = open(filename_plus_folder, 'w+')
+            fid.write(variables + "\n")
+            csvWriter = csv.writer(fid)
+            csvWriter.writerows(data_calc)
+            fid.close()
 
-                if self.__translate_to_matlab:
-                    if not path.isdir(self.__matlab__output_dir+'/freeflame_data_MATLAB/'+folder_header+'_'+str(round(mix_status, 6))):
-                            mkdir(self.__matlab__output_dir+'/freeflame_data_MATLAB/'+folder_header+'_'+str(round(mix_status, 6)))
-                    self.__TranslateToMatlabFile(filename_plus_folder,freeflame_filename, self.__matlab__output_dir + "/freeflame_data_MATLAB/"+folder_header+'_'+str(round(mix_status, 6)) + "/")
-                self.last_Y_flamelet = flame.Y
-                self.last_h_flamelet = flame.enthalpy_mass 
-                self.last_T_flamelet = flame.T 
+            if self.__translate_to_matlab:
+                if not path.isdir(self.__matlab__output_dir+'/freeflame_data_MATLAB/'+folder_header+'_'+str(round(mix_status, 6))):
+                        mkdir(self.__matlab__output_dir+'/freeflame_data_MATLAB/'+folder_header+'_'+str(round(mix_status, 6)))
+                self.__TranslateToMatlabFile(filename_plus_folder,freeflame_filename, self.__matlab__output_dir + "/freeflame_data_MATLAB/"+folder_header+'_'+str(round(mix_status, 6)) + "/")
+            self.last_Y_flamelet = flame.Y
+            self.last_h_flamelet = flame.enthalpy_mass
+            self.last_T_flamelet = flame.T
 
-                print("Successfull Freeflame simulation at "+folder_header+": "+str(mix_status)+ " T_u: " +str(T_ub) + " ("+str(i_freeflame+1)+"/"+str(self.__n_flamelets)+")")
-            else:
-                print("Unsuccessfull Freeflame simulation at "+folder_header+": "+str(mix_status)+ " T_u: " +str(T_ub) + " ("+str(i_freeflame+1)+"/"+str(self.__n_flamelets)+")")
-            
+            print("Successfull Freeflame simulation at "+folder_header+": "+str(mix_status)+ " T_u: " +str(T_ub) + " Np=%d" % len(flame.grid) + " ("+str(i_freeflame+1)+"/"+str(self.__n_flamelets)+")")
+            return flame
+
         except:
             print("Unsuccessfull Freeflame simulation at "+folder_header+": "+str(mix_status)+ " T_u: " +str(T_ub) + " ("+str(i_freeflame+1)+"/"+str(self.__n_flamelets)+")")
+            return None
 
-    def compute_SingleBurnerFlame(self, mix_status:float, T_burner:float, m_dot:float):
+    def compute_SingleBurnerFlame(self, mix_status:float, T_burner:float, m_dot:float, prev_flame:ct.BurnerFlame=None):
         """Compute the solution of a single burner-stabilized flamelet.
 
         :param mix_status: mixture fraction or equivalence ratio.
@@ -399,34 +444,60 @@ class DataGenerator_Cantera(DataGenerator_Base):
         :type T_burner: float
         :param m_dot: mass flux [kg m/s]
         :type m_dot: float
+        :param prev_flame: Converged BurnerFlame object from the previous mass-flux step,
+            reused directly to avoid file I/O and object reconstruction. When None the flame
+            is solved from scratch using Cantera's auto multi-stage strategy, defaults to None.
+        :type prev_flame: ct.BurnerFlame, optional
         :return: converged burner flame object
         :rtype: cantera.BurnerFlame
         """
-        self.gas.TP = T_burner, DefaultSettings_FGM.pressure
-        if self.__define_equivalence_ratio:
-            self.gas.set_equivalence_ratio(mix_status, self.__fuel_string, self.__oxidizer_string)
+        if prev_flame is None:
+            # First flame: set gas state for the fresh BurnerFlame object.
+            # ChemEquil (called internally by auto=True) requires T >= 300 K,
+            # so clamp to 300 K here; burner.T is restored to T_burner afterwards.
+            T_init = max(T_burner, 300.0)
+            self.gas.TP = T_init, DefaultSettings_FGM.pressure
+            if self.__define_equivalence_ratio:
+                self.gas.set_equivalence_ratio(mix_status, self.__fuel_string, self.__oxidizer_string)
+            else:
+                self.gas.set_mixture_fraction(mix_status, self.__fuel_string, self.__oxidizer_string)
+            initialgrid = np.linspace(0, self.__initial_grid_length, self.__initial_grid_Np)
+            burner_flame = ct.BurnerFlame(self.gas, grid=initialgrid)
+            burner_flame.burner.T = T_burner
+            burner_flame.set_refine_criteria(ratio=3, slope=0.15, curve=0.15, prune=0.05)
+            burner_flame.transport_model = self.__transport_model
         else:
-            self.gas.set_mixture_fraction(mix_status, self.__fuel_string, self.__oxidizer_string)
-        
-        # Definie initial grid.
-        initialgrid = np.linspace(0, self.__initial_grid_length, self.__initial_grid_Np)
+            # Subsequent burner flames: reuse the previous flame object directly.
+            # Just update the mass flux — no file I/O, no object reconstruction,
+            # and the solver's internal state (Jacobian estimate) carries over.
+            burner_flame = prev_flame
+        burner_flame.burner.mdot = m_dot
 
-        # Initiate burner flame object.
-        burner_flame = ct.BurnerFlame(self.gas, grid=initialgrid)
-        burner_flame.burner.mdot = m_dot 
-        burner_flame.set_refine_criteria(ratio=2, slope=0.025, curve=0.025)
-        burner_flame.transport_model = self.__transport_model
-        burner_flame.solve(loglevel=0, refine_grid=True, auto=False)
+        if self.__define_equivalence_ratio:
+            mix_label = "phi"
+        else:
+            mix_label = "mixfrac"
+        print("  Burner flame: %s=%.4f  T_burner=%.1f K  mdot=%.4e kg/m2/s" % (mix_label, mix_status, T_burner, m_dot))
+
+        # For the first flame use auto=True so Cantera's built-in multi-stage strategy
+        # (frozen chemistry → reacting → refine) reliably finds the ignited solution.
+        # For subsequent flames the previous converged solution is already a great
+        # initial guess, so auto=False is sufficient and avoids redundant work.
+        use_auto = (prev_flame is None)
+        burner_flame.solve(loglevel=self.__loglevel, refine_grid=True, auto=use_auto)
 
         return burner_flame
-    
-    def ComputeBurnerFlames(self, mix_status:float, m_dot:np.ndarray[float], T_burner:float=None):
+
+    def ComputeBurnerFlames(self, mix_status:float, m_dot:np.ndarray[float], T_burner:float=None, free_flame:ct.FreeFlame=None):
         """Generate burner-stabilized flamelet data for a specific mixture fraction or equivalence ratio and mass flux.
 
         :param mix_status: Equivalence ratio or mixture fraction value.
         :type mix_status: float
         :param m_dot: Mass flux array (kg s^{-1} m^{-1})
         :type m_dot: np.ndarray[float]
+        :param free_flame: Converged FreeFlame used to seed the first burner flame and set
+            its domain length. When None the first burner flame is solved from scratch.
+        :type free_flame: ct.FreeFlame, optional
         """
         if self.__define_equivalence_ratio:
             folder_header = "phi"
@@ -435,6 +506,7 @@ class DataGenerator_Cantera(DataGenerator_Base):
 
         if T_burner == None:
             T_burner = self.__T_unburnt_lower
+        print("Computing burner flamelets at "+folder_header+": "+str(mix_status)+ " T_burner: " +str(T_burner))
         self.gas.TP = T_burner, ct.one_atm
 
         if self.__define_equivalence_ratio:
@@ -442,13 +514,14 @@ class DataGenerator_Cantera(DataGenerator_Base):
         else:
             self.gas.set_mixture_fraction(mix_status, self.__fuel_string, self.__oxidizer_string)
 
+        prev_burner_flame = None
         for i_burnerflame, m_dot_next in enumerate(m_dot):
             try:
-                burner_flame = self.compute_SingleBurnerFlame(mix_status, self.__T_unburnt_lower, m_dot_next)
+                burner_flame = self.compute_SingleBurnerFlame(mix_status, T_burner, m_dot_next, prev_burner_flame)
                 if np.max(burner_flame.T) <= DefaultSettings_FGM.T_threshold:
                     print("Burnerflame at %s %.3e, mdot %.2e is not burning" % (folder_header, mix_status, m_dot_next))
-                    return 
-            
+                    continue
+
                 # Extracting flamelet data
                 variables, data_calc = self.__SaveFlameletData(burner_flame, self.gas)
 
@@ -458,7 +531,7 @@ class DataGenerator_Cantera(DataGenerator_Base):
                 if not path.isdir(self.GetOutputDir()+'/burnerflame_data/'+folder_header+'_'+str(round(mix_status, 6))):
                     mkdir(self.GetOutputDir()+'/burnerflame_data/'+folder_header+'_'+str(round(mix_status, 6)))
                 # burnerflame_filename = "burnerflamelet_"+folder_header+str(round(mix_status,6))+"_mdot"+str(round(m_dot_next, 4))+".csv"
-                burnerflame_filename = "burnerflamelet_%s%.6f_mdot%.4f.csv" % (folder_header, mix_status, m_dot_next)
+                burnerflame_filename = "burnerflamelet_%s%.6f_mdot%.5f.csv" % (folder_header, mix_status, m_dot_next)
                 filename_plus_folder = self.GetOutputDir()+"/burnerflame_data/"+folder_header+'_'+str(round(mix_status, 6)) + "/"+burnerflame_filename
                 fid = open(filename_plus_folder, 'w+')
                 fid.write(variables + "\n")
@@ -472,20 +545,21 @@ class DataGenerator_Cantera(DataGenerator_Base):
                     self.__TranslateToMatlabFile(filename_plus_folder,burnerflame_filename, self.__matlab__output_dir + "/burnerflame_data_MATLAB/"+folder_header+'_'+str(round(mix_status, 6)) + "/")
 
                 Y_max, Y_min = np.max(burner_flame.Y,axis=1), np.min(burner_flame.Y,axis=1)
-                delta_Y_flamelet = Y_max - Y_min 
+                delta_Y_flamelet = Y_max - Y_min
                 if max(delta_Y_flamelet) > 1e-5:
                     self.last_Y_flamelet = burner_flame.Y
-                    self.last_h_flamelet = burner_flame.enthalpy_mass 
-                    self.last_T_flamelet = burner_flame.T 
+                    self.last_h_flamelet = burner_flame.enthalpy_mass
+                    self.last_T_flamelet = burner_flame.T
 
-                print("Successfull burnerflame simulation at "+folder_header+": "+ str(mix_status)+" mdot: " + str(m_dot_next)+ " ("+str(i_burnerflame+1)+"/"+str(self.__n_flamelets)+")")
-                    
+                prev_burner_flame = burner_flame
+                print("Successfull burnerflame simulation at "+folder_header+": "+ str(mix_status)+" mdot: " + str(m_dot_next)+ " ("+str(i_burnerflame+1)+"/"+str(self.__n_mdot_flamelets)+")")
+
             except:
-                print("Unsuccessfull burnerflame simulation at "+folder_header+": "+ str(mix_status)+" mdot: " + str(m_dot_next)+ " ("+str(i_burnerflame+1)+"/"+str(self.__n_flamelets)+")")
+                print("Unsuccessfull burnerflame simulation at "+folder_header+": "+ str(mix_status)+" mdot: " + str(m_dot_next)+ " ("+str(i_burnerflame+1)+"/"+str(self.__n_mdot_flamelets)+")")
                 pass
-    
+
     def ComputeCounterFlowFlames(self, v_fuel:float, v_ox:float, T_ub:float):
-        """Generate counter-flow diffusion flamelet data for a given temperature, and reactant velocities. 
+        """Generate counter-flow diffusion flamelet data for a given temperature, and reactant velocities.
         Strain rate is gradually increased until extinction in order to distribute data over the progress variable spectrum.
 
         :param v_fuel: Fuel reactant velocity in meters per second.
@@ -520,7 +594,7 @@ class DataGenerator_Cantera(DataGenerator_Base):
         flame.oxidizer_inlet.mdot = rho_oxidizer*v_ox
         flame.set_refine_criteria(ratio=3, slope=0.04, curve=0.06, prune=0.02)
 
-        flame.solve(loglevel=0, auto=True)
+        flame.solve(loglevel=self.__loglevel, auto=True)
         variables, data_calc = self.__SaveFlameletData(flame, self.gas)
 
         counterflame_filename = "counterflamelet_strain_0_Tu"+str(round(T_ub, 4))+".csv"
@@ -563,7 +637,7 @@ class DataGenerator_Cantera(DataGenerator_Base):
 
             try:
                 # Try solving the flame
-                flame.solve(loglevel=0)
+                flame.solve(loglevel=self.__loglevel)
                 self.last_counterflame_massfraction = flame.Y
                 variables, data_calc = self.__SaveFlameletData(flame, self.gas)
 
@@ -604,7 +678,7 @@ class DataGenerator_Cantera(DataGenerator_Base):
                         mkdir(self.GetOutputDir()+'/equilibrium_data/')
         if not path.isdir(self.GetOutputDir() + "/equilibrium_data/" + folder_header+"_"+str(round(mix_status,6))):
             mkdir(self.GetOutputDir() + "/equilibrium_data/" + folder_header+"_"+str(round(mix_status,6)))
-        
+
         is_lean = False
         if self.__define_equivalence_ratio:
             gas_eq.set_equivalence_ratio(mix_status, self.__fuel_string, self.__oxidizer_string)
@@ -617,11 +691,11 @@ class DataGenerator_Cantera(DataGenerator_Base):
                 is_lean = True
             gas_eq.set_mixture_fraction(mix_status, self.__fuel_string, self.__oxidizer_string)
 
-        gas_eq.TP = max(T_range), ct.one_atm 
+        gas_eq.TP = max(T_range), ct.one_atm
         H_max = gas_eq.enthalpy_mass
         # In case of reaction products, set the maximum enthalpy to that of the reactants at the maximum temperature.
         if burnt:
-            gas_eq.TP = min(T_range), ct.one_atm 
+            gas_eq.TP = min(T_range), ct.one_atm
             if is_lean:
                 gas_eq.equilibrate("TP")
             else:
@@ -630,9 +704,9 @@ class DataGenerator_Cantera(DataGenerator_Base):
             T_range = np.linspace(min(T_range), gas_eq.T, len(T_range))
 
         for i, T in enumerate(T_range):
-            
+
             gas_eq.TP = T, ct.one_atm
-  
+
             if i == 0:
                 if not path.isdir(self.GetOutputDir()+'/equilibrium_data/'+folder_header+'_'+str(round(mix_status, 6))):
                     mkdir(self.GetOutputDir()+'/equilibrium_data/'+folder_header+'_'+str(round(mix_status, 6)))
@@ -667,26 +741,29 @@ class DataGenerator_Cantera(DataGenerator_Base):
 
         if mix_status < 0:
             raise Exception("Mixture status value should be positive.")
-        
+
         T_unburnt_range = np.linspace(self.__T_unburnt_upper, self.__T_unburnt_lower, self.__n_flamelets)
         # Generate adiabatic freeflame data
         if self.__run_freeflames:
+            print("Starting Free Flame simulations ...")
             # Generate and safe adiabatic flamelet data.
+            prev_free_flame = None
             for i_freeflame, T_ub in enumerate(T_unburnt_range):
-                self.ComputeFreeFlames(mix_status=mix_status, T_ub=T_ub, i_freeflame=i_freeflame)
+                prev_free_flame = self.ComputeFreeFlames(mix_status=mix_status, T_ub=T_ub, i_freeflame=i_freeflame, prev_flame=prev_free_flame)
 
         # Generate burner-stabilized flamelet data
         if self.__run_burnerflames:
+            print("Starting Burner Stabilized simulations ...")
             # Generate a single freeflamelet solution for reference
             if not self.__run_freeflames:
-                self.ComputeFreeFlames(mix_status=mix_status, T_ub=self.__T_unburnt_lower, i_freeflame=0)
+                prev_free_flame = self.ComputeFreeFlames(mix_status=mix_status, T_ub=self.__T_unburnt_lower, i_freeflame=0)
 
             # Define mass flow rate range.
-            m_dot_range = np.linspace(self.m_dot_free_flame, 0.001*self.m_dot_free_flame, self.__n_flamelets+1)
+            m_dot_range = np.linspace(0.98*self.m_dot_free_flame, 0.001*self.m_dot_free_flame, self.__n_mdot_flamelets+1)
             m_dot_range = m_dot_range[:-1]
 
             # Generate and safe adiabatic flamelet data.
-            self.ComputeBurnerFlames(mix_status=mix_status, m_dot=m_dot_range)
+            self.ComputeBurnerFlames(mix_status=mix_status, m_dot=m_dot_range, free_flame=prev_free_flame)
 
         # Generate chemical equilibrium data
         if self.__run_equilibrium:
@@ -695,13 +772,72 @@ class DataGenerator_Cantera(DataGenerator_Base):
             self.ComputeEquilibrium(mix_status=mix_status,\
                                     T_range=np.linspace(self.__T_unburnt_lower, self.__T_unburnt_upper, 2*self.__n_flamelets),\
                                     burnt=False)
-            
+
             # Generate reaction products data.
             self.ComputeEquilibrium(mix_status=mix_status,\
                                     T_range=np.linspace(self.__T_unburnt_lower, self.__T_unburnt_upper, 2*self.__n_flamelets),\
                                     burnt=True)
-        return 
-    
+
+        # Generate extra interpolated burner-stabilized flamelet data.
+        if self.__run_extra_interpolated_burnerflames:
+            if self.__define_equivalence_ratio:
+                folder_header = "phi"
+            else:
+                folder_header = "mixfrac"
+
+            burnerfolder = self.GetOutputDir() + '/burnerflame_data/' + folder_header + '_' + str(round(mix_status, 6))
+            if not path.isdir(burnerfolder):
+                return
+
+            # Find the burner flame file with the lowest mass flux.
+            from os import listdir as _listdir
+            burner_files = [f for f in _listdir(burnerfolder)
+                            if f.startswith("burnerflamelet_") and f.endswith(".csv")
+                            and "_int" not in f]
+            if not burner_files:
+                return
+
+            def _mdot_from_filename(fname):
+                try:
+                    return float(fname.split("_mdot")[1].replace(".csv", ""))
+                except Exception:
+                    return float("inf")
+
+            last_file = min(burner_files, key=_mdot_from_filename)
+            last_filepath = burnerfolder + "/" + last_file
+            print("Interpolating from lowest-mdot burner flame: " + last_file)
+
+            # Read header and all rows from the lowest-mdot burner flame.
+            with open(last_filepath, newline='') as f:
+                reader = csv.reader(f)
+                headerline = next(reader)
+                burner_rows = [list(map(float, row)) for row in reader]
+
+            # Read first row of cooled burnt equilibrium as the endpoint.
+            eq_filename = "equilibrium_b_" + folder_header + "_" + str(round(mix_status, 6)) + ".csv"
+            eq_filepath = path.join(self.GetOutputDir(), "equilibrium_data",
+                                    folder_header + "_" + str(round(mix_status, 6)), eq_filename)
+            if not path.isfile(eq_filepath):
+                print("Equilibrium file not found, skipping interpolated flames: " + eq_filepath)
+                return
+            eq_data = np.loadtxt(eq_filepath, delimiter=',', skiprows=1, ndmin=2)
+            eq_row = eq_data[0].tolist()
+
+            # Linearly interpolate N_int synthetic flames from the lowest-mdot burner flame to the equilibrium endpoint.
+            N_int = self.__n_mdot_extra_flamelets
+            for i in range(N_int):
+                ratio = float(i + 1) / float(N_int)
+                int_filename = burnerfolder + "/" + "burnerflamelet_%s%.6f_int%04d.csv" % (folder_header, mix_status, i)
+                with open(int_filename, 'w', newline='') as f:
+                    writer = csv.writer(f)
+                    writer.writerow(headerline)
+                    for burner_row in burner_rows:
+                        row_mix = [(1.0 - ratio) * a + ratio * b
+                                   for a, b in zip(burner_row, eq_row)]
+                        writer.writerow(row_mix)
+
+        return
+
     def ComputeFlamelets(self):
         """Generate and store all flamelet data for the current settings.
         """
@@ -710,17 +846,17 @@ class DataGenerator_Cantera(DataGenerator_Base):
 
         # Generate counter-flow diffusion flamelet data
         if self.__run_counterflames:
-            
+
             if not path.isdir(self.GetOutputDir()+'counterflame_data'):
                 mkdir(self.GetOutputDir()+'counterflame_data')
             for T_ub in T_unburnt_range:
-                self.gas.TP = T_ub, 101325 
+                self.gas.TP = T_ub, 101325
                 self.gas.set_mixture_fraction(1.0, self.__fuel_string, self.__oxidizer_string)
                 rho_fuel = self.gas.density_mass
-                rhou_fuel = rho_fuel * self.__u_fuel 
+                rhou_fuel = rho_fuel * self.__u_fuel
                 self.gas.set_mixture_fraction(0.0, self.__fuel_string, self.__oxidizer_string)
-                rho_ox = self.gas.density_mass 
-                self.__u_oxidizer = rhou_fuel / rho_ox 
+                rho_ox = self.gas.density_mass
+                self.__u_oxidizer = rhou_fuel / rho_ox
                 self.ComputeCounterFlowFlames(v_fuel=self.__u_fuel, v_ox=self.__u_oxidizer, T_ub=T_ub)
 
         # Generate all other flamelet types.
@@ -737,7 +873,7 @@ class DataGenerator_Cantera(DataGenerator_Base):
         :return: Flamelet variables string and data array
         :rtype: str, np.ndarray
         """
-        
+
         # Check if chemical equilibrium or flamelet data are supplied.
         flame_is_gas = (np.shape(flame.Y) == np.shape(gas.Y))
         molar_weights = np.reshape(gas.molecular_weights, [gas.n_species, 1])
@@ -767,22 +903,22 @@ class DataGenerator_Cantera(DataGenerator_Base):
         try:
             mixture_fraction = flame.mixture_fraction("Bilger")
         except:
-            mixture_fraction = np.sum(Y.T * np.reshape(self.z_i, [self.gas.n_species, 1]), axis=0) + self.c 
-        
+            mixture_fraction = np.sum(Y.T * np.reshape(self.z_i, [self.gas.n_species, 1]), axis=0) + self.c
+
         mean_molar_weights = np.dot(molar_weights.T, X)
-        enthalpy = flame.enthalpy_mass 
+        enthalpy = flame.enthalpy_mass
 
         density = flame.density
         cp = flame.cp_mass
         k = flame.thermal_conductivity
 
         T = flame.T
-        
+
         viscosity = flame.viscosity
-        
+
         Y_dot_net = net_reaction_rate * molar_weights
         Y_dot_pos = pos_reaction_rate * molar_weights
-        Y_dot_neg = neg_reaction_rate * molar_weights / (Y.T+1e-11) 
+        Y_dot_neg = neg_reaction_rate * molar_weights / (Y.T+1e-11)
 
         Le_i = ComputeLewisNumber(flame)
         if self.__transport_model == "unity-Lewis-number":
@@ -790,7 +926,7 @@ class DataGenerator_Cantera(DataGenerator_Base):
 
         cp_i = np.reshape(cp_i, np.shape(Y))
         enth_i = np.reshape(enth_i, np.shape(Y))
-        
+
         Le_i = Le_i.T
 
         if flame_is_gas:
@@ -800,7 +936,7 @@ class DataGenerator_Cantera(DataGenerator_Base):
             heat_rel = 0.0
         else:
             heat_rel = flame.heat_release_rate
-        
+
         # Define variables and output data array.
         variables = 'Distance,'
         data_matrix = np.reshape(grid, [len(grid), 1])
@@ -808,11 +944,11 @@ class DataGenerator_Cantera(DataGenerator_Base):
         data_matrix = np.append(data_matrix, velocity,axis=1)
         variables += ','.join("Y-"+s for s in gas.species_names)
         data_matrix = np.append(data_matrix, Y,axis=1)
-        variables += ',' + ','.join("Y_dot_net-"+s for s in gas.species_names) 
+        variables += ',' + ','.join("Y_dot_net-"+s for s in gas.species_names)
         data_matrix = np.append(data_matrix, Y_dot_net.T, axis=1)
-        variables += ',' + ','.join("Y_dot_pos-"+s for s in gas.species_names) 
+        variables += ',' + ','.join("Y_dot_pos-"+s for s in gas.species_names)
         data_matrix = np.append(data_matrix, Y_dot_pos.T, axis=1)
-        variables += ',' + ','.join("Y_dot_neg-"+s for s in gas.species_names) 
+        variables += ',' + ','.join("Y_dot_neg-"+s for s in gas.species_names)
         data_matrix = np.append(data_matrix, Y_dot_neg.T, axis=1)
         variables += ',' + ','.join("Cp-"+s for s in gas.species_names)
         data_matrix = np.append(data_matrix, cp_i, axis=1)
@@ -959,7 +1095,7 @@ class DataGenerator_Cantera(DataGenerator_Base):
             csvWriter = csv.writer(fid)
             csvWriter.writerows(total_data)
 
-def ComputeFlameletData(Config:Config_FGM, run_parallel:bool=False, N_processors:int=2):
+def ComputeFlameletData(Config:Config_FGM, run_parallel:bool=False, N_processors:int=2, loglevel:int=0):
     """Generate flamelet data according to Config_FGM settings either in serial or parallel.
 
     :param Config: Config_FGM class containing manifold and flamelet generation settings.
@@ -968,6 +1104,8 @@ def ComputeFlameletData(Config:Config_FGM, run_parallel:bool=False, N_processors
     :type run_parallel: bool, optional
     :param N_processors: Number of parallel jobs when generating flamelet data in parallel, defaults to 0
     :type N_processors: int, optional
+    :param loglevel: Cantera solver verbosity level (0=silent), defaults to 0
+    :type loglevel: int, optional
     :raises Exception: If number of processors is set to zero when running in parallel.
     """
 
@@ -995,12 +1133,15 @@ def ComputeFlameletData(Config:Config_FGM, run_parallel:bool=False, N_processors
     def ComputeFlameletData(mix_input):
 
         F = DataGenerator_Cantera(Config)
+        F.SetLoglevel(loglevel)
         F.ComputeFlameletsOnMixStatus(mix_input)
 
     if run_parallel:
-        Parallel(n_jobs=N_processors)(delayed(ComputeFlameletData)(mix_status) for mix_status in mixture_range)
+        with threadpool_limits(limits=1):
+            Parallel(n_jobs=N_processors)(delayed(ComputeFlameletData)(mix_status) for mix_status in mixture_range)
     else:
         F = DataGenerator_Cantera(Config)
+        F.SetLoglevel(loglevel)
         F.SetMixtureValues(mixture_range)
         F.ComputeFlamelets()
 
@@ -1023,7 +1164,7 @@ def ComputeBoundaryData(Config:Config_FGM, run_parallel:bool=False, N_processors
     mixture_range_lean = np.linspace(0, mix_status_stoch, int(Np_unb_mix/2))
     mixture_range_rich = np.linspace(mix_status_stoch, 1, int(Np_unb_mix/2)+1)
     mixture_range = np.append(mixture_range_lean, mixture_range_rich[1:])
-    
+
     if run_parallel:
         Parallel(n_jobs=N_processors)(delayed(ComputeEquilibriumData)(mix_status) for mix_status in mixture_range)
     else:
