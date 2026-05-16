@@ -673,18 +673,29 @@ class FlameletConcatenator:
                 S_flamelet_norm = S_flamelet / (max(S_flamelet)+1e-32)
 
                 T_flamelet = D[:, variables.index(FGMVars.Temperature.name)]
-                if np.max(T_flamelet) < DefaultSettings_FGM.T_threshold and not is_equilibrium:
+                # Interpolated cooling flames (_int####) and equilibrium flames always contain
+                # valid data even when T_max < T_threshold — they represent the cooled-product
+                # arm of the manifold and must not be discarded.
+                is_interpolated = "_int" in f
+                if np.max(T_flamelet) < DefaultSettings_FGM.T_threshold and not is_equilibrium and not is_interpolated:
                     BurningFlamelet = False
 
-                sourceterm_zero_line_numbers = [0, -1]
+                # Identify rows at which source terms must be zero: always at
+                # the first and last point (PV_min, PV_max endpoints), and with
+                # a small temperature margin when writing LUT data.
+                sourceterm_zero_line_numbers = np.zeros(len(T_flamelet), dtype=bool)
+                sourceterm_zero_line_numbers[0]  = True
+                sourceterm_zero_line_numbers[-1] = True
 
                 if self.__write_LUT_data:
-                    # Set source terms to zero near the start and end of the flamelet.
+                    # Extend zeroing to a 2 % temperature-margin band at both ends.
                     temp_margin = 2e-2
                     T_max, T_min = np.max(T_flamelet), np.min(T_flamelet)
-                    deltaT = temp_margin*(T_max - T_min)
-                    sourceterm_zero_line_numbers = np.logical_or((T_flamelet - T_min) < deltaT,\
-                                                                 ((T_max - T_flamelet) < deltaT))
+                    deltaT = temp_margin * (T_max - T_min)
+                    sourceterm_zero_line_numbers = np.logical_or(
+                        sourceterm_zero_line_numbers,
+                        np.logical_or((T_flamelet - T_min) < deltaT,
+                                      (T_max - T_flamelet) < deltaT))
 
                 # Load flamelet thermophysical property data
                 TD_data = np.zeros([len(D), len(self.__TD_train_vars)])
@@ -708,6 +719,8 @@ class FlameletConcatenator:
                         LookUp_data[:, iVar_LookUp] = D[:, idx_var_flamelet]
                         if LookUp_var == FGMVars.Heat_Release.name:
                             LookUp_data[sourceterm_zero_line_numbers, iVar_LookUp] = 0.0
+                            # Enforce non-negativity of heat release rate.
+                            LookUp_data[:, iVar_LookUp] = np.maximum(LookUp_data[:, iVar_LookUp], 0.0)
 
                 # Load species sources data
                 species_mass_fraction = np.zeros([len(D), len(self.__Species_in_FGM)])
@@ -743,7 +756,13 @@ class FlameletConcatenator:
                         Sources_data[:, 1 + 4*iSp + 2] = species_net_rate[:, iSp]
                         Sources_data[:, 1 + 4*iSp + 3] = species_mass_fraction[:, iSp]
 
-                    Sources_data[sourceterm_zero_line_numbers, :] = 0.0
+                    # Only zero the PV source term at the flamelet boundaries.
+                    # Species production rates and mass fractions are NOT zeroed
+                    # because (a) Y-{species} is non-zero at PV_max and (b) species
+                    # rates at PV_max are governed by Cantera's equilibrium values.
+                    Sources_data[sourceterm_zero_line_numbers, 0] = 0.0
+                    # Enforce non-negativity of PV source term (column 0).
+                    Sources_data[:, 0] = np.maximum(Sources_data[:, 0], 0.0)
 
                 # Compute preferential diffusion scalars
                 if self.__Config.PreferentialDiffusion() and BurningFlamelet:
