@@ -108,7 +108,7 @@ def ComputeRhoEGridData(config:Config_NICFD):
     """
     rho_min, rho_max = config.GetDensityBounds()[0], config.GetDensityBounds()[1]
     e_min, e_max = config.GetEnergyBounds()[0], config.GetEnergyBounds()[1]
-    
+
     Np_x = 200
     Np_y = 200
     rho_range = (rho_min - rho_max) * np.cos(np.linspace(0, 0.5*np.pi, Np_x)) + rho_max
@@ -170,7 +170,7 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
         for NN in DefaultSettings_NICFD.hidden_layer_architecture:
             self._hidden_layers.append(NN)
         return
-    
+
     def GetTrainData(self):
         super().GetTrainData()
         self.__s_scale = self._Y_max[0] - self._Y_min[0]
@@ -180,10 +180,10 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
         self.__rho_min = self._X_min[0]
         self.__e_max = self._X_max[1]
         self.__e_min = self._X_min[1]
-        
+
         self.__rho_scale = self._X_max[0] - self._X_min[0]
         self.__e_scale = self._X_max[1] - self._X_min[1]
-        
+
         _, TD_data_full = GetReferenceData(self._filedata_train+"_full.csv", self._controlling_vars, self.__TD_vars)
         _, TD_data_train = GetReferenceData(self._filedata_train+"_train.csv", self._controlling_vars, self.__TD_vars)
         _, TD_data_test = GetReferenceData(self._filedata_train+"_test.csv", self._controlling_vars, self.__TD_vars)
@@ -193,9 +193,9 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
         self.__TD_data_norm_train = tf.constant((TD_data_train - self.__TD_min)/(self.__TD_max - self.__TD_min),dtype=self._dt)
         self.__TD_data_norm_test = tf.constant((TD_data_test - self.__TD_min)/(self.__TD_max - self.__TD_min),dtype=self._dt)
         self.__TD_data_norm_val = tf.constant((TD_data_val - self.__TD_min)/(self.__TD_max - self.__TD_min),dtype=self._dt)
-        
+
         return
-    
+
     @tf.function
     def ComputeEntropyGradients(self, rhoe_norm:tf.Tensor):
 
@@ -217,7 +217,7 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
         dsdrhoe = [dsdrho_e, dsde_rho]
         d2sdrho2e2 = [[d2sdrho2, d2sdedrho],[d2sdedrho, d2sde2]]
         return s_dim, dsdrhoe, d2sdrho2e2
-    
+
     @tf.function
     def TD_Evaluation(self, rhoe_norm:tf.Tensor):
         s, dsdrhoe, d2sdrho2e2 = self.ComputeEntropyGradients(rhoe_norm)
@@ -225,7 +225,7 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
         rho = (self.__rho_max - self.__rho_min)*rho_norm + self.__rho_min
         T, P, c2 = self.EntropicEOS(rho, dsdrhoe, d2sdrho2e2)
         return s, T, P, c2
-    
+
     @tf.function
     def EntropicEOS(self,rho, dsdrhoe, d2sdrho2e2):
         dsdrho_e = dsdrhoe[0]
@@ -238,7 +238,7 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
         blue_term = (dsdrho_e * (2 - rho * T * d2sdedrho) + rho*d2sdrho2)
         green_term = (-T * d2sde2 * dsdrho_e + d2sdedrho)
         c2 = -rho * T * (blue_term - rho * green_term * (dsdrho_e / dsde_rho))
-  
+
         return T, P, c2
     @tf.function
     def __Compute_S_error(self, S_label:tf.Tensor, x_var:tf.Variable):
@@ -261,7 +261,7 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
         S_error = self.mean_square_error(y_true=S_label_norm, y_pred=S_norm)
 
         return S_error
-    
+
     @tf.function
     def __Compute_T_error(self, T_label_norm:tf.Tensor, x_var:tf.constant):
         """Compute the temperature prediction error.
@@ -279,12 +279,12 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
 
         # Normalize reference and predicted temperature.
         T_pred_norm = (T - self.__TD_min[1]) / (self.__TD_max[1] - self.__TD_min[1])
-        
+
         # Apply loss function.
         T_error = self.mean_square_error(y_true=T_label_norm, y_pred=T_pred_norm)
 
         return T_error
-    
+
     @tf.function
     def __Compute_P_error(self, P_label_norm:tf.Tensor,x_var:tf.constant):
         """Compute the pressure prediction error.
@@ -302,12 +302,12 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
 
         # Normalize reference and predicted pressure.
         P_pred_norm = (P - self.__TD_min[2]) / (self.__TD_max[2] - self.__TD_min[2])
-        
+
         # Apply loss function.
         P_error = self.mean_square_error(y_true=P_label_norm, y_pred=P_pred_norm)
 
         return P_error
-    
+
     @tf.function
     def __Compute_C2_error(self, C2_label_norm,x_var:tf.constant):
         """Compute the prediction error for squared speed of sound (SoS).
@@ -322,7 +322,7 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
 
         # Evaluate thermodynamic state.
         _, _, _, C2 = self.TD_Evaluation(x_var)
-        
+
         # Normalize reference and predicted squared SoS.
         C2_pred_norm = (C2 - self.__TD_min[3]) / (self.__TD_max[3] - self.__TD_min[3])
 
@@ -346,12 +346,12 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
             tape.watch(self._trainable_hyperparams)
             # Evaluate temperature loss value.
             S_loss = self.__Compute_S_error(S_label_norm, rhoe_norm)
-            
+
             # Compute MLP weight sensitvities.
             grads_S = tape.gradient(S_loss, self._trainable_hyperparams)
-        
+
         return S_loss, grads_S
-    
+
     @tf.function
     def __ComputeGradients_T_error(self, T_label_norm:tf.Tensor, rhoe_norm:tf.constant):
         """Compute temperature prediction error and respective MLP weight sensitivities.
@@ -368,10 +368,10 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
             tape.watch(self._trainable_hyperparams)
             # Evaluate temperature loss value.
             T_loss = self.__Compute_T_error(T_label_norm, rhoe_norm)
-            
+
             # Compute MLP weight sensitvities.
             grads_T = tape.gradient(T_loss, self._trainable_hyperparams)
-        
+
         return T_loss, grads_T
 
     @tf.function
@@ -394,7 +394,7 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
             grads_P = tape.gradient(P_loss, self._trainable_hyperparams)
 
         return P_loss, grads_P
-    
+
     @tf.function
     def __ComputeGradients_C2_error(self, C2_label_norm:tf.Tensor, rhoe_norm:tf.constant):
         """Compute SoS prediction error and respective MLP weight sensitivities.
@@ -411,15 +411,15 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
             C2_loss = self.__Compute_C2_error(C2_label_norm, rhoe_norm)
             grads_C2 = tape.gradient(C2_loss, self._trainable_hyperparams)
         return C2_loss, grads_C2
-    
+
     @tf.function
     def Train_Step(self, X_batch_norm:tf.constant, Y_batch_norm:tf.constant):
-        
+
         s_batch_norm = tf.gather(Y_batch_norm,indices=0,axis=1)
         T_batch_norm = tf.gather(Y_batch_norm,indices=1, axis=1)
         P_batch_norm = tf.gather(Y_batch_norm,indices=2, axis=1)
         C2_batch_norm = tf.gather(Y_batch_norm,indices=3, axis=1)
-        
+
         # Weight update for temperature prediction.
         s_loss, grads_s = self.__ComputeGradients_S_error(s_batch_norm, X_batch_norm)
         self._optimizer.apply_gradients(zip(grads_s, self._trainable_hyperparams))
@@ -435,13 +435,13 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
         # Weight update for SoS prediction.
         C2_loss, grads_C2 = self.__ComputeGradients_C2_error(C2_batch_norm,X_batch_norm)
         self._optimizer.apply_gradients(zip(grads_C2, self._trainable_hyperparams))
-  
+
         return s_loss, T_loss, P_loss, C2_loss
-    
+
     def SetTrainBatches(self):
         train_batches = tf.data.Dataset.from_tensor_slices((self._X_train_norm, self.__TD_data_norm_train)).batch(2**self._batch_expo)
         return train_batches
-    
+
     def ValidationLoss(self):
         rhoe_val_norm = tf.constant(self._X_val_norm, self._dt)
 
@@ -462,7 +462,7 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
         self.val_loss_history[3].append(c2_val_error)
 
         return s_val_error, T_val_error, p_val_error, c2_val_error
-    
+
     def TestLoss(self):
         rhoe_test_norm = tf.constant(self._X_test_norm, self._dt)
 
@@ -484,7 +484,7 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
         self.C2_test_loss = c2_test_error
 
         return s_test_error, T_test_error, p_test_error, c2_test_error
-    
+
     def PrintEpochInfo(self, i_epoch, val_loss):
         if self._verbose > 0:
             S_val_loss = val_loss[0]
@@ -494,7 +494,7 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
             print("Epoch %i Validation loss Entropy: %.4e, Temperature: %.4e, Pressure: %.4e, Speed of sound: %.4e" % (i_epoch, S_val_loss, T_val_loss, P_val_loss, C2_val_loss))
 
         return
-    
+
     def CustomCallback(self):
 
         # Save SU2 MLP and performance metrics.
@@ -506,7 +506,7 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
         self.__Generate_Error_Plots()
 
         return super().CustomCallback()
-    
+
     def Save_Relevant_Data(self):
         """Save network performance characteristics in text file and write SU2 MLP input file.
         """
@@ -530,7 +530,7 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
 
         self.write_SU2_MLP(self._save_dir + "/Model_"+str(self._model_index)+"/"+self._mlp_output_file_name)
         return
-    
+
     def __Generate_Error_Plots(self):
         """Make nice plots of the interpolated test data.
         """
@@ -543,7 +543,7 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
 
         rho_test = self._X_test[:, 0]#(self._X_max[self.__idx_rho] - self._X_min[self.__idx_rho])*self._X_test_norm[:, self.__idx_rho] + self._X_min[self.__idx_rho]
         e_test = self._X_test[:, 1]#(self._X_max[self.__idx_e] - self._X_min[self.__idx_e])*self._X_test_norm[:, self.__idx_e] + self._X_min[self.__idx_e]
-        
+
         S_test = self._Y_state_test[:,0]
         T_test = self._Y_state_test[:,1]
         P_test = self._Y_state_test[:,2]
@@ -670,7 +670,7 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
         plt.close(fig)
 
         return
-    
+
 class Train_Entropic_PINN(PhysicsInformedTrainer):
 
     _s_scale:float = None
@@ -687,7 +687,7 @@ class Train_Entropic_PINN(PhysicsInformedTrainer):
         self._hidden_layers = []
         for n in DefaultSettings_NICFD.hidden_layer_architecture:
             self._hidden_layers.append(n)
-            
+
         self._train_vars = [EntropicVars.s.name]
 
         self._state_vars = [EntropicVars.s.name,\
@@ -699,13 +699,13 @@ class Train_Entropic_PINN(PhysicsInformedTrainer):
         self._enable_boundary_loss = False
         self.scaler_function_name="minmax"
         self.weights_initializer = "random_uniform"
-        
+
         self._include_regularization = False
 
         self._dt = tf.float64
         self._dt_np = np.float64
         return
-    
+
     def GetTrainData(self):
 
         super().GetTrainData()
@@ -719,7 +719,7 @@ class Train_Entropic_PINN(PhysicsInformedTrainer):
         self._Y_state_offset_tf = tf.cast(self._Y_state_offset, self._dt)
 
         return
-    
+
     def SetStateVars(self, state_vars_in:list[str]):
         self._state_vars = state_vars_in.copy()
         return
@@ -728,7 +728,7 @@ class Train_Entropic_PINN(PhysicsInformedTrainer):
         self.__custom_state_grid = True
         self.__state_grid_ref = state_grid_in.copy()
         return
-    
+
     def CollectPIVars(self):
         val_lambda_default = super().CollectPIVars()
         self.lamba_labels = []
@@ -741,53 +741,53 @@ class Train_Entropic_PINN(PhysicsInformedTrainer):
             self.lamba_labels.append(l)
         self._N_bc = len(self.vals_lambda)
         return
-    
+
     def GetBoundaryData(self, y_vars=None):
         X_boundary, Y_boundary = GetReferenceData(self._filedata_train + "_val.csv", self._controlling_vars, self._train_vars)
         self._X_boundary_norm = self.scaler_function_x.transform(X_boundary)
         self._Y_boundary_norm = self.scaler_function_y.transform(Y_boundary)
-        
+
         return
-    
+
     def __SetRhoEProjection(self):
-        
+
         X_val, Y_val = GetReferenceData(self._filedata_train + "_val.csv", self._controlling_vars, [EntropicVars.p.name, EntropicVars.T.name, EntropicVars.dsdrho_e.name, EntropicVars.dsde_rho.name])
 
         rho_val = X_val[:, self._controlling_vars.index(EntropicVars.Density.name)]
         p_val = Y_val[:, 0]
         T_val = Y_val[:, 1]
-        
+
         idx_minrho = np.argmin(rho_val)
         Rgas = p_val[idx_minrho] / (rho_val[idx_minrho]*T_val[idx_minrho])
 
         compress_factor_threshold = 0.0
 
         compress_factor = p_val / (Rgas * rho_val * T_val)
-        
+
         idx_idealgas = compress_factor > compress_factor_threshold
 
         proj_rho, proj_e = np.zeros(np.shape(X_val)), np.zeros(np.shape(X_val))
         proj_rho[idx_idealgas, self._controlling_vars.index(EntropicVars.Density.name)] = 1.0
         proj_e[idx_idealgas, self._controlling_vars.index(EntropicVars.Energy.name)] = 1.0
-        
+
         target_grad_rho = Y_val[:, 2]
         target_grad_e = Y_val[:, 3]
-        
+
         target_grad_rho[np.invert(idx_idealgas)] = 0.0
         target_grad_e[np.invert(idx_idealgas)] = 0.0
-        
+
         proj_rho = np.delete(proj_rho, np.invert(idx_idealgas),axis=0)
         proj_e = np.delete(proj_e, np.invert(idx_idealgas),axis=0)
         target_grad_rho = np.delete(target_grad_rho, np.invert(idx_idealgas))
         target_grad_e = np.delete(target_grad_e, np.invert(idx_idealgas))
-        
+
         target_grad_rho /= self._Y_scale[0] / self._X_scale[self._controlling_vars.index(EntropicVars.Density.name)]
         target_grad_e /= self._Y_scale[0] / self._X_scale[self._controlling_vars.index(EntropicVars.Energy.name)]
-        
+
         self._X_boundary_norm = self._X_boundary_norm[idx_idealgas, :]
         lambda_labels = ["dsdrho_e"]
         return [proj_rho], [target_grad_rho], lambda_labels
-    
+
     @tf.function
     def CollectVariables(self):
         """Define weights and biases as trainable hyper-parameters.
@@ -798,7 +798,7 @@ class Train_Entropic_PINN(PhysicsInformedTrainer):
         for b in self._biases:
             self._trainable_hyperparams.append(b)
         return
-    
+
     @tf.function
     def ComputeEntropyGradients(self, rhoe_norm:tf.Tensor):
         with tf.GradientTape(watch_accessed_variables=False, persistent=True) as tape_2:
@@ -828,7 +828,7 @@ class Train_Entropic_PINN(PhysicsInformedTrainer):
         dsdrhoe = [dsdrho_e, dsde_rho]
         d2sdrho2e2 = [[d2sdrho2, d2sdedrho],[d2sdedrho, d2sde2]]
         return s_dim, dsdrhoe, d2sdrho2e2
-    
+
     @tf.function
     def EntropicEOS(self,rho,e, s, dsdrhoe, d2sdrho2e2):
         dsdrho_e = dsdrhoe[0]
@@ -856,13 +856,13 @@ class Train_Entropic_PINN(PhysicsInformedTrainer):
         dTde_p = dTde_rho + dTdrho_e*drhode_p
         dhde_p = dhde_rho + drhode_p*dhdrho_e
         Cp = dhde_p / dTde_p
-        
+
         c2 = dPdrho_e - dsdrho_e * dPde_rho / dsde_rho
 
         Y_state = tf.stack((rho, e, T, P, c2, s, dsdrho_e, dsde_rho, d2sdrho2, d2sdedrho, d2sde2, dTdrho_e, dTde_rho, dPdrho_e, dPde_rho, dhdrho_e, dhde_rho, dhdP_rho, dhdrho_P, dsdP_rho, dsdrho_P, Cp),axis=1)
         Y_state_selected = tf.stack(tf.tuple(Y_state[:,EntropicVars[var].value] for var in self._state_vars),axis=1)
         return Y_state_selected
-    
+
     @tf.function
     def TD_Evaluation(self, rhoe_norm:tf.Tensor):
         s, dsdrhoe, d2sdrho2e2 = self.ComputeEntropyGradients(rhoe_norm)
@@ -871,11 +871,11 @@ class Train_Entropic_PINN(PhysicsInformedTrainer):
         e_norm = tf.gather(rhoe_norm, indices=1, axis=1)
         e = self._e_scale*e_norm + self._e_offset
         return self.EntropicEOS(rho, e, s[:,0], dsdrhoe, d2sdrho2e2)
-    
+
     @tf.function
     def EvaluateState(self, X_norm:tf.Tensor):
         return self.TD_Evaluation(X_norm)
-    
+
     def EvaluateMLP(self, X:np.ndarray[float]):
         X_norm = tf.Variable(self.scaler_function_x.transform(X))
         s_norm = self._MLP_Evaluation(X_norm)
@@ -883,7 +883,7 @@ class Train_Entropic_PINN(PhysicsInformedTrainer):
         #print(s_dim.numpy()[:10])
         state = self.EvaluateState(X_norm).numpy()
         return state
-    
+
     @tf.function
     def ComputeStateError(self, X_label_norm:tf.constant,Y_state_label_norm:tf.constant):
         Y_state_pred = self.EvaluateState(X_label_norm)
@@ -894,13 +894,13 @@ class Train_Entropic_PINN(PhysicsInformedTrainer):
             pred_error += reg_loss
 
         return pred_error
-    
-    
+
+
     def PrintEpochInfo(self, i_epoch, val_loss):
         if self._verbose > 0:
             print(("Epoch %i Validation loss " % i_epoch) + ", ".join((" %s: %.4e" % (self._state_vars[iVar], val_loss[iVar])) for iVar in range(len(self._state_vars))))
         return
-    
+
     def CustomCallback(self):
 
         # Save SU2 MLP and performance metrics.
@@ -912,7 +912,7 @@ class Train_Entropic_PINN(PhysicsInformedTrainer):
         self.__Generate_Error_Plots()
 
         return super().CustomCallback()
-    
+
     def Save_Relevant_Data(self):
         """Save network performance characteristics in text file and write SU2 MLP input file.
         """
@@ -934,7 +934,7 @@ class Train_Entropic_PINN(PhysicsInformedTrainer):
 
         self.write_SU2_MLP(self._save_dir + "/Model_"+str(self._model_index)+"/"+self._mlp_output_file_name)
         return
-    
+
     def __Generate_Error_Plots(self):
         """Make nice plots of the interpolated test data.
         """
@@ -954,13 +954,13 @@ class Train_Entropic_PINN(PhysicsInformedTrainer):
         markevery=10
         val_pad = 30
 
-        
+
         rhoe_test = self.scaler_function_x.inverse_transform(self._X_test_norm)
         rho_test = rhoe_test[:,0]
         e_test = rhoe_test[:,1]
 
         Y_ref_test = self._scaler_state.inverse_transform(self._Y_state_test_norm)
-        
+
         for var in self._state_vars:
             Y_ref = Y_ref_test[:, self._state_vars.index(var)]
             Y_pred = state_test_pred[:, self._state_vars.index(var)]
@@ -1011,8 +1011,8 @@ class Train_Entropic_PINN(PhysicsInformedTrainer):
             plt.close(fig)
 
         return
-    
-           
+
+
 def transform_dsdrho(dsdrho_untransformed):
         return np.log(-dsdrho_untransformed)
 def transform_d2sdrho2(d2sdrho2_untransformed):
@@ -1037,7 +1037,7 @@ class Train_Entropic_Segregated(TensorFlowFit):
                             EntropicVars.d2sdedrho.name,\
                             EntropicVars.d2sde2.name]
         return
-    
+
     def TransformData(self, Y_untransformed):
         """Transform first and second entropy derivative w.r.t. density through logarithmic scaling.
 
@@ -1056,7 +1056,7 @@ class Train_Entropic_Segregated(TensorFlowFit):
         Y_transformed[:, idx_dsdrho_e] = dsdrho_transformed
         Y_transformed[:, idx_d2sdrho2] = d2sdrho2_transformed
         return Y_transformed
-    
+
     def TransformData_Inv(self, Y_transformed):
         idx_dsdrho_e = self._train_vars.index(EntropicVars.dsdrho_e.name)
         idx_d2sdrho2 = self._train_vars.index(EntropicVars.d2sdrho2.name)
@@ -1068,7 +1068,7 @@ class Train_Entropic_Segregated(TensorFlowFit):
         Y_untransformed[:, idx_dsdrho_e] = dsdrho_untransformed
         Y_untransformed[:, idx_d2sdrho2] = d2sdrho2_untransformed
         return Y_untransformed
-    
+
     def CustomCallback(self):
         self._test_score = self._model.evaluate(self._X_test_norm, self._Y_test_norm, verbose=0)[0]
         # Save SU2 MLP and performance metrics.
@@ -1079,11 +1079,11 @@ class Train_Entropic_Segregated(TensorFlowFit):
         self.PlotR2Data()
         self.SaveWeights()
         return super().CustomCallback()
-    
+
     def add_additional_header_info(self, fid):
         fid.write("Inverse transform dsdrho_e: -exp(dsdrho_e)\nInverse transform d2sdrho2: exp(d2sdrho2)\n")
         return
-    
+
 class TrainMLP_NICFD(TrainMLP):
     """Class for training MLP architectures
     """
@@ -1132,9 +1132,9 @@ class TrainMLP_NICFD(TrainMLP):
         #     raise Exception("Only the following state variables are supported: "+ ",".join((v for v in DefaultSettings_NICFD.supported_state_vars)))
         self._state_vars = state_vars_in.copy()
         self.SynchronizeTrainer()
-        
+
         return
-    
+
     def SynchronizeTrainer(self):
         """Synchronize all MLP trainer settings with locally stored settings.
         """
@@ -1159,13 +1159,13 @@ class TrainMLP_NICFD(TrainMLP):
         self.__trainer_PINN.SetFigFormat(self._fig_format)
         self.__trainer_PINN.SetScaler(self._scaler)
         return
-    
+
     def CommenceTraining(self):
         """Initiate the training process.
         """
         self.Train_DF()
         self.Train_PINN()
-        
+
 
         fid = open(self.worker_dir + "/current_iter.txt", "w+")
         fid.write(str(self.current_iter) + "\n")
@@ -1176,7 +1176,7 @@ class TrainMLP_NICFD(TrainMLP):
         self._trainer_direct.SetMLPFileHeader("MLP_direct")
         self._trainer_direct.Train_MLP()
         super().TrainPostprocessing()
-        
+
         self._trainer_direct.Save_Relevant_Data()
         self._trainer_direct.Plot_and_Save_History()
 
@@ -1197,7 +1197,7 @@ class TrainMLP_NICFD(TrainMLP):
         self.__trainer_PINN.Train_MLP()
         self.__trainer_PINN.PostProcessing()
         return
-    
+
     def TrainPostprocessing(self):
         self._test_score = self.__trainer_PINN.GetTestScore()
         if np.isnan(self._test_score):
@@ -1205,7 +1205,7 @@ class TrainMLP_NICFD(TrainMLP):
         self._cost_parameter = self.__trainer_PINN.GetCostParameter()
         self.__trainer_PINN.Save_Relevant_Data()
         return
-    
+
     def SetTrainStepType(self, train_step_type:str="Gauss-Seidel"):
         self.__trainer_PINN.SetTrainStepType(train_step_type)
         return
@@ -1213,14 +1213,14 @@ class TrainMLP_NICFD(TrainMLP):
         return self.__trainer_PINN.GetWeights()
     def GetBiases(self):
         return self.__trainer_PINN.GetBiases()
-    
+
     def GetScalerFunctionParams(self):
         return self.__trainer_PINN.GetScalerFunctionParams()
     def GetControlVars(self):
         return self.__trainer_PINN._controlling_vars
     def GetTrainVars(self):
         return self.__trainer_PINN._train_vars
-    
+
 class TrainMLP_NICFD_Segregated(TrainMLP):
     """Driver class for training a segregated entropic MLP.
     """
@@ -1238,4 +1238,3 @@ class TrainMLP_NICFD_Segregated(TrainMLP):
         TrainMLP.__init__(self, Config_in=Config_in)
         self.SynchronizeTrainer()
         return
-    

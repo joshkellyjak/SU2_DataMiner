@@ -100,7 +100,7 @@ for ivar, var in enumerate(variables):
     ArrayObject.SetNumberOfTuples(nPoints)
     for i in range(nPoints):
         ArrayObject.SetValue(i, D[i, ivar])
-    
+
     pointcloud.GetPointData().AddArray(ArrayObject)
     datasetArrays.append(
         {
@@ -241,7 +241,7 @@ def standard_buttons():
         vuetify.VIcon("mdi-crop-free")
 
 with SinglePageLayout(server) as layout:
-    
+
     layout.title.set_text("Test GUI for SU2 DataMiner")
     #
     with layout.toolbar:
@@ -276,7 +276,7 @@ with SinglePageLayout(server) as layout:
             #classes="mr-4",
         )
         ######################################################
-        
+
     # content components
     with layout.content:
         with vuetify.VContainer(fluid=True,classes="pa-0 fill-height",):
@@ -290,4 +290,3 @@ with SinglePageLayout(server) as layout:
             ctrl.on_server_ready.add(view.update)
 if __name__ == "__main__":
     server.start()
-    

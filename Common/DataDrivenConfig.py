@@ -61,7 +61,7 @@ class Config_NICFD(Config):
     __calc_transport_properties:bool = False
     __viscosity_model:str = DefaultSettings_NICFD.viscosity_model
     __conductivity_model:str = DefaultSettings_NICFD.conductivity_model
-    
+
     # Phases to include in fluid data.
     __gasphase:bool = True
     __twophase:bool = False
@@ -85,7 +85,7 @@ class Config_NICFD(Config):
     __Rho_upper:float = DefaultSettings_NICFD.Rho_max       # Upper density bound.
     __Energy_lower:float = DefaultSettings_NICFD.Energy_min # Lower energy bound.
     __Energy_upper:float = DefaultSettings_NICFD.Energy_max # Upper energy bound.
-    
+
     _state_vars:list[str] = ["s", "T","p","c2"]  # State variable names for which the physics-informed MLP is trained.
 
     # Table Generation Settings
@@ -109,7 +109,7 @@ class Config_NICFD(Config):
         self._config_type = DefaultSettings_NICFD.config_type
 
         self._controlling_variables = [DefaultSettings_NICFD.name_density, DefaultSettings_NICFD.name_energy]
-        
+
         # Set default settings.
         self.SetAlphaExpo(DefaultSettings_NICFD.init_learning_rate_expo)
         self.SetLRDecay(DefaultSettings_NICFD.learning_rate_decay)
@@ -124,14 +124,14 @@ class Config_NICFD(Config):
                 loaded_config = pickle.load(fid)
             if loaded_config._config_type != self._config_type:
                 raise Exception("Improper configuration file for NICFD configuration.")
-            
+
             self.__dict__ = loaded_config.__dict__.copy()
             print("Loaded configuration file with name " + loaded_config._config_name)
         else:
             print("Generating empty SU2 DataMiner configuration for NICFD")
 
         return
-    
+
     def PrintBanner(self):
         """Print banner visualizing EntropicAI configuration settings."""
         super().PrintBanner()
@@ -172,7 +172,7 @@ class Config_NICFD(Config):
                 print("Two-phase viscosity model: %s" % self.__viscosity_model)
 
         return
-    
+
 
     def SetFluid(self, fluid_name=DefaultSettings_NICFD.fluid_name):
         """
@@ -188,7 +188,7 @@ class Config_NICFD(Config):
         if type(fluid_name) == list:
             # if len(fluid_name) > 2:
             #     raise Exception("Only two fluids can be used for mixtures")
-            
+
             self.__fluid_names = []
             fluid_mixing = []
             for f in fluid_name:
@@ -204,7 +204,7 @@ class Config_NICFD(Config):
             if fluid_name not in supported_fluid_names:
                 raise Exception("Fluid name should be one of the following: %s" % (", ".join(q for q in supported_fluid_names)))
             self.__fluid_names = [fluid_name]
-        
+
         fluid_string = "&".join(f for f in self.__fluid_names)
         self.__fluid_string=fluid_string
         try:
@@ -212,7 +212,7 @@ class Config_NICFD(Config):
         except:
             raise Exception("Specified fluid name not found or mixture is not supported.")
         return
-    
+
     def SetEquationOfState(self, EOS_type_in:str=DefaultSettings_NICFD.EOS_type):
         """Define the equation of state backend used by CoolProp to generate fluid data.
 
@@ -224,10 +224,10 @@ class Config_NICFD(Config):
             raise Exception("Equation of state should be provided in string format.")
         if EOS_type_in.upper() not in DefaultSettings_NICFD.supported_backends:
             raise Exception("Equation of state not supported, should be one of the following : %s" % ", ".join(e for e in DefaultSettings_NICFD.supported_backends))
-        
+
         self.__EOS_type=EOS_type_in.upper()
         return
-    
+
     def IncludeTransportProperties(self, calc_transport_properties:bool=False):
         """Include transport properties in fluid data calculation
 
@@ -236,7 +236,7 @@ class Config_NICFD(Config):
         """
         self.__calc_transport_properties = calc_transport_properties
         return
-    
+
     def CalcTransportProperties(self):
         """Whether transport properties are included in the fluid data set.
 
@@ -244,7 +244,7 @@ class Config_NICFD(Config):
         :rtype: bool
         """
         return self.__calc_transport_properties
-    
+
     def SetConductivityModel(self, conductivity_model:str=DefaultSettings_NICFD.conductivity_model):
         """Specify the two-phase conductivity model.
 
@@ -259,7 +259,7 @@ class Config_NICFD(Config):
             self.EnableTwophase(True)
             print("Two-phase conductivity model specified, including two-phase fluid data.")
         return
-    
+
     def GetConductivityModel(self):
         """Get two-phase conductivity model.
 
@@ -267,7 +267,7 @@ class Config_NICFD(Config):
         :rtype: str
         """
         return self.__conductivity_model
-    
+
     def SetViscosityModel(self, viscosity_model:str=DefaultSettings_NICFD.viscosity_model):
         """Specify the two-phase viscosity model.
 
@@ -282,7 +282,7 @@ class Config_NICFD(Config):
             self.EnableTwophase(True)
             print("Two-phase viscosity model specified, including two-phase fluid data.")
         return
-    
+
     def GetViscosityModel(self):
         """Get two-phase viscosity model.
 
@@ -290,7 +290,7 @@ class Config_NICFD(Config):
         :rtype: str
         """
         return self.__viscosity_model
-    
+
     def EnableGasPhase(self, gas_phase:bool=True):
         """Include thermophysical state data from the fluid in gas phase
 
@@ -299,7 +299,7 @@ class Config_NICFD(Config):
         """
         self.__gasphase = gas_phase
         return
-    
+
     def GasPhase(self):
         """Whether thermophysical state data from the fluid in the gaseous phase are included.
 
@@ -307,7 +307,7 @@ class Config_NICFD(Config):
         :rtype: bool
         """
         return self.__gasphase
-    
+
     def EnableSuperCritical(self, supercritical:bool=True):
         """Include thermophysical state data of the fluid in supercritial, and of the supercritical gas and liquid phase if specified.
 
@@ -316,7 +316,7 @@ class Config_NICFD(Config):
         """
         self.__supercritical = supercritical
         return
-    
+
     def EnableTwophase(self, two_phase:bool=False):
         """Include two-phase thermophysical data of the fluid.
 
@@ -325,7 +325,7 @@ class Config_NICFD(Config):
         """
         self.__twophase = two_phase
         return
-    
+
     def EnableLiquidPhase(self, liquid_phase:bool=False):
         """Include thermodynamic state data from fluid in the liquid phase.
 
@@ -334,7 +334,7 @@ class Config_NICFD(Config):
         """
         self.__liquidphase = liquid_phase
         return
-    
+
     def TwoPhase(self):
         """Whether thermophysical state data from the fluid in the two-phase are included.
 
@@ -342,7 +342,7 @@ class Config_NICFD(Config):
         :rtype: bool
         """
         return self.__twophase
-    
+
     def LiquidPhase(self):
         """Whether thermophysical state data from the fluid in the liquid phase are included.
 
@@ -350,7 +350,7 @@ class Config_NICFD(Config):
         :rtype: bool
         """
         return self.__liquidphase
-    
+
     def SuperCritical(self):
         """Whether thermophysical state data from the fluid in the supercritical phases are included.
 
@@ -358,7 +358,7 @@ class Config_NICFD(Config):
         :rtype: bool
         """
         return self.__supercritical
-    
+
     def GetEquationOfState(self):
         """Retrieve the equation of state backend used by CoolProp for fluid data calculations.
 
@@ -366,7 +366,7 @@ class Config_NICFD(Config):
         :rtype: str
         """
         return self.__EOS_type
-    
+
     def SetFluidMoleFractions(self, mole_fractions:list[float]):
         """Set fluid mole fractions for mixture.
 
@@ -378,7 +378,7 @@ class Config_NICFD(Config):
         """
         if len(mole_fractions) != len(self.__fluid_names):
             raise Exception("Number of mole fractions should match the number of species")
-        
+
         m_sum = 0
         for m in mole_fractions:
             if m < 0:
@@ -388,7 +388,7 @@ class Config_NICFD(Config):
         # Normalize molar fractions
         self.__fluid_mole_fractions = mole_fractions_norm
         return
-        
+
     def GetFluid(self):
         """Get the name of the fluid for which thermodynamic data is generated.
         :return: fluid name
@@ -396,13 +396,13 @@ class Config_NICFD(Config):
 
         """
         return self.__fluid_string
-    
+
     def GetFluidNames(self):
         return self.__fluid_names.copy()
-    
+
     def GetMoleFractions(self):
         return self.__fluid_mole_fractions.copy()
-    
+
     def UseAutoRange(self, use_auto_range:bool=True):
         """Automatically determine the span of the thermodynamic state space for which fluid data are generated.
 
@@ -411,7 +411,7 @@ class Config_NICFD(Config):
         """
         self.__use_auto_range = bool(use_auto_range)
         return
-    
+
     def GetAutoRange(self):
         """The span of the thermodynamic state space is determined automatically.
 
@@ -419,7 +419,7 @@ class Config_NICFD(Config):
         :rtype: bool
         """
         return self.__use_auto_range
-    
+
     def UsePTGrid(self, PT_grid:bool=DefaultSettings_NICFD.use_PT_grid):
         """Define fluid data grid in the pressure-temperature space. If not, the fluid data grid is defined in the density-energy space.
 
@@ -428,7 +428,7 @@ class Config_NICFD(Config):
         """
         self.__use_PT = bool(PT_grid)
         return
-    
+
     def GetPTGrid(self):
         """Get the fluid data grid definition.
 
@@ -437,7 +437,7 @@ class Config_NICFD(Config):
         """
 
         return self.__use_PT
-    
+
     def SetTemperatureBounds(self, T_lower:float=DefaultSettings_NICFD.T_min, T_upper:float=DefaultSettings_NICFD.T_max):
         """Set the upper and lower temperature limits between which fluid data are generated.
 
@@ -455,7 +455,7 @@ class Config_NICFD(Config):
             self.__T_lower = T_lower
             self.__T_upper = T_upper
         return
-    
+
     def SetEnergyBounds(self, E_lower:float=DefaultSettings_NICFD.Energy_min, E_upper:float=DefaultSettings_NICFD.Energy_max):
         """Define the internal energy bounds of the density-energy based fluid data grid.
 
@@ -471,7 +471,7 @@ class Config_NICFD(Config):
             self.__Energy_lower=E_lower
             self.__Energy_upper=E_upper
         return
-    
+
     def GetEnergyBounds(self):
         """Get the interal energy bounds for the density-energy based fluid data grid.
 
@@ -480,7 +480,7 @@ class Config_NICFD(Config):
         """
 
         return [self.__Energy_lower, self.__Energy_upper]
-    
+
     def SetNpEnergy(self, Np_Energy:int=DefaultSettings_NICFD.Np_temp):
         """Set the number of data points along the energy axis of the fluid data grid.
 
@@ -495,7 +495,7 @@ class Config_NICFD(Config):
             self.__Np_T = Np_Energy
 
         return
-    
+
     def GetNpEnergy(self):
         """
         Get the number of divisions for the fluid static energy range.
@@ -505,7 +505,7 @@ class Config_NICFD(Config):
 
         """
         return self.__Np_T
-    
+
     def SetDensityBounds(self, Rho_lower:float=DefaultSettings_NICFD.Rho_min, Rho_upper:float=DefaultSettings_NICFD.Rho_max):
         """Define the density bounds of the density-energy based fluid data grid.
 
@@ -521,7 +521,7 @@ class Config_NICFD(Config):
             self.__Rho_lower=Rho_lower
             self.__Rho_upper=Rho_upper
         return
-    
+
     def SetNpDensity(self, Np_rho:int=DefaultSettings_NICFD.Np_p):
         """Set the number of data points along the density axis of the fluid data grid.
 
@@ -536,7 +536,7 @@ class Config_NICFD(Config):
             self.__Np_P = Np_rho
 
         return
-    
+
     def GetNpDensity(self):
         """
         Get the number of divisions for the fluid density range.
@@ -546,7 +546,7 @@ class Config_NICFD(Config):
 
         """
         return self.__Np_P
-    
+
     def GetDensityBounds(self):
         """Get the density bounds for the density-energy based fluid data grid.
 
@@ -554,7 +554,7 @@ class Config_NICFD(Config):
         :rtype: list[float]
         """
         return [self.__Rho_lower, self.__Rho_upper]
-    
+
     def GetTemperatureBounds(self):
         """Get the temperature bounds for the pressure-temperature based fluid data grid.
 
@@ -562,8 +562,8 @@ class Config_NICFD(Config):
         :rtype: list[float]
         """
         return [self.__T_lower, self.__T_upper]
-    
-    
+
+
     def SetNpTemp(self, Np_Temp:int=DefaultSettings_NICFD.Np_temp):
         """
         Set number of divisions for the temperature grid.
@@ -578,7 +578,7 @@ class Config_NICFD(Config):
         else:
             self.__Np_T = Np_Temp
         return
-    
+
     def GetNpTemp(self):
         """
         Get the number of divisions for the fluid temperature range.
@@ -588,7 +588,7 @@ class Config_NICFD(Config):
 
         """
         return self.__Np_T
-    
+
 
     def SetPressureBounds(self, P_lower:float=DefaultSettings_NICFD.P_min, P_upper:float=DefaultSettings_NICFD.P_max):
         """Set the upper and lower limits for the fluid pressure.
@@ -605,7 +605,7 @@ class Config_NICFD(Config):
             self.__P_lower = P_lower
             self.__P_upper = P_upper
         return
-    
+
     def GetPressureBounds(self):
         """Get the pressure bounds for the pressure-temperature based fluid data grid.
 
@@ -613,8 +613,8 @@ class Config_NICFD(Config):
         :rtype: list[float]
         """
         return [self.__P_lower, self.__P_upper]
-    
-    
+
+
     def SetNpPressure(self, Np_P:int=DefaultSettings_NICFD.Np_p):
         """
         Set number of divisions for the fluid pressure grid.
@@ -629,7 +629,7 @@ class Config_NICFD(Config):
         else:
             self.__Np_P = Np_P
         return
-    
+
     def GetNpPressure(self):
         """
         Get the number of divisions for the fluid pressure range.
@@ -639,7 +639,7 @@ class Config_NICFD(Config):
 
         """
         return self.__Np_P
-    
+
     def SetTableDiscretization(self, table_method:str=DefaultSettings_NICFD.tabulation_method):
         """Specify how thermodynamic state space is discretized for look-up table.
 
@@ -651,7 +651,7 @@ class Config_NICFD(Config):
             raise Exception("Table discretization method should be one of the following: %s" % ",".join(t for t in DefaultSettings_NICFD.tabulation_options))
         self.__Table_discretization = table_method
         return
-    
+
     def GetTableDiscretization(self):
         """Get thermodynamic state space discretization method.
 
@@ -659,7 +659,7 @@ class Config_NICFD(Config):
         :rtype: str
         """
         return self.__Table_discretization
-    
+
     def SetTableCellSize(self, base_cell_size:float, refined_cell_size:float=None):
         """Define the base and optional refined 2D table cell sizes.
 
@@ -687,7 +687,7 @@ class Config_NICFD(Config):
         :rtype: float, float
         """
         return self.__Table_base_cell_size, self.__Table_ref_cell_size
-    
+
     def SetTableRefinement(self, refinement_radius:float, refinement_threshold:float):
         """Define the table refinement occurance parameters.
 
@@ -712,8 +712,8 @@ class Config_NICFD(Config):
         :rtype: float, float
         """
         return self.__Table_ref_radius, self.__Table_curv_threshold
-    
-        
+
+
     def SetStateVars(self, state_vars_in:list[str]):
         """Set the state variables for which the physics-informed neural network is trained.
 
@@ -727,7 +727,7 @@ class Config_NICFD(Config):
         self._state_vars = state_vars_in.copy()
 
         return
-    
+
     def GetStateVars(self):
         """Return the list of state variable names for which the physics-informed MLP is trained.
 
@@ -736,8 +736,8 @@ class Config_NICFD(Config):
         """
 
         return self._state_vars
-    
-    
+
+
 
 
 #---------------------------------------------------------------------------------------------#
@@ -800,7 +800,7 @@ class Config_FGM(Config):
 
     # MLP output groups and architecture information.
     __MLP_output_groups:list[list[str]] = None  # Output variables for each MLP.
-    
+
     __alpha_expo:list[float] = [DefaultSettings_FGM.init_learning_rate_expo]
     __lr_decay:list[float] = [DefaultSettings_FGM.learning_rate_decay]
     __batch_expo:list[float] = [DefaultSettings_FGM.batch_size_exponent]
@@ -842,7 +842,7 @@ class Config_FGM(Config):
 
         self._config_type = DefaultSettings_FGM.config_type
         self._config_name = DefaultSettings_FGM.config_name
-        
+
         if load_file:
             print("Loading configuration for flamelet generation")
             with open(load_file, "rb") as fid:
@@ -859,11 +859,11 @@ class Config_FGM(Config):
             self.SetControllingVariables(DefaultSettings_FGM.controlling_variables)
 
             print("Generating empty SU2 DataMiner configuration for FGM")
-        
+
         self.__SynchronizeSettings()
 
         return
-    
+
     def SetControllingVariables(self, controlling_variables:list[str]=DefaultSettings_FGM.controlling_variables):
         """Define the set of controlling variables for the current manifold.
 
@@ -876,7 +876,7 @@ class Config_FGM(Config):
         super().SetControllingVariables(controlling_variables)
 
         return
-    
+
     def __SynchronizeSettings(self):
 
         # Re-set cantera solution.
@@ -919,7 +919,7 @@ class Config_FGM(Config):
         self.SetAverageLewisNumbers()
 
         return
-    
+
     def GetConstSpecieLewisNumbers(self):
         """Retrieve constant species Lewis numbers used to calculate the preferential diffusion scalars.
 
@@ -927,11 +927,11 @@ class Config_FGM(Config):
         :rtype: np.ndarray[float]
         """
         return self.__Le_const_sp
-    
+
     def PrintBanner(self):
         """Print banner visualizing the SU2 DataMiner configuration settings."""
         super().PrintBanner()
-        
+
         print("Config_FGMuration: " + self._config_name)
         print("")
         print("Flamelet generation settings:")
@@ -942,7 +942,7 @@ class Config_FGM(Config):
         print("Oxidizer definition: " + ",".join("%s: %.2e" % (self.__oxidizer_species[i], self.__oxidizer_weights[i]) for i in range(len(self.__oxidizer_species))))
         print("")
         print("Reactant temperature range: %.2f K -> %.2f K (%i steps)" % (self.__T_unb_lower, self.__T_unb_upper, self.__Np_T_unb))
-        
+
         if self.__run_mixture_fraction:
             print("Mixture status defined as mixture fraction")
         else:
@@ -986,7 +986,7 @@ class Config_FGM(Config):
             self.DisplayOutputGroups()
         print("")
         return
-    
+
     def ComputeMixFracConstants(self):
         """Define species weights such that Z = w * Y + z_c where Z is the mixture fraction, Y is the array of species mass fractions, w is a species weights array, and z_c is a constant.
         The components of w are used to calculate the value of the preferential diffusion scalar for the mixture fraction.
@@ -1005,7 +1005,7 @@ class Config_FGM(Config):
         Y_o = self.gas.Y
         self.gas.set_mixture_fraction(1.0, self.__fuel_string, self.__oxidizer_string)
         Y_f = self.gas.Y
-        
+
         # Calculating Bilger mixture fraction weighting factors.
         gamma_fuel = np.zeros(self.gas.n_elements)
         for i_e in range(self.gas.n_elements):
@@ -1027,14 +1027,14 @@ class Config_FGM(Config):
                 n_atoms = self.gas.n_atoms(self.gas.species_name(i_s), self.gas.element_name(i_e))
                 W_s = self.gas.molecular_weights[i_s]
                 w_z[i_s] += g * n_atoms * W_e / W_s
-        
+
         beta_o = np.sum(w_z * Y_o)
         beta_f = np.sum(w_z * Y_f)
         self.__mixfrac_coefficients = w_z / (beta_f - beta_o)
         self.__mixfrac_constant = -beta_o / (beta_f - beta_o)
         self.__mixfrac_coeff_carrier = self.__mixfrac_coefficients[self.gas.species_index(self.__carrier_specie)]
         return
-    
+
     def GetMixtureFractionCoefficients(self):
         """
         Get the species mass fraction coefficients for computation of the mixture fraction according to Bilger's definition.
@@ -1044,7 +1044,7 @@ class Config_FGM(Config):
 
         """
         return self.__mixfrac_coefficients
-    
+
     def GetMixtureFractionConstant(self):
         """
         Get the mixture fraction offset value according to Bilger's definition.
@@ -1053,7 +1053,7 @@ class Config_FGM(Config):
         :rtype: float
         """
         return self.__mixfrac_constant
-    
+
     def GetMixtureFractionCoeff_Carrier(self):
         """
         Get the mixture frraction coefficient of the carrier specie.
@@ -1062,7 +1062,7 @@ class Config_FGM(Config):
         :rtype: float
         """
         return self.__mixfrac_coeff_carrier
-    
+
     def GetFuelDefinition(self):
         """
         Get a list of species comprising the fuel reactants.
@@ -1071,7 +1071,7 @@ class Config_FGM(Config):
         :rtype: list[str]
         """
         return self.__fuel_species
-    
+
     def GetFuelWeights(self):
         """
         Get a list of the molar fractions of the fuel species.
@@ -1080,7 +1080,7 @@ class Config_FGM(Config):
         :rtype: list[float]
         """
         return self.__fuel_weights
-    
+
     def GetFuelString(self):
         """Retrieve the Cantera input string of the fuel definition
 
@@ -1088,7 +1088,7 @@ class Config_FGM(Config):
         :rtype: str
         """
         return self.__fuel_string
-    
+
     def GetOxidizerDefinition(self):
         """
         Get a list of species comprising the oxidizer reactants.
@@ -1097,7 +1097,7 @@ class Config_FGM(Config):
         :rtype: list[str]
         """
         return self.__oxidizer_species
-    
+
     def GetOxidizerWeights(self):
         """
         Get a list of the molar fractions of the oxidizer species.
@@ -1114,7 +1114,7 @@ class Config_FGM(Config):
         :rtype: str
         """
         return self.__oxidizer_string
-    
+
     def GetMixtureSpecies(self):
         """
         Get the list of passive species.
@@ -1138,7 +1138,7 @@ class Config_FGM(Config):
         """
         if len(fuel_species) == 0:
             raise Exception("Fuel definition should contain at least one species name.")
-        
+
         if (len(fuel_species) != len(fuel_weights)):
             raise Exception("Number of species and weigths for fuel definition should be equal.")
         self.__fuel_species = fuel_species.copy()
@@ -1146,7 +1146,7 @@ class Config_FGM(Config):
 
         self.__SynchronizeSettings()
         return
-    
+
     def SetOxidizerDefinition(self, oxidizer_species:list[str]=DefaultSettings_FGM.oxidizer_definition, \
                               oxidizer_weights:list[float]=DefaultSettings_FGM.oxidizer_weights):
         """
@@ -1170,7 +1170,7 @@ class Config_FGM(Config):
 
         self.__SynchronizeSettings()
         return
-    
+
     def SetReactionMechanism(self, mechanism_input:str=DefaultSettings_FGM.reaction_mechanism):
         """
         Define reaction mechanism used for flamelet data generation. The default setting is the gri30 mechanism for methane/hydrogen.
@@ -1180,7 +1180,7 @@ class Config_FGM(Config):
         :raise: Exception: If the reaction mechanism could not be loaded from path.
 
         """
-        
+
         self.__reaction_mechanism = mechanism_input
         try:
             self.gas = ct.Solution(mechanism_input)
@@ -1188,7 +1188,7 @@ class Config_FGM(Config):
             raise Exception("Specified reaction mechanism not found.")
         self.__SynchronizeSettings()
         return
-    
+
     def GetReactionMechanism(self):
         """
         Get the reaction mechanism used for flamelet generation.
@@ -1197,7 +1197,7 @@ class Config_FGM(Config):
 
         """
         return self.__reaction_mechanism
-    
+
     def SetTransportModel(self, transport_model:str=DefaultSettings_FGM.transport_model):
         """Define the transport model for the 1D flamelet computations: "unity-Lewis" or "multicomponent".
 
@@ -1210,11 +1210,11 @@ class Config_FGM(Config):
             self.__preferential_diffusion = False
         else:
             raise Exception("Transport model should be \"multicomponent\", \"mixture-averaged\", or \"unity-Lewis-number\"")
-        
+
         self.__transport_model=transport_model
         self.__SynchronizeSettings()
         return
-    
+
     def GetTransportModel(self):
         """Get the transport model for 1D flamelet computations.
 
@@ -1222,7 +1222,7 @@ class Config_FGM(Config):
         :rtype: str
         """
         return self.__transport_model
-    
+
     def SetMixtureBounds(self, mix_lower:float=DefaultSettings_FGM.eq_ratio_min, mix_upper:float=DefaultSettings_FGM.eq_ratio_max):
         """
         Set upper and lower bounds of mixture status for flamelet data manifold.
@@ -1242,14 +1242,14 @@ class Config_FGM(Config):
                 raise Exception("Mixture status should be positive.")
             if mix_upper > 1.0 and self.__run_mixture_fraction:
                 raise Exception("Mixture fraction bounds should be between 0.0 and 1.0")
-            
+
             self.__mix_status_lower = mix_lower
             self.__mix_status_upper = mix_upper
 
         self.SetAverageLewisNumbers()
 
         return
-    
+
     def GetMixtureBounds(self):
         """
         Get the mixture status bounds.
@@ -1258,7 +1258,7 @@ class Config_FGM(Config):
 
         """
         return [self.__mix_status_lower, self.__mix_status_upper]
-    
+
     def SetNpMix(self, input:int=DefaultSettings_FGM.Np_eq):
         """
         Set number of divisions between lean and rich mixture status for flamelet generation.
@@ -1273,7 +1273,7 @@ class Config_FGM(Config):
         else:
             self.__Np_mix_unb = input
         return
-    
+
     def GetNpMix(self):
         """
         Get the number of divisions between the lean and rich mixture status for flamelet generation.
@@ -1305,7 +1305,7 @@ class Config_FGM(Config):
         self.SetAverageLewisNumbers()
 
         return
-    
+
     def GetUnbTempBounds(self):
         """
         Get the reactant temperature bounds for flamelet generation.
@@ -1315,7 +1315,7 @@ class Config_FGM(Config):
 
         """
         return [self.__T_unb_lower, self.__T_unb_upper]
-    
+
     def SetNpTemp(self, Np_Temp:int=DefaultSettings_FGM.Np_temp):
         """
         Set number of divisions for the reactant temperature at each mixture fraction/equivalence ratio.
@@ -1330,7 +1330,7 @@ class Config_FGM(Config):
         else:
             self.__Np_T_unb = Np_Temp
         return
-    
+
     def GetNpTemp(self):
         """
         Get the number of divisions for the reactant temperature range.
@@ -1352,7 +1352,7 @@ class Config_FGM(Config):
         self.SetAverageLewisNumbers()
 
         return
-    
+
     def GetMixtureStatus(self):
         """
         Get the mixture status definition of the current Config_FGM class.
@@ -1362,7 +1362,7 @@ class Config_FGM(Config):
 
         """
         return self.__run_mixture_fraction
-    
+
     def RunFreeFlames(self, input:bool=DefaultSettings_FGM.include_freeflames):
         """
         Include adiabatic free flame data in the manifold.
@@ -1373,7 +1373,7 @@ class Config_FGM(Config):
         """
         self.__generate_freeflames = input
         return
-    
+
     def RunBurnerFlames(self, input:bool=DefaultSettings_FGM.include_burnerflames):
         """
         Include burner-stabilized flame data in the manifold.
@@ -1384,7 +1384,7 @@ class Config_FGM(Config):
         """
         self.__generate_burnerflames = input
         return
-    
+
     def RunEquilibrium(self, input:bool=DefaultSettings_FGM.include_equilibrium):
         """
         Include chemical equilibrium (reactants and products) data in the manifold.
@@ -1395,7 +1395,7 @@ class Config_FGM(Config):
         """
         self.__generate_equilibrium = input
         return
-    
+
     def RunCounterFlames(self, input:bool=DefaultSettings_FGM.include_counterflames):
         """
         Include counter-flow diffusion flame data in the manifold.
@@ -1406,7 +1406,7 @@ class Config_FGM(Config):
         """
         self.__generate_counterflames = input
         return
-    
+
     def GenerateFreeFlames(self):
         """
         Whether the manifold data contains adiabatic free-flame data.
@@ -1415,7 +1415,7 @@ class Config_FGM(Config):
         :rtype: bool
         """
         return self.__generate_freeflames
-    
+
     def GenerateBurnerFlames(self):
         """
         Whether the manifold data contains burner-stabilized flame data.
@@ -1424,7 +1424,7 @@ class Config_FGM(Config):
         :rtype: bool
         """
         return self.__generate_burnerflames
-    
+
     def GenerateEquilibrium(self):
         """
         Whether the manifold data contains chemical equilibrium data.
@@ -1433,7 +1433,7 @@ class Config_FGM(Config):
         :rtype: bool
         """
         return self.__generate_equilibrium
-    
+
     def GenerateCounterFlames(self):
         """
         Whether the manifold data contains counter-flow diffusion flame data.
@@ -1442,7 +1442,7 @@ class Config_FGM(Config):
         :rtype: bool
         """
         return self.__generate_counterflames
-    
+
     def TranslateToMatlab(self, input:bool):
         """
         Save a copy of flamelet data as MATLAB TableMaster format.
@@ -1451,7 +1451,7 @@ class Config_FGM(Config):
         """
         self.__write_MATLAB_files = input
         return
-    
+
     def WriteMatlabFiles(self):
         """
         Save a copy of flamelet data as MATLAB TableMaster format.
@@ -1460,7 +1460,7 @@ class Config_FGM(Config):
         :rtype: bool
         """
         return self.__write_MATLAB_files
-    
+
     def SetProgressVariableDefinition(self, pv_species:list[str]=DefaultSettings_FGM.pv_species, pv_weights:list[float]=DefaultSettings_FGM.pv_weights):
         """
         Set the progress variable species and mass-fraction weights.
@@ -1480,7 +1480,7 @@ class Config_FGM(Config):
             self.__pv_weights = pv_weights.copy()
             self.__custom_pv_set = True
         return
-    
+
     def ResetProgressVariableDefinition(self):
         """Reset progress variable definition to default (weighted reactants and major products).
         """
@@ -1489,7 +1489,7 @@ class Config_FGM(Config):
         self.__custom_pv_set = False
         self.SetDefaultProgressVariable()
         return
-    
+
     def GetProgressVariableSpecies(self):
         """
         Get the progress variable species names.
@@ -1498,7 +1498,7 @@ class Config_FGM(Config):
         :rtype: list[str]
         """
         return self.__pv_definition
-    
+
     def GetProgressVariableWeights(self):
         """
         Get the progress variable species weights.
@@ -1507,7 +1507,7 @@ class Config_FGM(Config):
         :rtype: list[float]
         """
         return self.__pv_weights
-    
+
     def SetDefaultProgressVariable(self):
         """Set progress variable to be weighted sum of fuel and oxidizer species (minus N2) and major product at stochiometry. 
            Weights are set as the inverse of specie molecular weight: negative for reactants, positive for product.
@@ -1550,7 +1550,7 @@ class Config_FGM(Config):
         denominator = sum([abs(w) for w in pv_weights])
         pv_weights = [w / denominator for w in pv_weights]
         return pv_species, pv_weights
-    
+
     def SetPassiveSpecies(self, passive_species:list[str]=[]):
         """
         Set the passive transported species for which source terms should be saved in the manifold.
@@ -1560,7 +1560,7 @@ class Config_FGM(Config):
         """
         self.__passive_species = passive_species
         return
-    
+
     def GetPassiveSpecies(self):
         """
         Get the list of passive species included in the manifold data.
@@ -1569,7 +1569,7 @@ class Config_FGM(Config):
         :rtype: list[str]
         """
         return self.__passive_species
-    
+
     def SetLookUpVariables(self, lookup_vars:list[str]=[]):
         """
         Define passive look-up terms to be included in the manifold.
@@ -1579,7 +1579,7 @@ class Config_FGM(Config):
         """
         self.__lookup_variables = lookup_vars
         return
-    
+
     def GetLookUpVariables(self):
         """
         Get the variable names of the passive look-up variables in the manifold.
@@ -1588,7 +1588,7 @@ class Config_FGM(Config):
         :rtype: list[str]
         """
         return self.__lookup_variables
-    
+
     def SetNpConcatenation(self, Np_input:int):
         """
         Set the number of query points per flamelet used to define the manifold.
@@ -1601,7 +1601,7 @@ class Config_FGM(Config):
             raise Exception("Number of interpolation points per flamelet should be higher than two.")
         else:
             self.__Np_per_flamelet = Np_input
-    
+
     def GetNpConcatenation(self):
         """
         Get the number of data points per flamelet used to define the manifold.
@@ -1610,7 +1610,7 @@ class Config_FGM(Config):
         :rtype: int
         """
         return self.__Np_per_flamelet
-    
+
     def ComputeProgressVariable(self, variables:list[str], flamelet_data:np.ndarray, Y_flamelet:np.ndarray=None):
         """Compute the progress variable based on the corresponding progress variable definition for an array of provided flamelet data or species mass fractions.
 
@@ -1636,13 +1636,13 @@ class Config_FGM(Config):
         else:
             if len(variables) != np.shape(flamelet_data)[1]:
                 raise Exception("Number of variables does not match data array.")
-            
+
             pv = np.zeros(np.shape(flamelet_data)[0])
             for iPv, pvSp in enumerate(self.__pv_definition):
                 pv += self.__pv_weights[iPv] * flamelet_data[:, variables.index("Y-"+pvSp)]
             return pv
 
-    
+
     def ComputeProgressVariable_Source(self, variables:list[str], flamelet_data:np.ndarray,net_production_rate_flamelet:np.ndarray=None):
         """
         Compute the progress variable source term based on the corresponding progress variable definition for an array of provided flamelet data.
@@ -1676,11 +1676,11 @@ class Config_FGM(Config):
                 mass_fraction = flamelet_data[:, variables.index('Y-'+pvSp)]
                 ppv += self.__pv_weights[iPv] * (prodrate_pos + prodrate_neg * mass_fraction)
             return ppv
-    
+
     def GetSparkSources(self, val_phi:float, val_T:float, iGroup:int=0):
         self.gas.set_equivalence_ratio(val_phi, self.__fuel_string, self.__oxidizer_string)
         self.gas.TP=val_T,DefaultSettings_FGM.pressure
-        
+
         flame = ct.FreeFlame(self.gas)
         flame.transport_model = self.__transport_model
         flame.solve(auto=True,refine_grid=True,loglevel=0)
@@ -1702,7 +1702,7 @@ class Config_FGM(Config):
         for i_sp in range(len(self.__passive_species)):
             sources_spark[len(control_vars) + i_sp] = species_spark[i_sp]
         return sources_spark
-    
+
     def EnablePreferentialDiffusion(self, use_PD:bool=DefaultSettings_FGM.preferential_diffusion):
         """Include preferential diffusion scalars in flamelet data manifold.
 
@@ -1715,7 +1715,7 @@ class Config_FGM(Config):
             self.SetAverageLewisNumbers()
 
         return
-    
+
     def PreferentialDiffusion(self):
         """Inclusion of preferential diffusion in flamelet data manifold.
 
@@ -1723,11 +1723,11 @@ class Config_FGM(Config):
         :rtype: bool
         """
         return self.__preferential_diffusion
-    
+
     def SetAveragingMethod(self, avg_method=avg_Le_const):
         self.__Le_avg_method = avg_method
         return
-    
+
     def AverageLewisNumber(self, Le_sp:np.ndarray, iSp:int):
         if self.__Le_avg_method == avg_Le_const:
             Le_av = avg_Le_const(Le_sp, self.__Le_const_sp[iSp])
@@ -1752,7 +1752,7 @@ class Config_FGM(Config):
         if reactant_temperature != None:
             if reactant_temperature < 0:
                 raise Exception("Reactant temperature should be positive.")
-        
+
         self.__Le_avg_method = avg_Le_const
         if (reactant_temperature == None):
             if (self.__Le_avg_T_unb == None):
@@ -1776,7 +1776,7 @@ class Config_FGM(Config):
             self.gas.set_mixture_fraction(self.__Le_avg_eq_ratio, self.__fuel_string, self.__oxidizer_string)
         else:
             self.gas.set_equivalence_ratio(self.__Le_avg_eq_ratio, self.__fuel_string, self.__oxidizer_string)
-        
+
         Le_reactants = ComputeLewisNumber(self.gas)
         self.gas.equilibrate("HP")
         Le_products = ComputeLewisNumber(self.gas)
@@ -1784,7 +1784,7 @@ class Config_FGM(Config):
         self.__Le_const_sp = 0.5*(Le_reactants + Le_products)
 
         return
-    
+
     def ComputeBetaTerms(self, variables:list[str], flamelet_data:np.ndarray):
         """
         Compute the differential diffusion scalars for a flamelet.
@@ -1800,7 +1800,7 @@ class Config_FGM(Config):
         """
         if len(variables) != np.shape(flamelet_data)[1]:
             raise Exception("Number of variables does not match data array.")
-        
+
         beta_z = np.zeros(len(flamelet_data))
         beta_h1 = flamelet_data[:, variables.index("Cp")] * np.ones(len(flamelet_data))
         cp_c = flamelet_data[:, variables.index("Cp-"+self.__carrier_specie)]
@@ -1821,7 +1821,7 @@ class Config_FGM(Config):
 
             h_i = flamelet_data[:, variables.index("h-"+self.__species_in_mixture[iSp])]
             beta_h2 += (h_i - h_c) * Y_sp / Le_av
-        
+
         beta_pv = np.zeros(len(flamelet_data))
         for iPv in range(len(self.__pv_definition)):
             Le_sp = flamelet_data[:, variables.index("Le-"+self.__pv_definition[iPv])]
@@ -1829,7 +1829,7 @@ class Config_FGM(Config):
             beta_pv += self.__pv_weights[iPv] * flamelet_data[:, variables.index("Y-"+self.__pv_definition[iPv])] / Le_av
 
         return beta_pv, beta_h1, beta_h2, beta_z
-    
+
     def GetUnburntScalars(self, equivalence_ratio:float, temperature:float):
         """
         Compute the reactant progress variable, total enthalpy, and mixture fraction for a given equivalence ratio and temperature.
@@ -1849,7 +1849,7 @@ class Config_FGM(Config):
 
         if temperature < 200:
             raise Exception("Temperature should be above 200 degrees Kelvin.")
-        
+
         self.__fuel_string = ",".join(self.__fuel_species[i]+":"+str(self.__fuel_weights[i]) for i in range(len(self.__fuel_species)))
         self.__oxidizer_string = ",".join(self.__oxidizer_species[i]+":"+str(self.__oxidizer_weights[i]) for i in range(len(self.__oxidizer_species)))
         self.gas.set_equivalence_ratio(equivalence_ratio, self.__fuel_string, self.__oxidizer_string)
@@ -1858,7 +1858,7 @@ class Config_FGM(Config):
         pv_unb = 0.0
         for iPV, pvSp in enumerate(self.__pv_definition):
             pv_unb += float(self.__pv_weights[iPV] * self.gas.Y[self.gas.species_index(pvSp)])
-        
+
         enth_unb = self.gas.enthalpy_mass
 
         mixfrac_unb = self.gas.mixture_fraction(self.__fuel_string, self.__oxidizer_string)
@@ -1871,9 +1871,9 @@ class Config_FGM(Config):
         else:
             if (equivalence_ratio < self.__mix_status_lower) or (equivalence_ratio > self.__mix_status_upper):
                 raise Warning("Provided equivalence ratio exceeds flamelet data range.")
-            
+
         return pv_unb, enth_unb, mixfrac_unb
-    
+
     def GetBurntScalars(self, equivalence_ratio:float, temperature:float=300):
         """
         Compute the reaction products (chemical equilibrium) progress variable, total enthalpy, and mixture fraction for a given equivalence ratio and temperature.
@@ -1898,11 +1898,11 @@ class Config_FGM(Config):
         pv_b = 0
         for iPV, pvSp in enumerate(self.__pv_definition):
             pv_b += self.__pv_weights[iPV] * self.gas.Y[self.gas.species_index(pvSp)]
-        
+
         enth_b = self.gas.enthalpy_mass
 
         mixfrac_b = self.gas.mixture_fraction(self.__fuel_string, self.__oxidizer_string)
-        
+
         if (temperature > self.__T_unb_upper) or (temperature < self.__T_unb_lower):
             raise Warning("Provided temperature is outside flamelet data bounds.")
         if self.__run_mixture_fraction:
@@ -1911,9 +1911,9 @@ class Config_FGM(Config):
         else:
             if (equivalence_ratio < self.__mix_status_lower) or (equivalence_ratio > self.__mix_status_upper):
                 raise Warning("Provided equivalence ratio exceeds flamelet data range.")
-            
+
         return pv_b, enth_b, mixfrac_b
-    
+
     def SetTableCellSize(self, base_cell_size:float, refined_cell_size:float=None):
         """Define the base and optional refined 2D table cell sizes.
 
@@ -1941,7 +1941,7 @@ class Config_FGM(Config):
         :rtype: float, float
         """
         return self.__Table_base_cell_size, self.__Table_ref_cell_size
-    
+
     def SetTableRefinement(self, refinement_radius:float, refinement_threshold:float):
         """Define the table refinement occurance parameters.
 
@@ -1959,7 +1959,7 @@ class Config_FGM(Config):
         self.__Table_ref_radius = refinement_radius
         self.__Table_curv_threshold = refinement_threshold
         return
-    
+
     def GetTableRefinement(self):
         """Returns the table refinement radius and refinement threshold values.
 
@@ -1967,7 +1967,7 @@ class Config_FGM(Config):
         :rtype: float, float
         """
         return self.__Table_ref_radius, self.__Table_curv_threshold
-    
+
     def SetTableLevelCount(self, level_count:int):
         """Define the number of 2D table levels along the mixture fraction direction.
 
@@ -1979,7 +1979,7 @@ class Config_FGM(Config):
             raise Exception("Number of table levels should be higher than 2.")
         self.__Table_level_count = level_count
         return
-    
+
     def GetTableLevelCount(self):
         """Returns the number of levels in the table.
 
@@ -1987,7 +1987,7 @@ class Config_FGM(Config):
         :rtype: int
         """
         return self.__Table_level_count
-    
+
     def SetTableMixtureFractionLimits(self, mixfrac_lower:float, mixfrac_upper:float):
         """Define the mixture fraction values between which table levels are generated.
 
@@ -2005,7 +2005,7 @@ class Config_FGM(Config):
         self.__Table_mixfrac_lower = mixfrac_lower
         self.__Table_mixfrac_upper = mixfrac_upper
         return
-    
+
     def GetTableMixtureFractionLimits(self):
         """Returns the lower and upper mixture fraction limits of the table between which table levels are generated.
 
@@ -2013,7 +2013,7 @@ class Config_FGM(Config):
         :rtype: float, float
         """
         return self.__Table_mixfrac_lower, self.__Table_mixfrac_upper
-    
+
     def AddOutputGroup(self, variable_names_in:list[str]):
         """Add an MLP output group of flamelet variables.
 
@@ -2023,7 +2023,7 @@ class Config_FGM(Config):
         """
         if len(variable_names_in) == 0:
             raise Exception("An MLP output group should be made up of at least one variable.")
-        
+
         if self.__MLP_output_groups == None:
             self.__MLP_output_groups = []
             self.__alpha_expo = []
@@ -2041,7 +2041,7 @@ class Config_FGM(Config):
         self.__NN.append(DefaultSettings_FGM.hidden_layer_architecture)
         self.__activation_function.append(DefaultSettings_FGM.activation_function)
         return
-    
+
     def EditOutputGroup(self, i_group:int, variable_names_in:list[str]):
         """Re-define the variables in a specific MLP output group.
 
@@ -2056,12 +2056,12 @@ class Config_FGM(Config):
             raise Exception("Group not present in MLP outputs.")
         if len(variable_names_in) == 0:
             raise Exception("An MLP output group should be made up of at least one variable.")
-        
+
         self.__MLP_output_groups[i_group] = []
         for var in variable_names_in:
             self.__MLP_output_groups[i_group].append(var)
         return
-    
+
     def RemoveOutputGroup(self, i_group:int):
         """Remove one of the MLP output groups.
 
@@ -2074,11 +2074,11 @@ class Config_FGM(Config):
         print("Removing output group %i: %s" % (i_group, ",".join(s for s in self.__MLP_output_groups[i_group-1])))
         self.__MLP_output_groups.remove(self.__MLP_output_groups[i_group-1])
         return
-    
+
     def ClearOutputGroups(self):
         self.__MLP_output_groups = None
         return
-    
+
     def DisplayOutputGroups(self):
         """Print the MLP output variables grouping arrangement.
         """
@@ -2092,7 +2092,7 @@ class Config_FGM(Config):
             print("Hidden layer architecture: " + ",".join(("%i" % n) for n in self.__NN[i_group]))
             print()
         return
-    
+
     def GetNMLPOutputGroups(self):
         """Get the number of MLP output groups.
 
@@ -2100,7 +2100,7 @@ class Config_FGM(Config):
         :rtype: int
         """
         return len(self.__MLP_output_groups)
-    
+
     def GetMLPOutputGroup(self, i_group:int):
         """Get the list of variables in a specific MLP group.
 
@@ -2110,66 +2110,66 @@ class Config_FGM(Config):
         :rtype: list[str]
         """
         return self.__MLP_output_groups[i_group]
-    
+
     def SetAlphaExpo(self, alpha_expo_in: float = DefaultSettings_FGM.init_learning_rate_expo, i_group:int=0):
         super().SetAlphaExpo(alpha_expo_in)
         self.__alpha_expo[i_group] = alpha_expo_in
         return
-    
+
     def GetAlphaExpo(self, i_group:int=0):
         return self.__alpha_expo[i_group]
-    
+
     def SetLRDecay(self, lr_decay_in: float = DefaultSettings_FGM.learning_rate_decay, i_group:int=0):
         super().SetLRDecay(lr_decay_in)
         self.__lr_decay[i_group] = lr_decay_in
         return
-    
+
     def GetLRDecay(self, i_group:int=0):
         return self.__lr_decay[i_group]
-    
+
     def SetBatchExpo(self, batch_expo_in: int = DefaultSettings_FGM.batch_size_exponent, i_group:int=0):
         super().SetBatchExpo(batch_expo_in)
         self.__batch_expo[i_group] = batch_expo_in
         return
-    
+
     def GetBatchExpo(self, i_group:int=0):
         return self.__batch_expo[i_group]
-    
+
     def SetActivationFunction(self, activation_function_in: str = DefaultSettings_FGM.activation_function, i_group:int=0):
         super().SetActivationFunction(activation_function_in)
         self.__activation_function[i_group] = activation_function_in
         return
-    
+
     def GetActivationFunction(self, i_group:int=0):
         return self.__activation_function[i_group]
-    
+
     def SetHiddenLayerArchitecture(self, hidden_layer_architecture: list[int] = DefaultSettings_FGM.hidden_layer_architecture, i_group:int=0):
         super().SetHiddenLayerArchitecture(hidden_layer_architecture)
         self.__NN[i_group] = []
         for N in hidden_layer_architecture:
             self.__NN[i_group].append(N)
         return
-    
+
     def GetHiddenLayerArchitecture(self, i_group:int=0):
         return self.__NN[i_group]
-    
+
     def GetWeightsBiases(self, i_group:int=0):
         return self._MLP_weights[i_group], self._MLP_biases[i_group]
-    
+
     def SetWeights(self, weights: list[np.ndarray[float]], i_group:int=0):
         self._MLP_weights[i_group] = []
         for w in weights:
             self.__WeightsCheck(w)
             self._MLP_weights[i_group].append(w)
         return
-    
+
     def SetBiases(self, biases:list[np.ndarray[float]], i_group:int=0):
         self._MLP_biases[i_group] = []
         for w in biases:
             self.__BiasesCheck(w)
             self._MLP_biases[i_group].append(w)
         return
-    
+
     def UpdateMLPHyperParams(self, trainer):
         group_idx = trainer.GetOutputGroup()
         train_vars = trainer.GetTrainVars().copy()
@@ -2196,7 +2196,7 @@ class Config_FGM(Config):
             self.__alpha_expo = []
             self.__batch_expo = []
         if (group_idx+1) > len(self._MLP_weights):
-            
+
             self._train_vars.append(train_vars)
             self._control_vars.append(control_vars)
             self._scaler_function_name.append(scaler_function_name)
@@ -2224,7 +2224,7 @@ class Config_FGM(Config):
             self.__alpha_expo[group_idx] = alpha_expo
             self.__batch_expo[group_idx] = batch_expo
         return
-    
+
     def WriteSU2MLP(self, file_name_out:str, group_idx:int=-1):
         if group_idx == -1:
             for iGroup in range(self.GetNMLPOutputGroups()):
@@ -2268,7 +2268,7 @@ class Config_FGM(Config):
         fid.write("Progress variable definition: " + "+".join(("%+.6e*%s" % (w, s)) for w, s in zip(self.__pv_weights, self.__pv_definition)))
         fid.write("\n\n")
         return
-    
+
     def SaveConfig(self):
         """
         Save the current FlameletAI configuration.
@@ -2282,5 +2282,5 @@ class Config_FGM(Config):
         pickle.dump(self, file)
         file.close()
         return
-    
+
 

@@ -44,7 +44,7 @@ class DataGenerator_Base:
     __output_file_header:str   # Fluid data output file header.
 
     __output_dir:str    # Path location at which to save fluid data.
-    
+
     def __init__(self, Config_in:Config=None):
         """Class constructor, define data generator optionally through SU2 DataMiner configuration. If no configuration is provided, default settings are applied.
 
@@ -64,7 +64,7 @@ class DataGenerator_Base:
         self.__output_file_header = self._Config.GetConcatenationFileHeader()
 
         return
-    
+
     def SetOutputDir(self, output_dir:str):
         """
         Define the fluid data output directory. This directory is set as the default storage directory
@@ -80,7 +80,7 @@ class DataGenerator_Base:
             self.__output_dir = output_dir
 
         return
-    
+
     def GetOutputDir(self):
         """
         Get the current DataMiner configuration fluid storage directory.
@@ -94,7 +94,7 @@ class DataGenerator_Base:
             raise Exception("Saved output directory not present on current machine.")
         else:
             return self.__output_dir
-        
+
     def SetConcatenationFileHeader(self, header:str=DefaultProperties.output_file_header):
         """
         Define the file name header for the collection of fluid data.
@@ -104,7 +104,7 @@ class DataGenerator_Base:
         """
         self.__output_file_header = header
         return
-    
+
     def GetConcatenationFileHeader(self):
         """Get fluid data output file header.
 
@@ -112,7 +112,7 @@ class DataGenerator_Base:
         :rtype: str
         """
         return self.__output_file_header
-    
+
 
     def SetTrainFraction(self, input:float=DefaultProperties.train_fraction):
         """
@@ -126,7 +126,7 @@ class DataGenerator_Base:
             raise Exception("Training data fraction should be between zero and one.")
         self.__train_fraction = input
         return
-    
+
     def SetTestFraction(self, input:float=DefaultProperties.test_fraction):
         """
         Define the fraction of fluid data separate from the training data used for
@@ -140,7 +140,7 @@ class DataGenerator_Base:
             raise Exception("Test data fraction should be between zero and one.")
         self.__test_fraction = input
         return
-    
+
     def GetTrainFraction(self):
         """
         Get fluid data fraction used for multi-layer perceptron training.
@@ -149,7 +149,7 @@ class DataGenerator_Base:
         :rtype: float 
         """
         return self.__train_fraction
-    
+
     def GetTestFraction(self):
         """
         Get fluid data fraction used for determining accuracy after training.
@@ -158,12 +158,11 @@ class DataGenerator_Base:
         :rtype: float 
         """
         return self.__test_fraction
-    
+
     def ComputeData(self):
         print("Initiating data generation proces...")
         return
-    
+
     def SaveData(self):
         print("Saving fluid data...")
         return
-    

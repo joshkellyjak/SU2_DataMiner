@@ -58,18 +58,18 @@ class SU2TableGenerator_Base:
     _table_nodes_norm = []  # Normalized table nodes for each level.
     _table_connectivity = []    # Table node connectivity per table level.
     _table_hullnodes = []   # Hull node indices per table level.
-    
+
     def __init__(self, Config_in):
         self._Config = Config_in
         self._savedir = self._Config.GetOutputDir()
         return
-    
+
     def SetSaveDir(self, save_dir:str):
         if not os.path.isdir(save_dir):
             raise Exception("Output directory %s not present on current hardware." % save_dir)
         self._savedir = save_dir
         return
-    
+
     def SetBaseCellSize(self, cell_size:float):
         """
         Define the base cell size for the table levels.
@@ -83,7 +83,7 @@ class SU2TableGenerator_Base:
         else:
             raise Exception("Proviced cell size should be higher than zero.")
         return
-    
+
     def SetRefinedCellSize(self, cell_size:float):
         """
         Define the refinement cell size for the table levels.
@@ -97,7 +97,7 @@ class SU2TableGenerator_Base:
         else:
             raise Exception("Proviced cell size should be higher than zero.")
         return
-    
+
     def SetRefinementThreshold(self, val_threshold:float):
         """
         Define normalized curvature threshold beyond which refinement should be applied to each table level.
@@ -112,8 +112,8 @@ class SU2TableGenerator_Base:
         else:
             raise Exception("Curvature threshold value should be higher than zero.")
         return
-    
-    
+
+
     def DefineFlameletDataInterpolator(self):
 
         print("Configuring KD-tree for most accurate lookups")
@@ -134,20 +134,20 @@ class SU2TableGenerator_Base:
         # Exctract train and test data
         train_data_file = self._Config.GetOutputDir()+"/"+self._Config.GetConcatenationFileHeader()+"_train.csv"
         test_data_file = self._Config.GetOutputDir()+"/"+self._Config.GetConcatenationFileHeader()+"_test.csv"
-        
+
         CV_train, D_train = GetReferenceData(train_data_file, self._controlling_variables, self._manifold_variables)
         CV_test, D_test = GetReferenceData(test_data_file, self._controlling_variables, self._manifold_variables)
-        
+
         CV_train_scaled = self._control_var_scaler.transform(CV_train)
         CV_test_scaled = self._control_var_scaler.transform(CV_test)
         D_train_scaled = data_scaler.transform(D_train)
         D_test_scaled = data_scaler.transform(D_test)
-        
+
         print("Done!")
         print("Setting up KD-tree...")
         self._lookup_tree = Invdisttree(X=CV_train_scaled,z=D_train_scaled)
         print("Done!")
-        
+
         print("Search for best tree parameters...")
         # Do brute-force search to get the optimum number of nearest neighbors and distance power.
         n_near_range = range(1, 20)
@@ -167,9 +167,9 @@ class SU2TableGenerator_Base:
         print("Setting up KD-tree...")
         self._lookup_tree = Invdisttree(X=CV_full_scaled,z=D_full)
         print("Done!")
-        
+
         return
-    
+
     def EvaluateManifoldInterpolator(self, CV_unscaled:np.ndarray):
         CV_scaled = self._control_var_scaler.transform(CV_unscaled)
         data_interp = self._lookup_tree(q=CV_scaled,nnear=self._n_near,p=self._p_fac)
@@ -177,9 +177,9 @@ class SU2TableGenerator_Base:
 
     def Compute2DTable(self, CV_1:str, CV_2:str):
         Np_grid = 300
-        
+
         return
-    
+
 class SU2TableGenerator:
 
     _Config:Config_FGM = None # Config_FGM class from which to read settings.
@@ -239,7 +239,7 @@ class SU2TableGenerator:
             self._custom_KDtreeparams = True
             self._n_near = n_near
             self._p_fac = p_fac
-            
+
         if load_file:
             # Load an existing TableGenerator object.
             with open(load_file, "rb") as fid:
@@ -253,7 +253,7 @@ class SU2TableGenerator:
 
         self._savedir = self._Config.GetOutputDir()
         return
-    
+
     def SetSaveDir(self, save_dir:str):
         if not os.path.isdir(save_dir):
             raise Exception("Output directory %s not present on current hardware." % save_dir)
@@ -272,7 +272,7 @@ class SU2TableGenerator:
         else:
             raise Exception("Number of table levels should be higher than 2.")
         return
-    
+
     def SetBaseCellSize(self, cell_size:float):
         """
         Define the base cell size for the table levels.
@@ -286,7 +286,7 @@ class SU2TableGenerator:
         else:
             raise Exception("Proviced cell size should be higher than zero.")
         return
-    
+
     def SetRefinedCellSize(self, cell_size:float):
         """
         Define the refinement cell size for the table levels.
@@ -300,7 +300,7 @@ class SU2TableGenerator:
         else:
             raise Exception("Proviced cell size should be higher than zero.")
         return
-    
+
     def SetRefinementThreshold(self, val_threshold:float):
         """
         Define normalized curvature threshold beyond which refinement should be applied to each table level.
@@ -315,7 +315,7 @@ class SU2TableGenerator:
         else:
             raise Exception("Curvature threshold value should be higher than zero.")
         return
-    
+
     def SetMixtureFractionLimits(self, mix_frac_min:float, mix_frac_max:float):
         """
         Define the mixture fraction limits of the table.
@@ -326,12 +326,12 @@ class SU2TableGenerator:
         :type mix_frac_max: float
         :raise: Exception: If the upper mixture fraction limit is below the lower mixture fraction limit.
         """
-        
+
         self._mixfrac_min_table = mix_frac_min
         self._mixfrac_max_table = mix_frac_max
         self.__PrepareTableLevels()
         return
-    
+
     def InsertMixtureFractionLevel(self, val_mixfrac_level:float):
         self.__table_insert_levels.append(val_mixfrac_level)
         self.__PrepareTableLevels()
@@ -343,7 +343,7 @@ class SU2TableGenerator:
         self._mixfrac_range_table = np.unique(np.sort(self._mixfrac_range_table))
         self._N_table_levels = len(self._mixfrac_range_table)
         return
-    
+
     def SetNCores(self, n_cores:int):
         """Set the number of cores and enable parallel computing of the table level connectivity generation.
 
@@ -356,7 +356,7 @@ class SU2TableGenerator:
         self.__Np_cores = n_cores
         self.__run_parallel = True
         return
-    
+
     def __DefineFlameletDataInterpolator(self):
 
         print("Configuring KD-tree for most accurate lookups")
@@ -373,21 +373,21 @@ class SU2TableGenerator:
 
         min_mixfrac_dataset = self.__min_CV[2]
         max_mixfrac_dataset = self.__max_CV[2]
-        
+
         self._mixfrac_min_table = min_mixfrac_dataset + 0.1*(max_mixfrac_dataset - min_mixfrac_dataset)
         self._mixfrac_max_table = max_mixfrac_dataset - 0.1*(max_mixfrac_dataset - min_mixfrac_dataset)
-        
+
         CV_full_scaled = self._scaler.fit_transform(CV_full)
 
         # Exctract train and test data
         train_data_file = self._Config.GetOutputDir()+"/"+self._Config.GetConcatenationFileHeader()+"_train.csv"
         test_data_file = self._Config.GetOutputDir()+"/"+self._Config.GetConcatenationFileHeader()+"_test.csv"
-        
+
         var_to_test_for = "ProdRateTot_PV"
-        
+
         D_train = np.loadtxt(train_data_file,delimiter=',',skiprows=1)
         D_test = np.loadtxt(test_data_file,delimiter=',',skiprows=1)
-        
+
         CV_train = np.vstack(tuple(D_train[:, self._Flamelet_Variables.index(c)] for c in self._controlling_variables)).T
         CV_test = np.vstack(tuple(D_test[:, self._Flamelet_Variables.index(c)] for c in self._controlling_variables)).T
 
@@ -399,7 +399,7 @@ class SU2TableGenerator:
         print("Setting up KD-tree...")
         self._lookup_tree = Invdisttree(X=CV_train_scaled,z=D_train)
         print("Done!")
-        
+
         if not self._custom_KDtreeparams:
             print("Search for best tree parameters...")
             # Do brute-force search to get the optimum number of nearest neighbors and distance power.
@@ -426,7 +426,7 @@ class SU2TableGenerator:
         CV_scaled = self._scaler.transform(CV_unscaled)
         data_interp = self._lookup_tree(q=CV_scaled,nnear=self._n_near,p=self._p_fac)
         return data_interp
-    
+
     def VisualizeTableLevel(self, val_mix_frac:float, var_to_plot:str=None):
         """Compute and visualize the table connectivity for a certain mixture fraction value.
 
@@ -434,7 +434,7 @@ class SU2TableGenerator:
         :type val_mix_frac: float
         :raises Exception: if the mixture fraction value lies outside the flamelet data range.
         """
-        
+
         Tria, Nodes, HullIdx,level_data = self.ComputeTableLevelMesh(val_mix_frac)
 
         if var_to_plot == None:
@@ -457,20 +457,20 @@ class SU2TableGenerator:
             ax.set_title(r"Table data at Z="+str(val_mix_frac))
             plt.show()
         return
-    
+
     def GenerateTableNodes(self):
         """
         Generate the table nodes and connectivity. 
         """
-        
+
         self.__PrepareTableLevels()
-        
+
         self._table_nodes = [None] * self._N_table_levels
         self._table_nodes_norm = [None] * self._N_table_levels
         self._table_connectivity = [None] * self._N_table_levels
         self._table_hullnodes = [None] * self._N_table_levels
         self.table_data = [None] * self._N_table_levels
-    
+
         flamelet_vars = []
         for var in self._Flamelet_Variables:
             flamelet_vars.append(var)
@@ -528,7 +528,7 @@ class SU2TableGenerator:
         print("Average number of elements: %i" % NTria_average)
         print("Average number of hull nodes: %i" % NHull_average)
         return
-    
+
     def ComputeTableNodes(self, iLevel:int):
         """Compute the table connectivity for a specific table level.
 
@@ -540,17 +540,17 @@ class SU2TableGenerator:
         """
         if iLevel < 0 or iLevel > self._N_table_levels:
             raise Exception("Specified table level out of bounds.")
-        
+
         # Compute the connectivity, normalized node values, and hull indices for the table level at the respective
         #   mixture fraction value.
         Z_Level = self._mixfrac_range_table[iLevel]
         Tria, Nodes_dim, HullIdx, TableDataLevel = self.ComputeTableLevelMesh(Z_Level)
 
         print("Computed triagulation on level %i out of %i with %i nodes." % (iLevel+1, self._N_table_levels, len(Nodes_dim)))
-        
+
         return [Nodes_dim, Tria, HullIdx, TableDataLevel]
-    
-    
+
+
     def WriteTableFile(self, output_filepath:str=None):
         """
         Save the table data and connectivity as a Dragon library file. If no file name is provided, the table file will be named according to the Config_FGM class name.
@@ -637,7 +637,7 @@ class SU2TableGenerator:
 
         fid.close()
         return
-    
+
     def ComputeTableLevelMesh(self, val_mix_frac:float):
         """
         Compute the table nodes, connectivity, and convex hull node indices of a 2D table level for a given mixture fraction value.
@@ -650,12 +650,12 @@ class SU2TableGenerator:
         """
         Coord_refinement, Coord_hull, hull_area,z_norm, CV_mesh, table_level_data  = self.__ComputeCurvature(val_mix_frac)
         MeshNodes_Norm, table_level_data = self.__Compute2DMesh(XY_hull=Coord_hull, XY_refinement=Coord_refinement,val_mixfrac_norm=z_norm, level_area=hull_area)
-        
+
         Tria = Delaunay(MeshNodes_Norm[:, :2])
         HullNodes = Tria.convex_hull[:, 0]
         MeshNodes_dim = self._scaler.inverse_transform(MeshNodes_Norm)
         return Tria.simplices, MeshNodes_dim, HullNodes, table_level_data
-    
+
     def __ComputeCurvature(self, val_mix_frac:float):
         """
         Compute the curvature of the reaction rate surface at a constant mixture fraction level. Identify the locations of high curvature where table refinement is required.
@@ -675,7 +675,7 @@ class SU2TableGenerator:
 
         # Compute reactant progress variable for the current mixture fraction.
         pv_unb = self._Config.ComputeProgressVariable(variables=None, flamelet_data=None, Y_flamelet=self._Config.gas.Y[:,np.newaxis])[0]
-        
+
         # Define maximum enthalpy as the reactant enthalpy at the maximum reactant temperature.
         self._Config.gas.TP=self._Config.GetUnbTempBounds()[1],DefaultSettings_FGM.pressure
         h_max = self._Config.gas.enthalpy_mass
@@ -683,7 +683,7 @@ class SU2TableGenerator:
         # Equilibrate at constant enthalpy to get product progress variable value.
         self._Config.gas.equilibrate("TP")
         pv_b = self._Config.ComputeProgressVariable(variables=None, flamelet_data=None, Y_flamelet=self._Config.gas.Y[:,np.newaxis])[0]
-        
+
         # Define minimum enthalpy as the product enthalpy cooled to minimum reactant temperature.
         self._Config.gas.TP=self._Config.GetUnbTempBounds()[0],DefaultSettings_FGM.pressure
         h_min = self._Config.gas.enthalpy_mass
@@ -703,7 +703,7 @@ class SU2TableGenerator:
         idx_keep = h_grid >= h_limit
 
         CV_grid = CV_grid_init[idx_keep, :]
-        
+
         CV_grid_norm_init = self._scaler.transform(CV_grid_init)
         CV_grid_norm = self._scaler.transform(CV_grid)
 
@@ -720,7 +720,7 @@ class SU2TableGenerator:
 
         x_refinement = CV_grid_norm_init[idx_ref, 0]
         y_refinement = CV_grid_norm_init[idx_ref, 1]
-    
+
 
         # 5: Generate refinement locations at reactant and product progress variable
         h_unb_range = np.linspace(h_min_unb, h_max, self._Config.GetNpTemp())
@@ -744,10 +744,10 @@ class SU2TableGenerator:
         XY_hull = np.vstack((x_hull, y_hull)).T
 
         val_mix_frac_norm = CV_grid_norm[0, -1]
-        
+
 
         return XY_refinement, XY_hull, hull.area, val_mix_frac_norm, CV_grid, Q_interp
-    
+
     def __ComputeSourceTermCurvature(self, PPV_interp:np.ndarray[float]):
         Q_norm = (PPV_interp - np.min(PPV_interp))/(np.max(PPV_interp) - np.min(PPV_interp))
         dQdy, dQdx = np.gradient(Q_norm)
@@ -759,7 +759,7 @@ class SU2TableGenerator:
         d2Q_norm = d2Q_norm.flatten()
         idx_ref = np.where(d2Q_norm > self._curvature_threshold)
         return idx_ref
-    
+
     def __Compute2DMesh(self, XY_hull:np.ndarray, XY_refinement:np.ndarray, val_mixfrac_norm:float, level_area:float):
         """
         Generate a 2D mesh for the current table level.
@@ -797,9 +797,9 @@ class SU2TableGenerator:
 
         hull_curve_1 = factory.addPolyline(hull_pts)
         hull_curve_2 = factory.addPolyline(hull_pts_2)
-        
+
         CL = factory.addCurveLoop([hull_curve_1, hull_curve_2])
-        
+
         surf = factory.addPlaneSurface([CL])
         gmsh.model.addPhysicalGroup(1, [hull_curve_1], name="hull_curve_1")
         gmsh.model.addPhysicalGroup(1, [hull_curve_2], name="hull_curve_2")
@@ -819,11 +819,11 @@ class SU2TableGenerator:
         gmsh.model.mesh.field.add("Min", 7)
         gmsh.model.mesh.field.setNumbers(7, "FieldsList", [2])
         gmsh.model.mesh.field.setAsBackgroundMesh(7)
-        
+
         lc = base_cell_size
         def meshSizeCallback(dim,tag,x,y,z,lc):
             return lc
-        
+
         gmsh.model.mesh.setSizeCallback(meshSizeCallback)
         gmsh.option.setNumber("Mesh.Algorithm", 5)
         gmsh.model.mesh.generate(2)
@@ -845,7 +845,7 @@ class SU2TableGenerator:
         table_level_data = self.__EvaluateFlameletInterpolator(CV_level_dim)
 
         return MeshPoints, table_level_data
-    
+
     def __GetStochMixtureFraction(self):
         fuel_definition = self._Config.GetFuelDefinition()
         fuel_weights = self._Config.GetFuelWeights()
@@ -858,7 +858,7 @@ class SU2TableGenerator:
         self._Config.gas.set_equivalence_ratio(1.0, fuel_string, ox_string)
         mixfrac_stoch = self._Config.gas.mixture_fraction(fuel_string, ox_string)
         return mixfrac_stoch
-    
+
     def SaveTableGenerator(self, file_name:str):
         """Save the current TableGenerator object settings such that subsequent tables can be
         generated faster.
@@ -881,7 +881,7 @@ class SU2TableGenerator:
             delta_h = val_cp_interp * delta
             CV_array[0,1] += delta_h
         return CV_array[0,1]
-    
+
 if __name__ == "__main__":
     config_input_file = sys.argv[-2]
     N_cores = int(sys.argv[-1])

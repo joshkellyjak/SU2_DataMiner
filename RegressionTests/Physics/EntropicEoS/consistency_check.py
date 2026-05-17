@@ -80,9 +80,9 @@ def EntropicEOS(rho:float,e:float, s:float, dsdrhoe:list[float], d2sdrho2e2:list
     dTde_p = dTde_rho + dTdrho_e*drhode_p
     dhde_p = dhde_rho + drhode_p*dhdrho_e
     Cp = dhde_p / dTde_p
-    
+
     c2 = dPdrho_e - dsdrho_e * dPde_rho / dsde_rho
-    
+
     state = {"rho" : rho,\
              "e" : e,\
              "T" : T,\
@@ -132,7 +132,7 @@ def GetFluidState(fluid:CP.AbstractState, rho:float, e:float):
             return state
     else:
         return 0
-    
+
 # Retrieve all currently supported fluids
 fluids = get_global_param_string("FluidsList").split(',')
 
@@ -220,26 +220,26 @@ for fluid_name in fluids:
             dpdrho_e_CoolProp = fluid.first_partial_deriv(CP.iP, CP.iDmass, CP.iUmass)
             dpdrho_e_FD = (state_rho_p["p"] - state_rho_m["p"])/(2*delta_rho_FD)
             dpdrho_e_EoS = state_base["dPdrho_e"]
-            
+
             # Calculate discretization errors between finite-differences and reference data.
             disc_error_dTde_rho = 100*abs(dTde_rho_FD - dTde_rho_CoolProp)/(abs(dTde_rho_CoolProp) + 1e-6)
             disc_error_dTdrho_e = 100*abs(dTdrho_e_FD - dTdrho_e_CoolProp)/(abs(dTdrho_e_CoolProp) + 1e-6)
             disc_error_dpde_rho = 100*abs(dpde_rho_FD - dpde_rho_CoolProp)/(abs(dpde_rho_CoolProp) + 1e-6)
             disc_error_dpdrho_e = 100*abs(dpdrho_e_FD - dpdrho_e_CoolProp)/(abs(dpdrho_e_CoolProp) + 1e-6)
             disc_errors = [disc_error_dTdrho_e, disc_error_dTde_rho, disc_error_dpdrho_e, disc_error_dpde_rho]
-            
+
             # Calculate consistency errors between EEoS and finite-differneces.
             const_error_dTde_rho = 100*abs(dTde_rho_FD - dTde_rho_EoS)/(abs(dTde_rho_FD) + 1e-6)
             const_error_dTdrho_e = 100*abs(dTdrho_e_FD - dTdrho_e_EoS)/(abs(dTdrho_e_FD) + 1e-6)
             const_error_dpde_rho = 100*abs(dpde_rho_FD - dpde_rho_EoS)/(abs(dpde_rho_FD) + 1e-6)
             const_error_dpdrho_e = 100*abs(dpdrho_e_FD - dpdrho_e_EoS)/(abs(dpdrho_e_FD) + 1e-6)
             const_errors = [const_error_dTde_rho, const_error_dTdrho_e, const_error_dpde_rho, const_error_dpde_rho]
-            
+
             # Model is consistent if the consistency error values are lower than the discretization error values.
             consistent = all([c <= d] for c, d in zip(const_errors, disc_errors))
             if not consistent:
                 consistent_EoS = False
-    
+
     if not consistent_EoS:
         with open("consistency_check.txt","a+") as fid:
             fid.write("Entropic equation of state is inconsistent for %s\n" % fluid_name)

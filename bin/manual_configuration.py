@@ -137,9 +137,9 @@ def ManualFlameletConfiguration():
     # Initiate empty configuration.
     Config_in:Config_FGM = Config_FGM()
     statisfied = False
-    
+
     while not statisfied:
-        
+
         # 1: Define reaction mechanism.
         InsertConfigOption(Config_in.SetReactionMechanism, Config_in.GetReactionMechanism(), "Insert reaction mechanism file to use for flamelet computations (%s by default): " % Config_in.GetReactionMechanism())
         print("Reaction mechanism: " + Config_in.GetReactionMechanism())
@@ -241,7 +241,7 @@ def ManualFlameletConfiguration():
                 # Set default value when invalid input.
                 Config_in.DefineMixtureStatus(False)
                 printwronginput()
-          
+
         if Config_in.GetMixtureStatus():
             print("Reactant mixture status defined as mixture fraction.")
         else:
@@ -267,7 +267,7 @@ def ManualFlameletConfiguration():
                     Config_in.SetMixtureBounds(mix_status_lower, mix_status_upper)
                 except:
                     printwronginput()
-        
+
         InsertConfigOption(Config_in.SetNpMix, Config_in.GetNpMix(), "Insert number of divisions for the mixture status range (%i by default): " % Config_in.GetNpMix())
         print("Lower reactant mixture status value: %.3f" % Config_in.GetMixtureBounds()[0])
         print("Upper reactant mixture status value: %.3f" % Config_in.GetMixtureBounds()[1])
@@ -336,9 +336,9 @@ def ManualNICFDConfiguration():
     # Initiate empty configuration.
     Config_in:Config_NICFD = Config_NICFD()
     statisfied = False
-    
+
     while not statisfied:
-        
+
         # 0: Define CoolProp equation of state.
         InsertConfigOption(Config_in.SetEquationOfState, DefaultSettings_NICFD.EOS_type, "Insert CoolProp equation of state (%s by default):" % DefaultSettings_NICFD.EOS_type)
         print("CoolProp equation of state: %s" % Config_in.GetEquationOfState())

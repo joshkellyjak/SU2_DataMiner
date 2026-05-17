@@ -64,7 +64,7 @@ class MLPOptimizer:
     _batch_expo:int = DefaultProperties.batch_size_exponent
     __batch_expo_min:int=3
     __batch_expo_max:int=7
-    
+
     # Optimize learning rate decay parameters.
     _optimizeLR:bool = True
 
@@ -106,7 +106,7 @@ class MLPOptimizer:
 
     # Optimized solution
     __x_optim:np.ndarray = None
-    
+
     # Restart optimization from previous instance
     __restart_optim:bool=False
 
@@ -129,7 +129,7 @@ class MLPOptimizer:
             print(loaded_config.__dict__)
             self.__dict__ = loaded_config.__dict__.copy()
             print("Loaded optimizer file")
-        
+
         return
 
     def SetNWorkers(self, n_workers:int=1):
@@ -143,7 +143,7 @@ class MLPOptimizer:
             raise Exception("Number of workers should be at least one.")
         self._n_workers = n_workers
         return
-    
+
     def SetNEpochs(self, n_epochs:int=DefaultProperties.N_epochs):
         """Set the number of epochs for which networks are trained.
 
@@ -155,7 +155,7 @@ class MLPOptimizer:
             raise Exception("Training should occur for at least one epoch.")
         self._n_epochs = n_epochs
         return
-    
+
     def Optimize_LearningRate_HP(self, optimize_LR:bool=True):
         """Consider learning-rate hyper-parameters in optimization.
 
@@ -164,7 +164,7 @@ class MLPOptimizer:
         """
         self._optimizeLR = optimize_LR
         return
-    
+
     def Optimize_ActivationFunction(self, optimize_phi:bool=True):
         """Consider the hidden layer activation function in the optimization.
 
@@ -173,7 +173,7 @@ class MLPOptimizer:
         """
         self._optimizephi = optimize_phi
         return
-    
+
     def SetNGenerations(self, n_generations:int):
         """Set the number of generations for which to run the genetic algorithm.
 
@@ -186,7 +186,7 @@ class MLPOptimizer:
         self.__set_custom_generation = True
         self.__n_generations_custom = n_generations
         return
-    
+
     def SetPopSize(self, pop_size:int):
         """Define the population size considered for the genetic optimizer.
 
@@ -199,7 +199,7 @@ class MLPOptimizer:
         self.__set_custom_popsize = True
         self.__custom_popsize = pop_size
         return
-    
+
     def SetAlpha_Expo(self, val_alpha_expo:float=DefaultSettings_NICFD.init_learning_rate_expo):
         """Set initial learning rate exponent (base 10).
 
@@ -213,7 +213,7 @@ class MLPOptimizer:
         self._alpha_expo = val_alpha_expo
 
         return
-    
+
     def SetLR_Decay(self, val_lr_decay:float=DefaultSettings_NICFD.learning_rate_decay):
         """Set the learning rate decay parameter value.
 
@@ -226,7 +226,7 @@ class MLPOptimizer:
         self._lr_decay = val_lr_decay
 
         return
-    
+
     def SetBounds_Alpha_Expo(self, alpha_expo_min:float=-3.0, alpha_expo_max:float=-1.0):
         """Set minimum and maximum values for the initial learning rate exponent (base 10) during optimization.
 
@@ -244,12 +244,12 @@ class MLPOptimizer:
         self.__alpha_expo_min = alpha_expo_min
         self.__alpha_expo_max = alpha_expo_max
         return
-    
+
     def SetBounds_LR_Decay(self, lr_decay_min:float=0.8, lr_decay_max:float=1.0):
         self.__lr_decay_max = lr_decay_max
         self.__lr_decay_min = lr_decay_min
         return
-    
+
     def Optimize_Batch_HP(self, optimize_batch:bool=True):
         """Consider the mini-batch size exponent as a hyper-parameter during optimization.
 
@@ -258,7 +258,7 @@ class MLPOptimizer:
         """
         self._optimizebatch = optimize_batch
         return
-    
+
     def SetBatch_Expo(self, batch_expo:int=DefaultSettings_NICFD.batch_size_exponent):
         """Set training batch exponent value (base 2).
 
@@ -270,9 +270,9 @@ class MLPOptimizer:
         if batch_expo < 1:
             raise Exception("Batch size exponent should be at least 1.")
         self._batch_expo = batch_expo
-        
+
         return
-    
+
     def Optimize_Pareto(self, optimize_multiobj:bool=False):
         """Enable multi-objective optimization where a Pareto front is formed for evaluation cost and validation loss.
 
@@ -281,7 +281,7 @@ class MLPOptimizer:
         """
         self.__run_multiobj = optimize_multiobj
         return
-    
+
     def SetActivationFunction(self, activation_function:str=DefaultSettings_NICFD.activation_function):
         """Set the hiden layer activation function name.
 
@@ -291,7 +291,7 @@ class MLPOptimizer:
 
         self._activation_function = activation_function
         return
-    
+
     def SetBounds_Batch_Expo(self, batch_expo_min:int=3, batch_expo_max:int=7):
         """Set minimum and maximum values for the training batch exponent (base 2) during optimization.
 
@@ -311,7 +311,7 @@ class MLPOptimizer:
         self.__batch_expo_max = batch_expo_max
 
         return
-    
+
     def SetBounds_NLayers(self, Nlayers_min:int=2, Nlayers_max:int=10):
         if Nlayers_max <=Nlayers_min:
             raise Exception("Upper bound value should exceed lower bound value.")
@@ -320,12 +320,12 @@ class MLPOptimizer:
         self.NLayers_max = Nlayers_max
         self.NLayers_min = Nlayers_min
         return
-    
+
     def SetBounds_NNeurons(self, NN_min:int=6, NN_max:int=40):
         self.__NN_min = NN_min
         self.__NN_max = NN_max
         return
-    
+
     def Optimize_Architecture_HP(self, optimize_architecture:bool=True):
         """Consider the hidden layer perceptron count as a hyper-parameter during optimization.
 
@@ -334,7 +334,7 @@ class MLPOptimizer:
         """
         self._optimizeNN = optimize_architecture
         return
-    
+
     def SetArchitecture(self, architecture:list[int]=DefaultSettings_NICFD.hidden_layer_architecture):
         """Set MLP hidden layer architecture.
 
@@ -350,7 +350,7 @@ class MLPOptimizer:
             self._architecture.append(NN)
 
         return
-    
+
     def SetBounds_Architecture(self, NN_min:int=10, NN_max:int=100, NL_min:int=2, NL_max:int=10):
         """Set the minimum and maximum values for the perceptron count in the hidden layer.
 
@@ -366,37 +366,37 @@ class MLPOptimizer:
             raise Exception("Upper bound value should exceed lower bound value.")
         if NN_min <= 1 or NN_max <= 1:
             raise Exception("At least one hidden layer perceptron should be used.")
-        
+
         if NL_min < 1:
             raise Exception("At least one hidden layer should be used.")
-        
+
         self.__NN_min = NN_min
         self.__NN_max = NN_max
         self.NLayers_min = NL_min
         self.NLayers_max = NL_max
         return
-    
+
     def __prepareBounds(self):
         bounds = []
 
         if self._optimizeLR:
             bounds += [{"low":self.__alpha_expo_min, "high":self.__alpha_expo_max},\
                        {"low":self.__lr_decay_min, "high":self.__lr_decay_max}]
-            
+
         if self._optimizebatch:
             bounds += [{"low":self.__batch_expo_min, "high":self.__batch_expo_max}]
-        
+
         if self._optimizephi:
             bounds += [{"low":0, "high":len(self.__activation_function_options)}]
-        
-            
+
+
         if self._optimizeNN:
             bounds += self.NLayers_min * [{"low":self.__NN_min, "high":self.__NN_max}]
             bounds += (self.NLayers_max - self.NLayers_min) * [{"low":0, "high":2},\
                                                                {"low":self.__NN_min, "high":self.__NN_max}]
         return bounds
 
-    
+
     def __setOptimizer(self):
 
         print("Initializing hyper-parameter optimization for:")
@@ -408,11 +408,11 @@ class MLPOptimizer:
             print("- hidden layer neuron count")
         if self._optimizephi:
             print("- hidden layer activation function")
-        
+
         self.__setOptimizer_PyGad()
         return
-    
-    
+
+
     def _postprocess_optimization(self, x):
 
         print("Optimized hyper-parameters:")
@@ -441,10 +441,10 @@ class MLPOptimizer:
             idx_x += 1
             print("- hidden layer architecture: "+ " ".join(("%i" % n) for n in architecture))
             self._Config.SetHiddenLayerArchitecture(architecture)
-        
+
         self._Config.SaveConfig()
         return
-    
+
     def _get_optim_extension(self):
         optim_extension = ""
         if self._optimizebatch:
@@ -456,7 +456,7 @@ class MLPOptimizer:
         if self._optimizephi:
             optim_extension += "Phi"
         return optim_extension
-    
+
     def _preprocess_optimization(self):
         if not any((self._optimizebatch, self._optimizeLR, self._optimizeNN, self._optimizephi)):
             raise Exception("At least one of the hyper-parameter options should be considered for optimization.")
@@ -467,17 +467,17 @@ class MLPOptimizer:
         self.CreateOutputs()
 
         return
-    
+
     def SetOutputFolder(self):
         self.save_dir = self._Config.GetOutputDir()+"/Architectures_Optim"+self._history_extension + "/"
         if not os.path.isdir(self.save_dir):
             os.mkdir(self.save_dir)
         return
-    
+
     def _initialize_history_file(self):
         self.opt_history_filepath = self.save_dir + "/history_opt_"+self._history_extension+".csv"
         return
-    
+
     def _set_history_header(self):
         if not self.__restart_optim:
             with open(self.opt_history_filepath, "w+") as fid:
@@ -486,30 +486,30 @@ class MLPOptimizer:
                 else:
                     fid.write("Iteration,mini-batch exp, activation function, alpha expo, lr decay, architecture,fitness\n")
         return
-    
+
     def CreateOutputs(self):
         self.SetOutputFolder()
 
         self._initialize_history_file()
 
         self._set_history_header()
-        
+
         return
-    
+
     def optimizeHP(self):
         """Initate hyper-parameter optimization routine.
 
         :raises Exception: if neither of the available sets of hyper-parameters are considered for optimization.
         """
         self._preprocess_optimization()
-        
+
         # Prepare bounds and commence hyper-parameter optimization.
         self.__setOptimizer()
 
         # Extract optimized hyper-parameters and update configuration.
         self._postprocess_optimization(self.__x_optim)
         return
-    
+
     def RestartOptimizer(self, restart_from_prev:bool=False):
         """_summary_
 
@@ -518,7 +518,7 @@ class MLPOptimizer:
         """
         self.__restart_optim = restart_from_prev
         return
-    
+
     def __setOptimizer_PyGad(self):
         """Commence hyper-parameter optimization.
         """
@@ -535,7 +535,7 @@ class MLPOptimizer:
             popsize = self.__custom_popsize
         else:
             popsize = 10*n_genes
-        
+
         # Set generation count
         if self.__set_custom_generation:
             n_gens = self.__n_generations_custom
@@ -544,7 +544,7 @@ class MLPOptimizer:
 
         # Half of the parents in the population mate
         num_parents_mating = int(0.5 * popsize)
-        
+
         # Construct initial population
         initial_pop = self.__GenerateInitialPopulation(popsize)
 
@@ -570,13 +570,13 @@ class MLPOptimizer:
                         random_seed=1,\
                         parent_selection_type=parent_selector,\
                         on_generation=self.saveGenerationInfo)
-            
+
 
         self.__optimizer.run()
 
         self.__x_optim, _, _ = self.__optimizer.best_solution()
         return
-    
+
     def __prepareGeneType(self):
         gene_type = []
         if self._optimizeLR:
@@ -589,7 +589,7 @@ class MLPOptimizer:
             gene_type += self.NLayers_min * [int] + 2*(self.NLayers_max - self.NLayers_min) * [int]
 
         return gene_type
-    
+
     def saveGenerationInfo(self, ga_instance:pygad.GA):
         """Save population information per completed generation.
         """
@@ -620,15 +620,15 @@ class MLPOptimizer:
         self.SaveOptimizer(ga_instance)
 
         return
-    
+
     def SaveOptimizer(self, ga_instance:pygad.GA):
         ga_instance.save(self.save_dir+"/optimizer_instance_"+self._history_extension)
         return
-    
+
     def LoadOptimizer(self):
         ga_instance = pygad.load(self.save_dir+"/optimizer_instance_"+self._history_extension)
         return ga_instance
-    
+
     def _translateGene(self, x:np.ndarray[float], Evaluator:TrainMLP):
         """Translate gene to hyper-parameters
 
@@ -698,7 +698,7 @@ class MLPOptimizer:
             initial_pop.append(initial_architectures)
         initial_pop = np.hstack(tuple(s for s in initial_pop))
         return initial_pop
-    
+
     def __GenerateInitialLearningRates(self,N_individuals:int):
         """Generate initial set of learning rate hyper-parameters.
 
@@ -712,9 +712,9 @@ class MLPOptimizer:
         lr_array[:, 0] += 0.1*(self.__alpha_expo_max - self.__alpha_expo_min)*(np.random.rand(N_individuals) - 0.5)
         lr_array[:, 1] = self._lr_decay
         lr_array[:, 1] += 0.1*(self.__lr_decay_max - self.__lr_decay_min)*(np.random.rand(N_individuals) - 0.5)
-        
+
         return lr_array
-    
+
     def __GenerateInitialBatch(self, N_individuals:int):
         """Generate initial set of batch size exponents and activation function indices.
 
@@ -736,7 +736,7 @@ class MLPOptimizer:
         """
         phi = np.random.randint(size=N_individuals, low=0,high=len(self.__activation_function_options))
         return phi[:,np.newaxis]
-    
+
     def __GenerateInitialArchitectures(self, N_individuals:int):
         """Generate (random) initial set of hidden layer architectures. These
         architectures are unimodal, which should perform relatively well.
@@ -747,7 +747,7 @@ class MLPOptimizer:
         :rtype: np.ndarray
         """
         architecture_array = np.zeros([N_individuals, self.NLayers_min + 2 * (self.NLayers_max - self.NLayers_min)],dtype=int)
-        
+
         for i in range(N_individuals):
             NLayers = np.random.randint(self.NLayers_min, self.NLayers_max)
             NN = np.random.randint(self.__NN_min, self.__NN_max, NLayers)
@@ -765,22 +765,22 @@ class MLPOptimizer:
                 architecture_array[i, self.NLayers_min + 2 * jLayer] = 0
                 architecture_array[i, self.NLayers_min + 2* jLayer + 1] = np.random.randint(self.__NN_min, self.__NN_max)
         return architecture_array
-    
+
     def fitnessGA(self, ga_instance:pygad.GA, x:np.ndarray, x_idx:int):
         return self.fitnessFunction(x, worker_idx=x_idx)
-    
+
     def transformTestScore(self, val_test_score:float):
         return -np.log10(val_test_score)
-    
+
     def transformCostParameter(self, val_cost_param:float):
         return 1000 / val_cost_param
-    
+
     def inv_transformTestScore(self, val_norm_test_score:float):
         return np.power(10, -val_norm_test_score)
-    
+
     def inv_transformCostParam(self, val_norm_cost_param:float):
         return self.transformCostParameter(val_norm_cost_param)
-    
+
     def fitnessFunction(self, x:np.ndarray, worker_idx:int=None):
         if worker_idx == None:
             if self._n_workers > 1:
@@ -803,7 +803,7 @@ class MLPOptimizer:
 
     def _prepare_evaluator(self):
         return TrainMLP(self._Config)
-    
+
     def _evaluate_MLP_performance(self, x:np.ndarray, MLP_evaluator:TrainMLP):
 
         self._translateGene(x, Evaluator=MLP_evaluator)
@@ -822,7 +822,7 @@ class MLPOptimizer:
         # Extract test set evaluation score.
         MLP_evaluator.TrainPostprocessing()
         return
-    
+
     def _extract_objective_function(self, MLP_evaluator:TrainMLP):
         test_score = MLP_evaluator.GetTestScore()
         cost_parameter = MLP_evaluator.GetCostParameter()
@@ -835,18 +835,18 @@ class MLPOptimizer:
         else:
             return fitness_test_score
 
-    
+
     def inv_fitnessFunction(self, x):
         return -self.fitnessFunction(x=x)
-    
-    
-    
+
+
+
 class MLPOptimizer_NICFD(MLPOptimizer):
     _activation_function:str = "exponential"
 
     def _prepare_evaluator(self):
         return TrainMLP_NICFD(self._Config)
-    
+
     def _postprocess_optimization(self, x):
 
         Config:Config_NICFD = Config_NICFD(self._Config.GetConfigName() + ".cfg")
@@ -883,14 +883,14 @@ class MLPOptimizer_NICFD(MLPOptimizer):
             idx_x += 1
         Config.SaveConfig()
         return
-    
+
 class MLPOptimizer_FGM(MLPOptimizer):
     __output_group:int = 0
     _activation_function:str="gelu"
     def __init__(self, Config_in:Config_FGM):
         MLPOptimizer.__init__(self, Config_in)
         return
-    
+
     def SetOutputGroup(self, output_group:int=0):
         self.__output_group = output_group
         self.SetAlpha_Expo(self._Config.GetAlphaExpo(output_group))
@@ -898,20 +898,20 @@ class MLPOptimizer_FGM(MLPOptimizer):
         self.SetBatch_Expo(self._Config.GetBatchExpo(output_group))
         self.SetArchitecture(self._Config.GetHiddenLayerArchitecture(output_group))
         return
-    
+
     def _initialize_history_file(self):
         self.opt_history_filepath = "%s/history_optim_Group%i_%s.csv" % (self.save_dir, (self.__output_group+1),self._history_extension)
         return
-    
+
     def SetOutputFolder(self):
         self.save_dir = "%s/Architectures_Group%i_Optim%s" % (self._Config.GetOutputDir(), (self.__output_group+1), self._history_extension)
         if not os.path.isdir(self.save_dir):
             os.mkdir(self.save_dir)
         return
-    
+
     def _prepare_evaluator(self):
         return TrainMLP_FGM(self._Config, self.__output_group)
-    
+
     def _postprocess_optimization(self, x):
 
         Config:Config_FGM = Config_FGM(self._Config.GetConfigName() + ".cfg")
@@ -950,24 +950,24 @@ class MLPOptimizer_FGM(MLPOptimizer):
             idx_x += 1
         Config.SaveConfig()
         return
-    
+
     def SaveOptimizer(self, ga_instance:pygad.GA):
         ga_instance.save("%s/optimizer_instance_Group%i_%s" % (self.save_dir, self.__output_group+1, self._history_extension))
         return
-    
+
     def LoadOptimizer(self):
         ga_instance = pygad.load("%s/optimizer_instance_Group%i_%s" % (self.save_dir, self.__output_group+1, self._history_extension))
         return ga_instance
-    
+
 class MLPOptimizer_NICFD(MLPOptimizer):
 
     def __init__(self, Config_in:Config_NICFD):
         MLPOptimizer.__init__(self, Config_in)
         return
-    
+
     def _prepare_evaluator(self):
         return TrainMLP_NICFD(self._Config)
-    
+
 class PlotHPOResults:
     _Config:Config = None
     _optimizelearningrate:bool = True
@@ -987,11 +987,11 @@ class PlotHPOResults:
     _optimize_pareto:bool = True
 
     def __init__(self, Config_in:Config):
-        
+
         self._Config = Config_in
         return
-    
-    
+
+
     def Optimize_LearningRate_HP(self, optimize_LR:bool=True):
         """Consider learning-rate hyper-parameters in optimization.
 
@@ -1000,7 +1000,7 @@ class PlotHPOResults:
         """
         self._optimizelearningrate = optimize_LR
         return
-    
+
     def Optimize_Batch_HP(self, optimize_batch:bool=True):
         """Consider the mini-batch size exponent as a hyper-parameter during optimization.
 
@@ -1009,7 +1009,7 @@ class PlotHPOResults:
         """
         self._optimizebatch = optimize_batch
         return
-    
+
     def Optimize_Architecture_HP(self, optimize_architecture:bool=True):
         """Consider the hidden layer perceptron count as a hyper-parameter during optimization.
 
@@ -1018,17 +1018,17 @@ class PlotHPOResults:
         """
         self._optimizearchitecture = optimize_architecture
         return
-    
+
     def Optimize_Activation_HP(self, optimize_activation_function:bool=True):
         self._optimizephi = optimize_activation_function
         return
-    
-    
+
+
     def SetFolderHeader(self):
         optim_header = "Architectures_Optim"
         optim_header += self._get_optim_extension()
         return optim_header
-    
+
     def ReadModelPerformance(self, filedirpath:str, model_idx:int, worker_idx:int):
         if os.path.isfile(filedirpath):
             with open(filedirpath, 'r') as fid:
@@ -1052,7 +1052,7 @@ class PlotHPOResults:
             self._completed_models.append(model_idx)
             self._completed_workers.append(worker_idx)
         return
-    
+
     def _get_optim_extension(self):
         optim_extension = ""
         if self._optimizebatch:
@@ -1064,7 +1064,7 @@ class PlotHPOResults:
         if self._optimizephi:
             optim_extension += "Phi"
         return optim_extension
-    
+
     def ReadArchitectures(self):
         optim_header = self.SetFolderHeader()
 
@@ -1085,27 +1085,27 @@ class PlotHPOResults:
                         self.ReadModelPerformance(optim_directory + "/" + p + "/" + m + "/MLP_performance.txt", model_idx, worker_idx)
 
         return
-    
+
     def GetOptimHistory(self):
         history_filename = "history_optim_" + self._get_optim_extension()
         history_filepath = self._Config.GetOutputDir()+"/"+history_filename + ".csv"
         return history_filepath
-    
+
     def PlotParetoFront(self):
-        
+
         history_filepath = self.GetOptimHistory()
 
         H = np.loadtxt(history_filepath, delimiter=',',skiprows=1)
         N_gen = int(H[-1,0])
         Np_per_gen = np.sum(H[:,0] == N_gen)
-        
+
         plt.rcParams["axes.prop_cycle"] = plt.cycler("color", plt.cm.jet(np.linspace(0,1,N_gen)))
         total_data = None
         init = True
 
         plt.figure(figsize=[10,10])
         ax = plt.axes()
-        
+
         for iGen in range(N_gen):
             gen_data = H[iGen*Np_per_gen:(iGen+1)*Np_per_gen, [-2, -1]]
             if init:
@@ -1131,13 +1131,13 @@ class PlotHPOResults:
         plt.tight_layout()
         plt.show()
         return
-    
+
     def GetParetoLocations(self):
         plot_data = np.hstack((np.array(self._hidden_layer_neurons)[:,np.newaxis],np.array(self._val_score)[:,np.newaxis]))
         mask = paretoset(plot_data, sense=["min","min"])
         ix_sorted = np.argsort(plot_data[:, 0][mask])
         workers_pareto, models_pareto = np.array(self._completed_workers)[mask], np.array(self._completed_models)[mask]
-        
+
         optim_header = self.SetFolderHeader()
 
         optim_directory = self._Config.GetOutputDir()+"/"+optim_header
@@ -1145,7 +1145,7 @@ class PlotHPOResults:
         for w, m in zip(workers_pareto[ix_sorted], models_pareto[ix_sorted]):
             pareto_locs.append("%s/Worker_%i/Model_%i/" % (optim_directory, w, m))
         return pareto_locs
-    
+
     def PlotLossPhi(self):
 
         plt.figure(figsize=[9,9])
@@ -1154,7 +1154,7 @@ class PlotHPOResults:
         ax.plot(self._val_score, self._idx_phi, 'ko')
         for nn, sc, w, m in zip(self._idx_phi, self._val_score, self._completed_workers, self._completed_models):
             ax.text(sc, nn, "W"+str(w)+"M"+str(m),color='k')
-        
+
         plot_data = np.hstack((np.array(self._hidden_layer_neurons)[:,np.newaxis],np.array(self._val_score)[:,np.newaxis]))
         mask = paretoset(plot_data, sense=["min","min"])
         score_pareto, ix_phi_pareto, workers_pareto, models_pareto = np.array(self._val_score)[mask], np.array(self._idx_phi)[mask], np.array(self._completed_workers)[mask], np.array(self._completed_models)[mask]
@@ -1169,7 +1169,7 @@ class PlotHPOResults:
         plt.tight_layout()
         plt.show()
         return
-    
+
     def PlotLossAlphaExpo(self):
 
         plt.figure(figsize=[9,9])
@@ -1178,7 +1178,7 @@ class PlotHPOResults:
         ax.plot(self._val_score, self._alpha_expo, 'ko')
         for nn, sc, w, m in zip(self._alpha_expo, self._val_score, self._completed_workers, self._completed_models):
             ax.text(sc, nn, "W"+str(w)+"M"+str(m),color='k')
-        
+
         plot_data = np.hstack((np.array(self._hidden_layer_neurons)[:,np.newaxis],np.array(self._val_score)[:,np.newaxis]))
         mask = paretoset(plot_data, sense=["min","min"])
         score_pareto, alpha_expo_pareto, workers_pareto, models_pareto = np.array(self._val_score)[mask], np.array(self._alpha_expo)[mask], np.array(self._completed_workers)[mask], np.array(self._completed_models)[mask]
@@ -1193,16 +1193,16 @@ class PlotHPOResults:
         plt.tight_layout()
         plt.show()
         return
-    
+
     def PlotLossLRDecay(self):
-        
+
         plt.figure(figsize=[9,9])
         ax = plt.axes()
 
         ax.plot(self._val_score, self._lr_decay, 'ko')
         for nn, sc, w, m in zip(self._lr_decay, self._val_score, self._completed_workers, self._completed_models):
             ax.text(sc, nn, "W"+str(w)+"M"+str(m),color='k')
-        
+
         plot_data = np.hstack((np.array(self._hidden_layer_neurons)[:,np.newaxis],np.array(self._val_score)[:,np.newaxis]))
         mask = paretoset(plot_data, sense=["min","min"])
         score_pareto, lr_decay_pareto, workers_pareto, models_pareto = np.array(self._val_score)[mask], np.array(self._lr_decay)[mask], np.array(self._completed_workers)[mask], np.array(self._completed_models)[mask]
@@ -1218,16 +1218,16 @@ class PlotHPOResults:
         plt.tight_layout()
         plt.show()
         return
-    
+
     def PlotLossBatchSize(self):
-        
+
         plt.figure(figsize=[9,9])
         ax = plt.axes()
 
         ax.plot(self._val_score, self._batch_expo, 'ko')
         for nn, sc, w, m in zip(self._batch_expo, self._val_score, self._completed_workers, self._completed_models):
             ax.text(sc, nn, "W"+str(w)+"M"+str(m),color='k')
-        
+
         plot_data = np.hstack((np.array(self._hidden_layer_neurons)[:,np.newaxis],np.array(self._val_score)[:,np.newaxis]))
         mask = paretoset(plot_data, sense=["min","min"])
         score_pareto, batch_expo_pareto, workers_pareto, models_pareto = np.array(self._val_score)[mask], np.array(self._batch_expo)[mask], np.array(self._completed_workers)[mask], np.array(self._completed_models)[mask]
@@ -1243,7 +1243,7 @@ class PlotHPOResults:
         plt.tight_layout()
         plt.show()
         return
-    
+
     def PlotLossSize(self):
 
         plot_data = np.hstack((np.array(self._hidden_layer_neurons)[:,np.newaxis],np.array(self._val_score)[:,np.newaxis]))
@@ -1256,7 +1256,7 @@ class PlotHPOResults:
         ax.plot(self._val_score[::frq], self._hidden_layer_neurons[::frq], 'ko')
         for nn, sc, w, m in zip(self._hidden_layer_neurons[::frq], self._val_score[::frq], self._completed_workers[::frq], self._completed_models[::frq]):
             ax.text(sc, nn, "W"+str(w)+"M"+str(m),color='k')
-        
+
         ax.plot(np.array(self._val_score)[mask], np.array(self._hidden_layer_neurons)[mask], 'ro')
 
         ax.grid()
@@ -1268,7 +1268,7 @@ class PlotHPOResults:
         plt.tight_layout()
         plt.show()
         return
-    
+
     def GetParetoIndices(self):
         plot_data = np.hstack((np.array(self._hidden_layer_neurons)[:,np.newaxis],np.array(self._val_score)[:,np.newaxis]))
         mask = paretoset(plot_data, sense=["min","min"])
@@ -1282,10 +1282,10 @@ class PlotHPOResults:
         pareto_indices = []
         for w, m in zip(np.array(self._completed_workers)[mask][sorted_indices], np.array(self._completed_models)[mask][sorted_indices]):
             pareto_indices.append(optim_directory + ("/Worker_%i/Model_%i/" % (w, m)))
-        
-        
+
+
         return pareto_indices
-    
+
     def GetParetoHP(self):
         plot_data = np.hstack((np.array(self._hidden_layer_neurons)[:,np.newaxis],np.array(self._val_score)[:,np.newaxis]))
         mask = paretoset(plot_data, sense=["min","min"])
@@ -1316,7 +1316,7 @@ class PlotHPOResults:
                 N_H = [int(s) for s in lines[9].strip().split(":")[-1].split()]
                 weights = [np.load(filedir + ("/W_%i.npy" % i)) for i in range(len(N_H)+1)]
                 biases = [np.load(filedir + ("/b_%i.npy" % i)) for i in range(len(N_H)+1)]
-                
+
                 pareto_alpha_expo.append(alpha_expo)
                 pareto_lr_decay.append(lr_decay)
                 pareto_batch_expo.append(batch_expo)
@@ -1325,7 +1325,7 @@ class PlotHPOResults:
                 pareto_weights.append(weights)
                 pareto_biases.append(biases)
         return pareto_alpha_expo, pareto_lr_decay, pareto_batch_expo, pareto_phi, pareto_N_H, pareto_weights, pareto_biases
-    
+
     def PlotParetoArchitectures(self):
 
         plot_data = np.hstack((np.array(self._hidden_layer_neurons)[:,np.newaxis],np.array(self._val_score)[:,np.newaxis]))
@@ -1358,7 +1358,7 @@ class PlotHPOResults:
                 lines = fid.readlines()
             NN = [int(s) for s in lines[-1].strip().split(":")[-1].split()]
             hidden_layer_architectures.append(NN)
-        
+
             axs[i, 0].plot(pareto_scores, pareto_costs, 'ko-',markersize=10)
             axs[i, 0].plot(pareto_scores[i],pareto_costs[i], 'ro',markersize=12)
             axs[i, 0].set_xscale('log')
@@ -1369,7 +1369,7 @@ class PlotHPOResults:
             axs[i, 0].set_title("Worker %i, Model %i" % (worker_idx, model_idx))
             for j in range(len(hidden_layer_architectures[i])):
                 axs[i, 1].plot((j+1)*np.ones(int(hidden_layer_architectures[i][j])), np.arange(int(hidden_layer_architectures[i][j])) - 0.5*hidden_layer_architectures[i][j], 'ko')
-            
+
             axs[i, 1].set_ylim([-20, 20])
             axs[i, 1].set_xlim([0, 10])
             axs[i, 1].grid()
@@ -1378,7 +1378,7 @@ class PlotHPOResults:
         fig.savefig(optim_directory + "/pareto_analysis.pdf",format='pdf',bbox_inches='tight')
         plt.close(fig)
         return
-    
+
     def PlotParetoConvergence(self):
         history_file = self.GetOptimHistory()
 
@@ -1405,13 +1405,13 @@ class PlotHPOResults:
 
         last_gen_size = history_size[ix_last_gen]
         last_gen_score = history_score[ix_last_gen]
-        
+
         min_score,max_score = np.min(last_gen_score),np.max(last_gen_score)
         min_size,max_size = np.min(last_gen_size),np.max(last_gen_size)
-        
+
         last_gen_size_scaled = (last_gen_size - min_size)/(max_size - min_size)
         last_gen_score_scaled = (last_gen_score - min_score)/(max_score - min_score)
-        
+
         P_last_scaled = np.hstack((last_gen_size_scaled[:,np.newaxis],last_gen_score_scaled[:,np.newaxis]))
         last_gen_groups.append(np.hstack((last_gen_size[:,np.newaxis],last_gen_score[:,np.newaxis])))
 
@@ -1425,7 +1425,7 @@ class PlotHPOResults:
 
         history_score_scaled = (np.array(history_score) - min_score)/(max_score - min_score)
         history_size_scaled = (np.array(history_size) - min_size)/(max_size - min_size)
-        
+
         hypervolume = []
         general_distance = []
 
@@ -1436,7 +1436,7 @@ class PlotHPOResults:
             general_distance.append(dist_general)
             hypervolume.append(HV_gen)
 
-        
+
         HV_last = hypervolume[-1]
         HV_pref = hypervolume[np.argwhere(np.array(hypervolume) < HV_last)[-1][0]]
         HV_change = 100*(HV_pref - HV_last)/HV_last
@@ -1458,7 +1458,7 @@ class PlotHPOResults:
         ax.set_ylabel(r"Pareto hyper-volume $(HV)[-]$",fontsize=20)
         ax.grid()
         ax.tick_params(which='both',labelsize=20)
-        
+
         fig.savefig(optim_directory + "/pareto_history_plot.pdf",format='pdf',bbox_inches='tight')
         plt.show()
 
@@ -1469,20 +1469,20 @@ class PlotHPOResults_FGM(PlotHPOResults):
         PlotHPOResults.__init__(self, Config)
         self.__group_idx = group_idx
         return
-    
+
     def SetGroupIndex(self, group_idx:int):
         self.__group_idx = group_idx
         return
-    
+
     def SetFolderHeader(self):
         optim_header = "Architectures_Group%i_Optim" % (self.__group_idx+1)
         optim_header += self._get_optim_extension()
         return optim_header
-    
+
     def GetOptimHistory(self):
         history_filename = "history_optim_Group%i" % (self.__group_idx+1) + "_"
         history_filename += self._get_optim_extension()
         history_filepath = self._Config.GetOutputDir()+("/Architectures_Group%i_Optim%s/" % (self.__group_idx+1, self._get_optim_extension()))+history_filename + ".csv"
         return history_filepath
-    
-    
+
+

@@ -143,7 +143,7 @@ class SU2TableGenerator_NICFD:
             self._table_vars.remove(EntropicVars.ViscosityDyn.name)
             self._table_vars.remove(EntropicVars.Conductivity.name)
         return
-    
+
     def SetFDStepSize(self, val_step_size:float=3e-7):
         """Set the relative step size for density and static energy for evaluating fluid properties in the two-phase region.
 
@@ -164,7 +164,7 @@ class SU2TableGenerator_NICFD:
         """
         self._Config.SetNpDensity(Np_x)
         return
-    
+
     def SetNpEnergy(self, Np_y:int=DefaultSettings_NICFD.Np_temp):
         """Specify the number of table nodes in the y-direction of the Cartesian table.
 
@@ -186,7 +186,7 @@ class SU2TableGenerator_NICFD:
         self._DataGenerator.UseAutoRange(False)
         self._DataGenerator.SetDensityBounds(Rho_lower, Rho_upper)
         return
-    
+
     def SetEnergyBounds(self, E_lower:float=DefaultSettings_NICFD.Energy_min, E_upper:float=DefaultSettings_NICFD.Energy_max):
         """Define the internal energy bounds of the density-energy based fluid data grid.
 
@@ -210,7 +210,7 @@ class SU2TableGenerator_NICFD:
             raise Exception("Cell size value should be positive")
         self._base_cell_size = cell_size_coarse
         return
-    
+
     def SetCellSize_Refined(self, cell_size_ref:float=5e-3):
         """Specify the refined level cell size of the table
 
@@ -222,7 +222,7 @@ class SU2TableGenerator_NICFD:
             raise Exception("Cell size value should be positive")
         self._refined_cell_size = cell_size_ref
         return
-    
+
     def SetRefinement_Radius(self, refinement_radius:float=1e-2):
         """Specify the radius around each refinement point within which the refined cell size is applied
 
@@ -234,7 +234,7 @@ class SU2TableGenerator_NICFD:
             raise Exception("Refinement radius should be positive")
         self._refinement_radius = refinement_radius
         return
-    
+
     def SetTableDiscretization(self, method:str=DefaultSettings_NICFD.tabulation_method):
         """Overwrite the thermodynamic state space discretization method from the configuration.
 
@@ -243,7 +243,7 @@ class SU2TableGenerator_NICFD:
         """
         self._Config.SetTableDiscretization(method)
         return
-    
+
     def SetTableVars(self, table_vars_in:list[str]):
         """Specify the thermophysical variables to be included in the table file. All quantities are included by default. The list shoud at least contain "Density" and "Energy".
         
@@ -259,17 +259,17 @@ class SU2TableGenerator_NICFD:
         if EntropicVars.Energy.name not in table_vars_in:
             print("Energy should always be included in table variables")
             self._table_vars.append(EntropicVars.Energy.name)
-        
+
         if self._Config.EnableTwophase() and EntropicVars.VaporQuality.name in table_vars_in:
             print("Table generator not configured for two-phase, ignoring vapor quality from table data.")
             table_vars_in.remove(EntropicVars.VaporQuality.name)
-        
+
         if not self._Config.CalcTransportProperties():
             if EntropicVars.Conductivity.name in table_vars_in:
                 print("Table generator not configured for transport properties, ignoring conductivity data")
             if EntropicVars.ViscosityDyn.name in table_vars_in:
                 print("Table generator not configured for transport properties, ignoring viscosity data")
-            
+
         valid_vars = True
         for v in table_vars_in:
             found_var = False
@@ -283,7 +283,7 @@ class SU2TableGenerator_NICFD:
         if not valid_vars:
             raise Exception("Some specified thermophysical variables are not supported.")
         return
-    
+
     def __Compute2DMesh(self, points:np.ndarray[float], ref_pts:np.ndarray[float]=[],show:bool=False,sat_curve_pts:np.ndarray[float]=[]):
         """Populate two-dimensional thermodynamic state space with table nodes according to refinement settings.
 
@@ -318,7 +318,7 @@ class SU2TableGenerator_NICFD:
             i = i_next
             hull_indices.append(i_next)
         XY_hull = XY_hull[hull_indices, :]
-        
+
         # Initiate gmsh
         gmsh.initialize()
         gmsh.model.add("table_level")
@@ -329,7 +329,7 @@ class SU2TableGenerator_NICFD:
         hull_pts = []
         for i in range(int(len(XY_hull))):
             hull_pts.append(factory.addPoint(XY_hull[i, 0], XY_hull[i, 1], 0, self._base_cell_size))
-        
+
         # Connect hull points to a closed multi-component curve
         hull_lines = []
         for i in range(len(hull_pts)-1):
@@ -352,7 +352,7 @@ class SU2TableGenerator_NICFD:
                     ref_pt_ids.append(factory.addPoint(ref_pts[i,0], ref_pts[i, 1], 0.0))
 
         factory.synchronize()
-        
+
         if add_sat_curve:
 
             # Create normal vector to saturation curve.
@@ -376,7 +376,7 @@ class SU2TableGenerator_NICFD:
             valid_pts = np.logical_and(valid_sat_curve_pts, valid_nans)
 
             # Clip the saturation curve points to the bounds of the thermodynamic mesh
-            
+
             within_hull = np.zeros(len(sat_curve_pts),dtype=np.bool)
             for i in range(len(sat_curve_pts)):
                 XY_with_pt = np.vstack((XY_hull, sat_curve_rhoe_upper[i,:]))
@@ -389,7 +389,7 @@ class SU2TableGenerator_NICFD:
                 within_hull_lower = (area_n <= area_ref)
                 within_hull[i] = (within_hull_upper and within_hull_lower)
             valid_pts = np.logical_and(valid_pts, within_hull)
-            
+
             sat_curve_pts = sat_curve_pts[valid_pts, :]
             norm_vector = norm_vector[valid_pts, :]
 
@@ -474,7 +474,7 @@ class SU2TableGenerator_NICFD:
             for i in range(len(sat_curve_lower_lines)):
                 gmsh.model.mesh.setTransfiniteCurve(sat_curve_lower_lines[i], 2)
                 gmsh.model.mesh.setTransfiniteCurve(sat_curve_upper_lines[i], 2)
-                
+
             for s, c in zip(sat_surfs, sat_curve_cornertags):
                 gmsh.model.mesh.setTransfiniteSurface(s, cornerTags=c)
                 gmsh.model.mesh.setRecombine(2, s)
@@ -519,9 +519,9 @@ class SU2TableGenerator_NICFD:
                 quads[:, [0, 2, 3]],
             ])
         gmsh.finalize()
-        
+
         return MeshPoints, tris
-    
+
     def __map_tags(self,tags,nodeTags_sorted,order):
         tags = np.asarray(tags, dtype=np.int64).ravel()
         pos = np.searchsorted(nodeTags_sorted, tags)
@@ -530,7 +530,7 @@ class SU2TableGenerator_NICFD:
             missing = np.unique(tags[~ok])
             raise RuntimeError(f"Node tags non trovati in getNodes(): {missing[:20]} (tot missing={len(missing)})")
         return order[pos]
-    
+
     def __CalcMeshData(self, fluid_data_mesh:np.ndarray[float]):
         """Calculate the fluid thermodynamic state variables for the table nodes
 
@@ -554,7 +554,7 @@ class SU2TableGenerator_NICFD:
                 fluid_data_out[i, :] = None
         fluid_data_out = fluid_data_out[self.valid_mask,:]
         return fluid_data_out
-    
+
     def __CartesianTableData(self):
         print("Generating table on Cartesian grid")
         Np_rho = self._Config.GetNpDensity()
@@ -610,7 +610,7 @@ class SU2TableGenerator_NICFD:
             except:
                 self.state_data[idx_2d[0], idx_2d[1], :] = None
         return
-    
+
     def __CartesianTriangulation(self):
         """
         Create Delaunay triangulation of valid grid points.
@@ -622,13 +622,13 @@ class SU2TableGenerator_NICFD:
         e_table = self.state_data[:,:,EntropicVars.Energy.value]
         rho_valid = rho_table[self.valid_mask].flatten()
         e_valid = e_table[self.valid_mask].flatten()
-        
+
         # Stack as (N, 2) array
         cv_table = np.column_stack([rho_valid, e_valid])
 
         #self._table_nodes = np.column_stack(tuple(self.state_data[:,:,EntropicVars[v].value][self.valid_mask].flatten() for v in self._table_vars))
         self._table_nodes = np.column_stack(tuple(self.state_data[:,:,i][self.valid_mask].flatten() for i in range(EntropicVars.N_STATE_VARS.value)))
-            
+
         # Create Delaunay triangulation
         tri = Delaunay(cv_table)
         self._table_connectivity = tri.simplices
@@ -664,11 +664,11 @@ class SU2TableGenerator_NICFD:
 
         sat_curve_pts_norm = state_sat_curve_norm[:, [EntropicVars.Density.value,EntropicVars.Energy.value]]
         return sat_curve_pts_norm
-    
+
     def __GenerateMeshAndData(self, rhoe_norm:np.ndarray[float], sat_curve_pts:np.ndarray[float],ix_ref=[]):
-        
+
         rhoe_norm_mesh_nodes,tria = self.__Compute2DMesh(rhoe_norm, ref_pts=rhoe_norm[ix_ref,:], show=False, sat_curve_pts=sat_curve_pts)
-        
+
         # Calculate thermodynamic state variables of initial table nodes
         fluid_data_norm = np.zeros([len(rhoe_norm_mesh_nodes), EntropicVars.N_STATE_VARS.value])
         fluid_data_norm[:, EntropicVars.Density.value] = rhoe_norm_mesh_nodes[:,0]
@@ -676,7 +676,7 @@ class SU2TableGenerator_NICFD:
         fluid_data_mesh = self._fluid_data_scaler.inverse_transform(fluid_data_norm)
         fluid_data_mesh = self.__CalcMeshData(fluid_data_mesh)
         return fluid_data_mesh, tria
-    
+
     def GenerateTable(self):
         """Initiate table generation process
         """
@@ -693,9 +693,9 @@ class SU2TableGenerator_NICFD:
             print("Generating table with adaptive refinement")
 
             self._table_nodes = np.column_stack(tuple(self.state_data[:,:,i][self.valid_mask].flatten() for i in range(EntropicVars.N_STATE_VARS.value)))
-            
+
             fluid_data_norm = self._fluid_data_scaler.fit_transform(self._table_nodes)
-            
+
             sat_curve_pts_norm = []
             if self._Config.TwoPhase():
                 sat_curve_pts_norm = self.__CreateSaturationCurve()
@@ -711,7 +711,7 @@ class SU2TableGenerator_NICFD:
 
             # # Regenerate table including refinement locations
             rhoe_norm_mesh = fluid_data_norm[:, [EntropicVars.Density.value, EntropicVars.Energy.value]]
-        
+
             # Create triangulation of filtered thermodynamic state data
             print("Generating refined thermodynamic mesh...")
             fluid_data_ref, _ = self.__GenerateMeshAndData(rhoe_norm_mesh, sat_curve_pts_norm, ix_ref=ix_ref)
@@ -730,7 +730,7 @@ class SU2TableGenerator_NICFD:
             self._table_hullnodes = HullNodes
 
         return
-    
+
     def __remove_invalid_nodes_from_mesh(self, connectivity, valid_mask, rhoe_mesh_norm):
 
         conn = np.asarray(connectivity, dtype=np.int64)
@@ -757,7 +757,7 @@ class SU2TableGenerator_NICFD:
         x, y = table_data_norm[:, EntropicVars.Density.value], table_data_norm[:, EntropicVars.Energy.value]
         # scale_x= self._fluid_data_scaler.data_max_[EntropicVars.Density.value] - self._fluid_data_scaler.data_min_[EntropicVars.Density.value]
         # scale_y= self._fluid_data_scaler.data_max_[EntropicVars.Energy.value] - self._fluid_data_scaler.data_min_[EntropicVars.Energy.value]
-        
+
         pts = np.column_stack([x, y, np.zeros_like(x)])  # z=0
 
         conn = np.asarray(self._table_connectivity, dtype=np.int64)
@@ -791,12 +791,12 @@ class SU2TableGenerator_NICFD:
         """
         if TD_variable not in self._table_vars:
             raise Exception("%s is not present in fluid data" % TD_variable)
-        
+
         self.__refinement_vars.append(TD_variable)
         self.__refinement_norm_min.append(norm_val_min)
         self.__refinement_norm_max.append(norm_val_max)
         return
-    
+
     def __ApplyRefinement(self, fluid_data_norm_ref:np.ndarray[float]):
         ix_ref = np.array([],dtype=np.int64)
         fluid_vars = [a.name for a in EntropicVars][:-1]
@@ -811,7 +811,7 @@ class SU2TableGenerator_NICFD:
         else:
             return []
 
-            
+
     def WriteTableFile(self, output_filepath:str=None):
         """
         Save the table data and connectivity as a Dragon library file. If no file name is provided, the table file will be named according to the Config_FGM class name.
@@ -878,4 +878,3 @@ class SU2TableGenerator_NICFD:
         fid.close()
 
         return
-    
