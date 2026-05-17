@@ -6,7 +6,7 @@ from su2dataminer.process_data import FlameletConcatenator
 from su2dataminer.manifold import TrainMLP_FGM
 
 alpha_expo = -2.6
-lr_decay = 0.999 
+lr_decay = 0.999
 activation_function="swish"
 N_H = [10,10,10,10]
 batch_expo = 2

@@ -33,13 +33,13 @@ random.seed(seed_value)
 seed_value += 1
 import numpy as np
 np.random.seed(seed_value)
-seed_value += 1 
+seed_value += 1
 import tensorflow as tf
 tf.random.set_seed(seed_value)
 config = tf.compat.v1.ConfigProto()
 config.gpu_options.allow_growth = True
-import matplotlib.pyplot as plt 
-import cantera as ct 
+import matplotlib.pyplot as plt
+import cantera as ct
 
 from Common.DataDrivenConfig import Config_FGM
 from Manifold_Generation.MLP.Trainer_Base import MLPTrainer, TensorFlowFit,PhysicsInformedTrainer,TrainMLP, CustomTrainer
@@ -49,7 +49,7 @@ from Common.Properties import FGMVars
 
 class Train_Flamelet_Direct(TensorFlowFit):
     __Config:Config_FGM
-    _train_name:str 
+    _train_name:str
 
     def __init__(self, Config_in:Config_FGM, group_idx:int=0):
         TensorFlowFit.__init__(self)
@@ -83,18 +83,18 @@ class Train_Flamelet_Direct(TensorFlowFit):
             self._X_offset = self.scaler_function_x.mean_
         elif self.scaler_function_name == "robust":
             self._X_offset = self.scaler_function_x.center_
-        elif self.scaler_function_name == "minmax":  
+        elif self.scaler_function_name == "minmax":
             self._X_scale = 1 / self.scaler_function_x.scale_
             
             self._X_offset = -self.scaler_function_x.min_ / self.scaler_function_x.scale_
-        return 
+        return
     
 class Train_FGM_PINN(PhysicsInformedTrainer):
     """Physics-informed trainer class for flamelet manifold applications.
     """
 
     __Config:Config_FGM = None    # FlameletAI configuration class to read output variables and hyper-parameters from.
-    _dt=tf.float64 
+    _dt=tf.float64
     _dt_np=np.float64
     def __init__(self, Config_in:Config_FGM, group_idx:int=0):
         """Class constructor. Initialize a physics-informed trainer object for a given output group.
@@ -107,7 +107,7 @@ class Train_FGM_PINN(PhysicsInformedTrainer):
 
         # Initiate parent class.
         PhysicsInformedTrainer.__init__(self)
-        self.__Config = Config_in 
+        self.__Config = Config_in
         self._controlling_vars = self.__Config.GetControllingVariables()
         self._train_vars = self.__Config.GetMLPOutputGroup(group_idx)
         self.callback_every = 10
@@ -128,14 +128,14 @@ class Train_FGM_PINN(PhysicsInformedTrainer):
         self.SetSaveDir(os.getcwd())
         self.SetInitializer("he_uniform")
 
-        return 
+        return
     
     def GetTrainData(self):
         """Read domain and boundary training data and pre-process reactant-product matrices for visualization.
         """
         super().GetTrainData()
         self.__GenerateBoundaryMatrices()
-        return 
+        return
     
     def SetTrainVariables(self, train_vars: list[str]):
         """Define the dependent variables to train for. For physics-informed FGM training, the state variables are the same 
@@ -155,7 +155,7 @@ class Train_FGM_PINN(PhysicsInformedTrainer):
         :rtype: np.ndarray[float],np.ndarray[float]
         """
         projection_array_train = np.zeros(np.shape(self._X_boundary_norm))
-        projection_array_train[:, self._controlling_vars.index(DefaultProperties.name_enth)] = 1.0 
+        projection_array_train[:, self._controlling_vars.index(DefaultProperties.name_enth)] = 1.0
         
         target_grad_array = np.zeros([len(projection_array_train)])
         return projection_array_train, target_grad_array
@@ -178,7 +178,7 @@ class Train_FGM_PINN(PhysicsInformedTrainer):
 
         # Compute progress variable values for pure oxidizer and pure fuel.
         self.__Config.gas.set_mixture_fraction(0.0, fuel_string,oxidizer_string)
-        Y_ox = self.__Config.gas.Y 
+        Y_ox = self.__Config.gas.Y
         self.__Config.gas.set_mixture_fraction(1.0,  fuel_string,oxidizer_string)
         Y_f = self.__Config.gas.Y
         
@@ -189,14 +189,14 @@ class Train_FGM_PINN(PhysicsInformedTrainer):
         self.__Config.gas.set_equivalence_ratio(1.0,  fuel_string,oxidizer_string)
         Z_st = self.__Config.gas.mixture_fraction( fuel_string,oxidizer_string)
         self.__Config.gas.equilibrate("TP")
-        Y_b_st = self.__Config.gas.Y 
+        Y_b_st = self.__Config.gas.Y
         pv_st = self.__Config.ComputeProgressVariable(variables=None, flamelet_data=None, Y_flamelet=Y_b_st[:,np.newaxis])[0]
         h_st = self.__Config.gas.enthalpy_mass
         X_st_norm = self.scaler_function_x.transform(np.array([[pv_st, h_st, Z_st]]))[0,:]
         Z_st_norm = X_st_norm[2]
 
         # Identify rich and lean boundary nodes.
-        is_rich = mixfrac_boundary_norm > Z_st_norm 
+        is_rich = mixfrac_boundary_norm > Z_st_norm
         is_stoch = mixfrac_boundary_norm == Z_st_norm
         is_lean = np.invert(is_rich)
 
@@ -243,11 +243,11 @@ class Train_FGM_PINN(PhysicsInformedTrainer):
             pv_boundary = X_boundary[iz,self._controlling_vars.index(DefaultProperties.name_pv)]
             self.__Config.gas.set_mixture_fraction(min(max(z,0),1.0), fuel_string, oxidizer_string)
             self.__Config.gas.TP=self.__Config.GetUnbTempBounds()[0], DefaultProperties.pressure
-            Y = self.__Config.gas.Y 
+            Y = self.__Config.gas.Y
             pv_unb = self.__Config.ComputeProgressVariable(variables=None, flamelet_data=None, Y_flamelet=Y[:,np.newaxis])
             
             if pv_boundary > (pv_unb+1e-3*self._X_scale[self._controlling_vars.index(DefaultProperties.name_pv)]):
-                is_unb[iz] = False 
+                is_unb[iz] = False
 
         return is_unb
     
@@ -275,17 +275,17 @@ class Train_FGM_PINN(PhysicsInformedTrainer):
 
         z_fuel = 1.0
         self.__Config.gas.set_mixture_fraction(z_fuel, self.__Config.GetFuelString(), self.__Config.GetOxidizerString())
-        Y_fuel = self.__Config.gas.Y 
+        Y_fuel = self.__Config.gas.Y
         
         z_ox = 0.0
         self.__Config.gas.set_mixture_fraction(z_ox, self.__Config.GetFuelString(), self.__Config.GetOxidizerString())
-        Y_ox = self.__Config.gas.Y 
+        Y_ox = self.__Config.gas.Y
         
         self.__Config.gas.set_equivalence_ratio(1.0, self.__Config.GetFuelString(), self.__Config.GetOxidizerString())
         z_stoch = self.__Config.gas.mixture_fraction(self.__Config.GetFuelString(), self.__Config.GetOxidizerString())
-        self.__Config.gas.TP = self.__Config.GetUnbTempBounds()[1], ct.one_atm 
+        self.__Config.gas.TP = self.__Config.GetUnbTempBounds()[1], ct.one_atm
         self.__Config.gas.equilibrate("TP")
-        Y_stoch = self.__Config.gas.Y 
+        Y_stoch = self.__Config.gas.Y
         
         beta_pv_fuel = beta_pv_ox = beta_pv_stoch = 0.0
         for sp, w in zip(pv_species, pv_weights):
@@ -305,7 +305,7 @@ class Train_FGM_PINN(PhysicsInformedTrainer):
         target_grad_arrays.append(target_grad_pvz)
         bc_labels.append("Beta_pv : pv-Z")
 
-        return projection_arrays, target_grad_arrays, bc_labels 
+        return projection_arrays, target_grad_arrays, bc_labels
     
     def __SetBeta_Z_projection(self):
         """Get boundary penalty gradient projection array and target projected gradient for the mixture fraction preferential diffusion scalar.
@@ -329,19 +329,19 @@ class Train_FGM_PINN(PhysicsInformedTrainer):
 
         z_fuel = 1.0
         self.__Config.gas.set_mixture_fraction(z_fuel, self.__Config.GetFuelString(), self.__Config.GetOxidizerString())
-        Y_fuel = self.__Config.gas.Y 
+        Y_fuel = self.__Config.gas.Y
         beta_Z_fuel = np.sum((z_i - z_Ns) * Y_fuel / Le_i)
 
         z_ox = 0.0
         self.__Config.gas.set_mixture_fraction(z_ox, self.__Config.GetFuelString(), self.__Config.GetOxidizerString())
-        Y_ox = self.__Config.gas.Y 
+        Y_ox = self.__Config.gas.Y
         beta_Z_ox = np.sum((z_i - z_Ns) * Y_ox / Le_i)
         
         self.__Config.gas.set_equivalence_ratio(1.0, self.__Config.GetFuelString(), self.__Config.GetOxidizerString())
         z_stoch = self.__Config.gas.mixture_fraction(self.__Config.GetFuelString(), self.__Config.GetOxidizerString())
-        self.__Config.gas.TP = self.__Config.GetUnbTempBounds()[1], ct.one_atm 
+        self.__Config.gas.TP = self.__Config.GetUnbTempBounds()[1], ct.one_atm
         self.__Config.gas.equilibrate("TP")
-        Y_stoch = self.__Config.gas.Y 
+        Y_stoch = self.__Config.gas.Y
         beta_Z_stoch = np.sum((z_i - z_Ns) * Y_stoch / Le_i)
 
         target_grad_pvz[is_unb] = (beta_Z_fuel - beta_Z_ox) / (z_fuel - z_ox)
@@ -355,7 +355,7 @@ class Train_FGM_PINN(PhysicsInformedTrainer):
         target_grad_arrays.append(target_grad_pvz)
         bc_labels.append("Beta_Z : pv-Z")
         
-        return projection_arrays, target_grad_arrays, bc_labels 
+        return projection_arrays, target_grad_arrays, bc_labels
     
     def __SetMolarWeight_projection(self):
         """Get boundary penalty gradient projection array and target projected gradient for the mean molecular weight.
@@ -477,7 +477,7 @@ class Train_FGM_PINN(PhysicsInformedTrainer):
                     self.idx_PIvar.append(ivar)
                     self.projection_arrays.append(p)
                     self.target_arrays.append(t)
-                    self.lamba_labels.append(b)  
+                    self.lamba_labels.append(b)
                     self.vals_lambda.append(val_lambda_default)
 
             if (var == FGMVars.Beta_Enth.name):
@@ -489,16 +489,16 @@ class Train_FGM_PINN(PhysicsInformedTrainer):
                     self.lamba_labels.append(b)
                     self.vals_lambda.append(val_lambda_default)
 
-        self._N_bc = len(self.vals_lambda) 
-        return 
+        self._N_bc = len(self.vals_lambda)
+        return
     
-    @tf.function 
+    @tf.function
     def EvaluateState(self, X_label_norm:tf.constant):
         Y_pred_norm = self._MLP_Evaluation(X_label_norm)
         Y_pred = Y_pred_norm * self._Y_state_scale_tf + self._Y_state_offset_tf
-        return Y_pred 
+        return Y_pred
     
-    @tf.function 
+    @tf.function
     def ComputeStateError(self, X_label_norm:tf.constant,Y_state_label_norm:tf.constant):
         return self.Compute_Direct_Error(X_label_norm, Y_state_label_norm)
     
@@ -535,23 +535,23 @@ class Train_FGM_PINN(PhysicsInformedTrainer):
             H_max = gas_unb.enthalpy_mass
             gas_b.TP = T_range[0], DefaultProperties.pressure
             gas_b.equilibrate("HP")
-            gas_b.HP = H_max, DefaultProperties.pressure 
+            gas_b.HP = H_max, DefaultProperties.pressure
             T_range_b = np.linspace(self.__Config.GetUnbTempBounds()[0], gas_b.T, self.__Config.GetNpTemp())
             pv_b = self.__Config.ComputeProgressVariable(variables=None, flamelet_data=None, Y_flamelet=gas_b.Y[:,np.newaxis])[0]
             for iT, T in enumerate(T_range):
                 gas_unb.TP = T, DefaultProperties.pressure
                 self.pv_unb[iZ, iT] = pv_unb
                 self.h_unb[iZ, iT] = gas_unb.enthalpy_mass
-                self.z_unb[iZ, iT] = Z 
+                self.z_unb[iZ, iT] = Z
 
                 gas_b.TP = T_range_b[iT], DefaultProperties.pressure
                 self.pv_b[iZ, iT] = pv_b
                 self.h_b[iZ, iT] = gas_b.enthalpy_mass
-                self.z_b[iZ, iT] = Z 
+                self.z_b[iZ, iT] = Z
         if self._verbose > 0:
             print("Done!")
         
-        return 
+        return
     
     def __PlotUnbData(self):
         """Plot predicted quantities on chemical equilibrium data.
@@ -605,7 +605,7 @@ class Train_FGM_PINN(PhysicsInformedTrainer):
             ax.set_title(r""+self._train_vars[iVar] + r" Prediction along products",fontsize=20)
             fig.savefig(self._save_dir+"/Model_"+str(self._model_index)+"/Burnt_Pred_"+self._train_vars[iVar] +"."+self._figformat,format=self._figformat,bbox_inches='tight')
             plt.close(fig)
-        return 
+        return
     
     def CustomCallback(self):
         self.Plot_and_Save_History()
@@ -657,7 +657,7 @@ class Train_FGM_PINN(PhysicsInformedTrainer):
         return super().PostProcessing()
     
 class NullMLP(CustomTrainer):
-    __Config:Config_FGM = None 
+    __Config:Config_FGM = None
     def __init__(self, Config_in:Config_FGM):
         """Empty MLP to output zero for the NULL variable in SU2 simulations.
 
@@ -665,7 +665,7 @@ class NullMLP(CustomTrainer):
         :type Config_in: Config_FGM
         """
 
-        self.__Config = Config_in 
+        self.__Config = Config_in
 
         # Store controlling variables and null variable as output.
         self._controlling_vars = self.__Config.GetControllingVariables()
@@ -677,7 +677,7 @@ class NullMLP(CustomTrainer):
 
         self._train_name = "NULL"
 
-        return 
+        return
     
     def GetTrainData(self):
         """Extract controlling variable ranges from manifold data.
@@ -692,12 +692,12 @@ class NullMLP(CustomTrainer):
             self._X_offset = self.scaler_function_x.mean_
         elif self.scaler_function_name == "robust":
             self._X_offset = self.scaler_function_x.center_
-        elif self.scaler_function_name == "minmax":  
+        elif self.scaler_function_name == "minmax":
             self._X_scale = 1 / self.scaler_function_x.scale_
             
             self._X_offset = -self.scaler_function_x.min_ / self.scaler_function_x.scale_
 
-        return 
+        return
     
     def add_additional_header_info(self, fid):
         fid.write("Progress variable definition: " + "+".join(("%+.6e*%s" % (w, s)) for w, s in zip(self.__Config.GetProgressVariableWeights(), self.__Config.GetProgressVariableSpecies())))
@@ -718,9 +718,9 @@ class NullMLP(CustomTrainer):
 
         for i in range(len(NN)-1):
             self._weights.append(tf.Variable(tf.zeros(shape=(NN[i],NN[i+1]),dtype=self._dt),self._dt))
-            self._biases.append(tf.Variable(tf.zeros(shape=(NN[i+1],),dtype=self._dt),self._dt))             
+            self._biases.append(tf.Variable(tf.zeros(shape=(NN[i+1],),dtype=self._dt),self._dt))
             
-        return 
+        return
 
     def Save_Relevant_Data(self):
         """Generate zero MLP for predicting the NULL variable in SU2 simulations.
@@ -730,7 +730,7 @@ class NullMLP(CustomTrainer):
         self._Y_scale = np.ones(1)
         self._Y_offset = np.zeros(1)
         self.write_SU2_MLP(self._save_dir + "/Model_"+str(self._model_index)+"/MLP_"+self._train_name)
-        return 
+        return
     
 class TrainMLP_FGM(TrainMLP):
     """Class for training MLP architectures
@@ -762,7 +762,7 @@ class TrainMLP_FGM(TrainMLP):
         :raises Exception: if MLP output group index is undefined by flameletAI configuration.
         """
 
-        self.__Config = Config 
+        self.__Config = Config
         self.__output_group=group_idx
         self.CheckPINNVars()
         TrainMLP.__init__(self, Config_in=Config)
@@ -775,7 +775,7 @@ class TrainMLP_FGM(TrainMLP):
         self._trainer_direct.SetTrainVariables(self._Config.GetMLPOutputGroup(self.__output_group))
         super().SynchronizeTrainer()
 
-        return 
+        return
 
     def SetOutputGroup(self, iGroup:int):
         """Define MLP output group.
@@ -800,7 +800,7 @@ class TrainMLP_FGM(TrainMLP):
             self.architecture.append(n)
         self.CheckPINNVars()
         self.SynchronizeTrainer()
-        return 
+        return
     
     def GetOutputGroup(self):
         return self.__output_group
@@ -808,7 +808,7 @@ class TrainMLP_FGM(TrainMLP):
     def EnableBCLoss(self, enable_bc_loss:bool=True):
         if self.__kind_trainer == "physicsinformed":
             self.__trainer_PINN.EnableBCLoss(enable_bc_loss)
-        return 
+        return
     
     def CheckPINNVars(self):
         """Check if any of the variables in the MLP output group contain physics-informed variables and 
@@ -830,14 +830,14 @@ class TrainMLP_FGM(TrainMLP):
             self.__kind_trainer = "direct"
             if self.verbose > 0:
                 print("Using direct trainer.")
-        return 
+        return
     
     def SetBoundaryDataFile(self, boundary_data_file:str):
         if self.__kind_trainer != "physicsinformed" and self.verbose > 0:
             print("Boundary data will be ignored.")
         else:
             self.__trainer_PINN.SetBoundaryDataFile(boundary_data_file)
-        return 
+        return
     
     def CommenceTraining(self):
         if self.__kind_trainer == "physicsinformed":
@@ -901,18 +901,18 @@ def PlotFlameletData(Trainer:MLPTrainer, Config:Config_FGM, train_name:str):
         
         ref_data_flamelet = np.zeros([len(flameletData), len(Trainer._train_vars)])
 
-        # Collect prediction variables from flamelet data. 
+        # Collect prediction variables from flamelet data.
         for iVar, Var in enumerate(Trainer._train_vars):
             if "Beta_" in Var:
                 beta_pv, beta_enth_thermal, beta_enth, beta_mixfrac = Config.ComputeBetaTerms(variables_flamelet, flameletData)
             if Var == "Beta_ProgVar":
-                ref_data_flamelet[:, iVar] = beta_pv 
+                ref_data_flamelet[:, iVar] = beta_pv
             elif Var == "Beta_Enth_Thermal":
                 ref_data_flamelet[:, iVar] = beta_enth_thermal
             elif Var == "Beta_Enth":
-                ref_data_flamelet[:, iVar] = beta_enth 
+                ref_data_flamelet[:, iVar] = beta_enth
             elif Var == "Beta_MixFrac":
-                ref_data_flamelet[:, iVar] = beta_mixfrac 
+                ref_data_flamelet[:, iVar] = beta_mixfrac
             elif Var == "ProdRateTot_PV":
                 ref_data_flamelet[:, iVar] = Config.ComputeProgressVariable_Source(variables_flamelet, flameletData)
             elif Var == "DiffusionCoefficient":
@@ -944,4 +944,4 @@ def PlotFlameletData(Trainer:MLPTrainer, Config:Config_FGM, train_name:str):
         axs[iVar].grid()
         figs[iVar].savefig(Trainer._save_dir + "/Model_"+str(Trainer._model_index) + "/flameletdata_"+train_name+"_" + Var + "."+Trainer._figformat, format=Trainer._figformat, bbox_inches='tight')
         plt.close(figs[iVar])
-    return 
+    return

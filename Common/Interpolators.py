@@ -24,7 +24,7 @@
 #=============================================================================================#
 
 from scipy.spatial import cKDTree as KDTree
-import numpy as np 
+import numpy as np
 
 class Invdisttree:
     """ inverse-distance-weighted interpolation using KDTree:

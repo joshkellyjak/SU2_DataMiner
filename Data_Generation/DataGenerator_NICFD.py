@@ -1,8 +1,8 @@
 ###############################################################################################
-#       #      _____ __  _____      ____        __        __  ____                   #        #  
-#       #     / ___// / / /__ \    / __ \____ _/ /_____ _/  |/  (_)___  ___  _____   #        #  
-#       #     \__ \/ / / /__/ /   / / / / __ `/ __/ __ `/ /|_/ / / __ \/ _ \/ ___/   #        #      
-#       #    ___/ / /_/ // __/   / /_/ / /_/ / /_/ /_/ / /  / / / / / /  __/ /       #        #  
+#       #      _____ __  _____      ____        __        __  ____                   #        #
+#       #     / ___// / / /__ \    / __ \____ _/ /_____ _/  |/  (_)___  ___  _____   #        #
+#       #     \__ \/ / / /__/ /   / / / / __ `/ __/ __ `/ /|_/ / / __ \/ _ \/ ___/   #        #
+#       #    ___/ / /_/ // __/   / /_/ / /_/ / /_/ /_/ / /  / / / / / /  __/ /       #        #
 #       #   /____/\____//____/  /_____/\__,_/\__/\__,_/_/  /_/_/_/ /_/\___/_/        #        #
 #       #                                                                            #        #
 ###############################################################################################
@@ -17,8 +17,8 @@
 #                                                                                             |
 #                                                                                             |
 # Description:                                                                                |
-#  Class for generating fluid data for NI-CFD data mining operations.                         |                                                               
-#                                                                                             |  
+#  Class for generating fluid data for NI-CFD data mining operations.                         |
+#                                                                                             |
 # Version: 3.1.0                                                                              |
 #                                                                                             |
 #=============================================================================================#
@@ -28,10 +28,10 @@
 #---------------------------------------------------------------------------------------------#
 import CoolProp.CoolProp as CP
 import CoolProp as CoolP
-import numpy as np 
+import numpy as np
 from tqdm import tqdm
-import csv 
-import matplotlib.pyplot as plt 
+import csv
+import matplotlib.pyplot as plt
 np.random.seed(2)
 
 #---------------------------------------------------------------------------------------------#
@@ -46,7 +46,7 @@ class DataGenerator_CoolProp(DataGenerator_Base):
     """Class for generating fluid data using CoolProp
     """
     _Config:Config_NICFD
-    fluid = None 
+    fluid = None
     __accepted_phases:list[int] =  []
     # Pressure and temperature limits
     __use_PT:bool = DefaultSettings_NICFD.use_PT_grid
@@ -62,15 +62,15 @@ class DataGenerator_CoolProp(DataGenerator_Base):
     # Density and static energy limits
     __rho_min:float = DefaultSettings_NICFD.Rho_min
     __rho_max:float = DefaultSettings_NICFD.Rho_max
-    __e_min:float = DefaultSettings_NICFD.Energy_min 
-    __e_max:float = DefaultSettings_NICFD.Energy_max 
+    __e_min:float = DefaultSettings_NICFD.Energy_min
+    __e_max:float = DefaultSettings_NICFD.Energy_max
     __X_grid:np.ndarray[float] = None
-    __Y_grid:np.ndarray[float] = None 
+    __Y_grid:np.ndarray[float] = None
 
     # Entropy derivatives.
-    __StateVars_fluid:np.ndarray[float] = None 
-    __success_locations:np.ndarray[bool] = None 
-    __mixture:bool = False 
+    __StateVars_fluid:np.ndarray[float] = None
+    __success_locations:np.ndarray[bool] = None
+    __mixture:bool = False
 
     __fd_step_size_rho:float = 7e-3
     __fd_step_size_e:float = 7e-3
@@ -85,7 +85,7 @@ class DataGenerator_CoolProp(DataGenerator_Base):
             # Load configuration and set default properties.
             self.__use_PT = self._Config.GetPTGrid()
             if len(self._Config.GetFluidNames()) > 1:
-                self.__mixture = True 
+                self.__mixture = True
 
             # Define phases for which to generate fluid data.
             self.EnableTwophase(self._Config.TwoPhase())
@@ -114,12 +114,12 @@ class DataGenerator_CoolProp(DataGenerator_Base):
             self.__e_min, self.__e_max = e_bounds[0], e_bounds[1]
             self.__Np_Y = self._Config.GetNpTemp()
 
-        return 
+        return
     
     def UseAutoRange(self, use_auto_range:bool=True):
         """Automatically set controlling variable ranges depending on the fluid triple point and critical point."""
         self.__auto_range = use_auto_range
-        return 
+        return
     
     def PreprocessData(self):
         """Generate density and static energy grid at which to evaluate fluid properties.
@@ -169,11 +169,11 @@ class DataGenerator_CoolProp(DataGenerator_Base):
                 X_min = self.__rho_min
                 X_max = self.__rho_max
                 Y_min = self.__e_min
-                Y_max = self.__e_max 
+                Y_max = self.__e_max
         X_range = (X_min - X_max) * np.cos(np.linspace(0, 0.5*np.pi, self.__Np_X)) + X_max
         Y_range = np.linspace(Y_min, Y_max, self.__Np_Y)
         self.__X_grid, self.__Y_grid = np.meshgrid(X_range, Y_range)
-        return 
+        return
     
     def UpdateConfig(self):
         if self.__use_PT:
@@ -183,7 +183,7 @@ class DataGenerator_CoolProp(DataGenerator_Base):
             self._Config.SetDensityBounds(self.__rho_min, self.__rho_max)
             self._Config.SetEnergyBounds(self.__e_min, self.__e_max)
         self._Config.SaveConfig()
-        return 
+        return
     
     def VisualizeDataGrid(self):
         """Visualize query points at which fluid data are evaluated.
@@ -201,7 +201,7 @@ class DataGenerator_CoolProp(DataGenerator_Base):
         ax.grid()
         
         plt.show()
-        return 
+        return
     
     def SetTemperatureBounds(self, T_lower:float=DefaultSettings_NICFD.T_min, T_upper:float=DefaultSettings_NICFD.T_max):
         """Set the upper and lower temperature limits for the fluid data grid.
@@ -229,7 +229,7 @@ class DataGenerator_CoolProp(DataGenerator_Base):
     
     def SetNpDensity(self, Np_density:int=DefaultSettings_NICFD.Np_p):
         self.SetNpPressure(Np_P=Np_density)
-        return 
+        return
 
     def GetNpDensity(self):
         return self.GetNpPressure()
@@ -237,11 +237,11 @@ class DataGenerator_CoolProp(DataGenerator_Base):
     def SetDensityBounds(self, Density_lower:float=DefaultSettings_NICFD.Rho_min, Density_upper:float=DefaultSettings_NICFD.Rho_max):
         self.__rho_min = Density_lower
         self.__rho_max = Density_upper
-        return 
+        return
     
     def SetNpEnergy(self, Np_energy:int=DefaultSettings_NICFD.Np_temp):
         self.SetNpTemp(Np_Temp=Np_energy)
-        return 
+        return
     
     def GetNpEnergy(self):
         return self.GetNpTemp()
@@ -249,7 +249,7 @@ class DataGenerator_CoolProp(DataGenerator_Base):
     def SetEnergyBounds(self, Energy_lower:float=DefaultSettings_NICFD.Energy_min, Energy_upper:float=DefaultSettings_NICFD.Energy_max):
         self.__e_min = Energy_lower
         self.__e_max = Energy_upper
-        return 
+        return
     
     
     def SetNpTemp(self, Np_Temp:int=DefaultSettings_NICFD.Np_temp):
@@ -265,7 +265,7 @@ class DataGenerator_CoolProp(DataGenerator_Base):
             raise Exception("Number of unburnt temperature samples should be higher than one.")
         else:
             self.__Np_Y = Np_Temp
-        return 
+        return
     
     def GetNpTemp(self):
         """
@@ -291,8 +291,8 @@ class DataGenerator_CoolProp(DataGenerator_Base):
         if (Np_P <= 0):
             raise Exception("Number of unburnt temperature samples should be higher than one.")
         else:
-            self.__Np_X = Np_P 
-        return 
+            self.__Np_X = Np_P
+        return
     
     def GetNpPressure(self):
         return self.__Np_X
@@ -311,7 +311,7 @@ class DataGenerator_CoolProp(DataGenerator_Base):
         else:
             self.__P_min = P_lower
             self.__P_max = P_upper
-        return 
+        return
     
     def GetPressureBounds(self):
         """Get minimum and maximum pressure.
@@ -327,7 +327,7 @@ class DataGenerator_CoolProp(DataGenerator_Base):
         :return: minimum and maximum fluid density in data set.
         :rtype: tuple
         """
-        return self.__rho_min, self.__rho_max 
+        return self.__rho_min, self.__rho_max
     
     def GetEnergyBounds(self):
         """Get fluid static energy bounds values.
@@ -335,7 +335,7 @@ class DataGenerator_CoolProp(DataGenerator_Base):
         :return: minimum and maximum fluid static energy in data set.
         :rtype: tuple
         """
-        return self.__e_min, self.__e_max 
+        return self.__e_min, self.__e_max
     
     def IncludeTransportProperties(self, calc_transport_properties:bool=False):
         """Include transport properties in fluid data calculation
@@ -344,7 +344,7 @@ class DataGenerator_CoolProp(DataGenerator_Base):
         :type calc_transport_properties: bool, optional
         """
         self._Config.IncludeTransportProperties(calc_transport_properties)
-        return 
+        return
     
     def CalcTransportProperties(self):
         return self._Config.CalcTransportProperties()
@@ -364,7 +364,7 @@ class DataGenerator_CoolProp(DataGenerator_Base):
             self.__accepted_phases.remove(CoolP.iphase_gas)
             if CoolP.iphase_supercritical_gas in self.__accepted_phases:
                 self.__accepted_phases.remove(CoolP.iphase_supercritical_gas)
-        return 
+        return
 
     def GasPhase(self):
         """Whether gas phase data are included in the fluid data set.
@@ -385,7 +385,7 @@ class DataGenerator_CoolProp(DataGenerator_Base):
             self.__accepted_phases.append(CoolP.iphase_twophase)
         if not self._Config.TwoPhase() and CoolP.iphase_twophase in self.__accepted_phases:
             self.__accepted_phases.remove(CoolP.iphase_twophase)
-        return 
+        return
     
     def TwoPhase(self):
         return self._Config.TwoPhase()
@@ -405,7 +405,7 @@ class DataGenerator_CoolProp(DataGenerator_Base):
             self.__accepted_phases.remove(CoolP.iphase_liquid)
             if CoolP.iphase_supercritical_liquid in self.__accepted_phases:
                 self.__accepted_phases.remove(CoolP.iphase_supercritical_liquid)
-        return 
+        return
     
     def LiquidPhase(self):
         """Whether to include fluid data in liquid phase.
@@ -437,7 +437,7 @@ class DataGenerator_CoolProp(DataGenerator_Base):
                 self.__accepted_phases.remove(CoolP.iphase_supercritical_gas)
             if CoolP.iphase_supercritical_liquid in self.__accepted_phases:
                 self.__accepted_phases.remove(CoolP.iphase_supercritical_liquid)
-        return 
+        return
     
     def SetConductivityModel(self, conductivity_model:str=DefaultSettings_NICFD.conductivity_model):
         """Specify the two-phase conductivity model.
@@ -450,7 +450,7 @@ class DataGenerator_CoolProp(DataGenerator_Base):
         if not self.TwoPhase():
             self.EnableTwophase(True)
             print("Two-phase conductivity model specified, including two-phase fluid data.")
-        return 
+        return
     
     def GetConductivityModel(self):
         """Get two-phase conductivity model.
@@ -471,7 +471,7 @@ class DataGenerator_CoolProp(DataGenerator_Base):
         if not self.TwoPhase():
             self.EnableTwophase(True)
             print("Two-phase viscosity model specified, including two-phase fluid data.")
-        return 
+        return
     
     def GetViscosityModel(self):
         """Get two-phase viscosity model.
@@ -505,9 +505,9 @@ class DataGenerator_CoolProp(DataGenerator_Base):
                     # Check if fluid phase is not vapor or liquid
                     self.__StateVars_fluid[i,j,:], self.__success_locations[i,j] = self.GetStateVector()
                 except:
-                    self.__success_locations[i,j] = False 
+                    self.__success_locations[i,j] = False
                     self.__StateVars_fluid[i, j, :] = None
-        return 
+        return
     
     def __TransportProperties(self, q:float):
         """Evaluate fluid transport properties
@@ -556,8 +556,8 @@ class DataGenerator_CoolProp(DataGenerator_Base):
         return viscosity, conductivity, vapor_q
     
     def __EntropicEoS(self, rho, e, s, derivs, state_vector_struct:dict):
-        state_vector_struct[EntropicVars.Density.name] = rho 
-        state_vector_struct[EntropicVars.Energy.name] = e 
+        state_vector_struct[EntropicVars.Density.name] = rho
+        state_vector_struct[EntropicVars.Energy.name] = e
         state_vector_struct[EntropicVars.s.name] = s
         dsdrho_e = derivs["dsdrho_e"]
         state_vector_struct[EntropicVars.dsdrho_e.name] = dsdrho_e
@@ -584,14 +584,14 @@ class DataGenerator_CoolProp(DataGenerator_Base):
         dTdrho_e = -Temperature * Temperature * d2sdedrho
         state_vector_struct[EntropicVars.dTdrho_e.name] = dTdrho_e
         
-        dhde_rho = 1 + dPde_rho / rho 
-        dhdrho_e = -Pressure * np.power(rho, -2) + dPdrho_e / rho 
+        dhde_rho = 1 + dPde_rho / rho
+        dhdrho_e = -Pressure * np.power(rho, -2) + dPdrho_e / rho
         state_vector_struct[EntropicVars.dhde_rho.name] = dhdrho_e
         state_vector_struct[EntropicVars.dhdrho_e.name] = dhde_rho
 
-        # drhode_p = -dPde_rho / dPdrho_e 
+        # drhode_p = -dPde_rho / dPdrho_e
         # dTde_p = dTde_rho + dTdrho_e * drhode_p
-        # dhde_p = dhde_rho + drhode_p*dhdrho_e 
+        # dhde_p = dhde_rho + drhode_p*dhdrho_e
         # Cp = dhde_p / (dTde_p+np.sign(dTde_p)*1e-8)
         # Cv = 1 / (dTde_rho+np.sign(dTde_rho)*1e-8)
 
@@ -615,7 +615,7 @@ class DataGenerator_CoolProp(DataGenerator_Base):
         state_vector_struct[EntropicVars.dhdp_rho.name] = dhdP_rho
         state_vector_struct[EntropicVars.dsdrho_p.name] = dsdrho_P
         state_vector_struct[EntropicVars.dsdp_rho.name] = dsdP_rho
-        return 
+        return
         
 
         
@@ -642,9 +642,9 @@ class DataGenerator_CoolProp(DataGenerator_Base):
         d2sdedrho = derivs["d2sdedrho"]
 
         # Store entropy, Jacobian, and Hessian components
-        state_vector_struct[EntropicVars.s.name] = s 
-        state_vector_struct[EntropicVars.Density.name] = rho 
-        state_vector_struct[EntropicVars.Energy.name] = e 
+        state_vector_struct[EntropicVars.s.name] = s
+        state_vector_struct[EntropicVars.Density.name] = rho
+        state_vector_struct[EntropicVars.Energy.name] = e
         state_vector_struct[EntropicVars.dsdrho_e.name] = dsdrho_e
         state_vector_struct[EntropicVars.dsde_rho.name] = dsde_rho
         state_vector_struct[EntropicVars.d2sdrho2.name] = d2sdrho2
@@ -655,7 +655,7 @@ class DataGenerator_CoolProp(DataGenerator_Base):
         Temperature = self.fluid.T()#pow(dsde_rho, -1)
         state_vector_struct[EntropicVars.T.name] = Temperature
         Pressure = self.fluid.p()#-rho * rho * Temperature * dsdrho_e
-        state_vector_struct[EntropicVars.p.name] = Pressure 
+        state_vector_struct[EntropicVars.p.name] = Pressure
         Enthalpy = self.fluid.hmass()
         state_vector_struct[EntropicVars.Enthalpy.name] = Enthalpy
 
@@ -676,7 +676,7 @@ class DataGenerator_CoolProp(DataGenerator_Base):
             state_vector_struct[EntropicVars.dsdp_rho.name] = self.fluid.first_partial_deriv(CP.iSmass, CP.iP, CP.iDmass)
         else:
             self.__EntropicEoS(rho, e, s, derivs, state_vector_struct)
-        return 
+        return
         
     def __ThermodynamicState(self):
         """Evaluate the thermodynamic state variables
@@ -738,7 +738,7 @@ class DataGenerator_CoolProp(DataGenerator_Base):
 
         else:
             correct_phase = False
-            state_vector_vals[:] = None 
+            state_vector_vals[:] = None
         return state_vector_vals, correct_phase
     
 
@@ -774,7 +774,7 @@ class DataGenerator_CoolProp(DataGenerator_Base):
             raise Exception("Relative step sizes for finite-differences should be positive")
         self.__fd_step_size_rho = fd_step_rho
         self.__fd_step_size_e = fd_step_e
-        return 
+        return
     
     def ComputeSaturationCurve(self):
         """Compute the density and static energy along the fluid saturation curve
@@ -796,7 +796,7 @@ class DataGenerator_CoolProp(DataGenerator_Base):
         rho_sat=np.concatenate((rhoLiq[:-1],np.flip(rhoVap)))
         e_sat=np.concatenate((eLiq[:-1],np.flip(eVap)))
         sat_curve=np.column_stack((rho_sat,e_sat))
-        return sat_curve 
+        return sat_curve
     
     def GetFDStepSizes(self):
         return self.__fd_step_size_rho, self.__fd_step_size_e
@@ -946,9 +946,9 @@ class DataGenerator_CoolProp(DataGenerator_Base):
     
 
     def DiscretizationError(self, rho, e):
-        self.UpdateFluid(rho, e) 
+        self.UpdateFluid(rho, e)
         state_vector,_ = self.GetStateVector()
-        self.UpdateFluid(rho, e) 
+        self.UpdateFluid(rho, e)
         dPde_rho_ref = self.fluid.first_partial_deriv(CP.iP, CP.iUmass, CP.iDmass)
         dPdrho_e_ref = self.fluid.first_partial_deriv(CP.iP, CP.iDmass, CP.iUmass)
         dTde_rho_ref = self.fluid.first_partial_deriv(CP.iT, CP.iUmass, CP.iDmass)
@@ -1094,7 +1094,7 @@ class DataGenerator_CoolProp(DataGenerator_Base):
         """
 
         self.fluid.update(CP.DmassUmass_INPUTS, val_rho, val_e)
-        return 
+        return
     
     def VisualizeFluidData(self):
         """Visualize computed fluid data.
@@ -1135,7 +1135,7 @@ class DataGenerator_CoolProp(DataGenerator_Base):
         ax2.set_title("Fluid speed of sound data",fontsize=22)
 
         plt.show()
-        return 
+        return
     
     def SaveData(self):
         """Save fluid data in separate files for train, test and validation.
@@ -1211,7 +1211,7 @@ class DataGenerator_CoolProp(DataGenerator_Base):
             csvWriter = csv.writer(fid)
             csvWriter.writerows(val_data)
             
-        return 
+        return
     
     def GetStateData(self):
         return self.__StateVars_fluid, self.__success_locations

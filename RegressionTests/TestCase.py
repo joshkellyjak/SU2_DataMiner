@@ -1,8 +1,8 @@
-import os,sys 
-import subprocess 
+import os,sys
+import subprocess
 import datetime
-import time 
-import difflib 
+import time
+import difflib
 
 def is_float(test_string):
     try:
@@ -13,17 +13,17 @@ def is_float(test_string):
     
 class TestCase:
     reference_files:list[str]
-    test_files:list[str] 
+    test_files:list[str]
     config_dir:str
-    config_file:str 
-    exec_command:str 
-    timeout:float = 120.0 
-    comp_threshold:float = 0.0 
+    config_file:str
+    exec_command:str
+    timeout:float = 120.0
+    comp_threshold:float = 0.0
     tolerance:float = 1e-12
     num_decimals:int = 10
     
     def __init__(self, tag_in:str):
-          self.tag = tag_in 
+          self.tag = tag_in
           self.config_dir = "."
           self.config_file = "config.cfg"
 
@@ -32,8 +32,8 @@ class TestCase:
 
     def run_test(self):
         print('==================== Start Test: %s ===================='%self.tag)
-        passed = True 
-        timed_out = False 
+        passed = True
+        timed_out = False
 
         logfilename = "%s.log" % os.path.splitext(self.config_file)[0]
 
@@ -49,17 +49,17 @@ class TestCase:
         while process.poll() is None:
             time.sleep(0.1)
             now = datetime.datetime.now()
-            running_time = (now - start).seconds 
+            running_time = (now - start).seconds
             if running_time > self.timeout:
                 try:
                     process.kill()
                 except AttributeError:
                     pass
                 timed_out = True
-                passed = False 
+                passed = False
         
         if process.poll() != 0:
-            passed = False 
+            passed = False
             print("ERROR")
             print("Output from the failed case:")
             subprocess.call(["cat", logfilename])
@@ -72,16 +72,16 @@ class TestCase:
                 with open(fromfile,'r') as fid:
                     fromlines = fid.readlines()
                 with open(tofile, 'r') as fid:
-                    tolines = fid.readlines() 
+                    tolines = fid.readlines()
                 
                 max_delta = 0
-                compare_counter = 0 
-                ignore_counter = 0 
+                compare_counter = 0
+                ignore_counter = 0
 
                 if len(fromlines) != len(tolines):
                     diff = ["ERROR: Number of lines in %s and %s differ (%i vs %i)." % (fromfile, tofile, len(fromlines), len(tolines))]
-                    passed = False 
-                else:    
+                    passed = False
+                else:
                     for i_line in range(0, len(fromlines)):
 
                         from_line = fromlines[i_line].strip().split(',')
@@ -90,7 +90,7 @@ class TestCase:
                         # Add error if number of entries in the line differ
                         if len(from_line) != len(to_line):
                             diff.append("ERROR: Number of words in file %s line %i differ." % (fromfile, (i_line+1)))
-                            passed = False 
+                            passed = False
 
                         # Check entries in each line
                         for i_word in range(len(from_line)):
@@ -103,8 +103,8 @@ class TestCase:
                             # One entry is a float and the other is a string
                             if from_isfloat != to_isfloat:
                                 diff.append("ERROR: File entries in %s \"%s\" and \"%s\" in line %i, word %i differ" % (fromfile, from_word, to_word, (i_line+1), (i_word+1)))
-                                passed = False 
-                                delta = 0.0 
+                                passed = False
+                                delta = 0.0
                                 max_delta = "not applicable"
                             
                             # Compare floats
@@ -139,7 +139,7 @@ class TestCase:
                             break
                 
                 if diff == []:
-                    passed = True 
+                    passed = True
                 else:
                     if len(diff) > 10:
                         print("Error, more than 10 differences found in %s:" % fromfile)
@@ -154,4 +154,4 @@ class TestCase:
         print('==================== End Test: %s ====================\n'%self.tag)
         sys.stdout.flush()
         os.chdir(workdir)
-        return passed 
+        return passed

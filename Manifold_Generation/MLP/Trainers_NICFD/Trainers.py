@@ -33,17 +33,17 @@ random.seed(seed_value)
 seed_value += 1
 import numpy as np
 np.random.seed(seed_value)
-seed_value += 1 
+seed_value += 1
 import tensorflow as tf
 tf.random.set_seed(seed_value)
 config = tf.compat.v1.ConfigProto()
 config.gpu_options.allow_growth = True
-import matplotlib.pyplot as plt 
+import matplotlib.pyplot as plt
 from matplotlib import ticker
-from enum import Enum 
+from enum import Enum
 
 import CoolProp as CoolP
-import CoolProp.CoolProp as CP 
+import CoolProp.CoolProp as CP
 
 from Common.DataDrivenConfig import Config_NICFD
 from Common.CommonMethods import GetReferenceData
@@ -68,7 +68,7 @@ def GetStateVector(fluid:CP.AbstractState):
     :rtype: np.ndarray, bool
     """
     state_vector_vals = np.ones(EntropicVars.N_STATE_VARS.value)
-    correct_phase = True 
+    correct_phase = True
     accepted_phases:list[int] = [CoolP.iphase_gas, CoolP.iphase_supercritical_gas, CoolP.iphase_supercritical]
     if fluid.phase() in accepted_phases:
         state_vector_vals[EntropicVars.s.value] = fluid.smass()
@@ -95,7 +95,7 @@ def GetStateVector(fluid:CP.AbstractState):
         state_vector_vals[EntropicVars.cp.value] = fluid.cpmass()
     else:
         correct_phase = False
-        state_vector_vals[:] = None 
+        state_vector_vals[:] = None
     return state_vector_vals, correct_phase
 
 def ComputeRhoEGridData(config:Config_NICFD):
@@ -123,16 +123,16 @@ def ComputeRhoEGridData(config:Config_NICFD):
         for j in range(Np_y):
             rho = xx[i,j]
             e = yy[i,j]
-            state_cp[i,j,EntropicVars.Density.value] = rho 
-            state_cp[i,j,EntropicVars.Energy.value] = e 
+            state_cp[i,j,EntropicVars.Density.value] = rho
+            state_cp[i,j,EntropicVars.Energy.value] = e
             try:
                 fluid.update(CP.DmassUmass_INPUTS, rho, e)
                 state_vector_vals, correct_phase = GetStateVector(fluid)
                 if correct_phase:
                     state_cp[i,j,:] = state_vector_vals
             except:
-                pass 
-    return state_cp 
+                pass
+    return state_cp
 
 
 class Train_Entropic_Direct(TensorFlowFit):
@@ -147,7 +147,7 @@ class Train_Entropic_Direct(TensorFlowFit):
             self._hidden_layers.append(NN)
 
         self._train_vars = [EntropicVars.s.name]
-        return                
+        return
 
 class Train_Entropic_Derivatives(PhysicsInformedTrainer):
     __s_scale:float=0
@@ -207,7 +207,7 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
         d2sdedrho_norm = tf.gather(Y_norm, indices=4, axis=1)
         d2sde2_norm = tf.gather(Y_norm, indices=5, axis=1)
 
-        s_dim = self.__s_scale * s_norm + self.__s_min 
+        s_dim = self.__s_scale * s_norm + self.__s_min
         dsdrho_e = tf.math.multiply((self.__s_scale / self.__rho_scale), dsdrho_e_norm)
         dsde_rho = tf.math.multiply((self.__s_scale / self.__e_scale), dsde_rho_norm)
         d2sdrho2 = tf.math.multiply((self.__s_scale / tf.pow(self.__rho_scale, 2)),d2sdrho2_norm)
@@ -218,15 +218,15 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
         d2sdrho2e2 = [[d2sdrho2, d2sdedrho],[d2sdedrho, d2sde2]]
         return s_dim, dsdrhoe, d2sdrho2e2
     
-    @tf.function 
+    @tf.function
     def TD_Evaluation(self, rhoe_norm:tf.Tensor):
         s, dsdrhoe, d2sdrho2e2 = self.ComputeEntropyGradients(rhoe_norm)
         rho_norm = tf.gather(rhoe_norm, indices=0, axis=1)
-        rho = (self.__rho_max - self.__rho_min)*rho_norm + self.__rho_min 
+        rho = (self.__rho_max - self.__rho_min)*rho_norm + self.__rho_min
         T, P, c2 = self.EntropicEOS(rho, dsdrhoe, d2sdrho2e2)
         return s, T, P, c2
     
-    @tf.function 
+    @tf.function
     def EntropicEOS(self,rho, dsdrhoe, d2sdrho2e2):
         dsdrho_e = dsdrhoe[0]
         dsde_rho = dsdrhoe[1]
@@ -240,7 +240,7 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
         c2 = -rho * T * (blue_term - rho * green_term * (dsdrho_e / dsde_rho))
   
         return T, P, c2
-    @tf.function 
+    @tf.function
     def __Compute_S_error(self, S_label:tf.Tensor, x_var:tf.Variable):
         """Compute the temperature prediction error.
 
@@ -306,7 +306,7 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
         # Apply loss function.
         P_error = self.mean_square_error(y_true=P_label_norm, y_pred=P_pred_norm)
 
-        return P_error 
+        return P_error
     
     @tf.function
     def __Compute_C2_error(self, C2_label_norm,x_var:tf.constant):
@@ -529,7 +529,7 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
         fid.close()
 
         self.write_SU2_MLP(self._save_dir + "/Model_"+str(self._model_index)+"/"+self._mlp_output_file_name)
-        return 
+        return
     
     def __Generate_Error_Plots(self):
         """Make nice plots of the interpolated test data.
@@ -596,7 +596,7 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
 
 
         fig = plt.figure(figsize=[10,10])
-        ax = plt.axes() 
+        ax = plt.axes()
         cax = ax.scatter(rho_test, e_test, c=100*np.abs((S_test_pred.numpy() - S_test)/S_test))
         cbar = plt.colorbar(cax, ax=ax)
         #cbar.set_label(r'Temperature prediction error $(\epsilon_T)[\%]$', rotation=270, fontsize=label_fontsize)
@@ -608,7 +608,7 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
         plt.close(fig)
 
         fig = plt.figure(figsize=[10,10])
-        ax = plt.axes() 
+        ax = plt.axes()
         cax = ax.scatter(rho_test, e_test, c=100*np.abs((T_test_pred.numpy() - T_test)/T_test))
         cbar = plt.colorbar(cax, ax=ax)
         #cbar.set_label(r'Temperature prediction error $(\epsilon_T)[\%]$', rotation=270, fontsize=label_fontsize)
@@ -620,7 +620,7 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
         plt.close(fig)
 
         fig = plt.figure(figsize=[10,10])
-        ax = plt.axes() 
+        ax = plt.axes()
         cax = ax.scatter(rho_test, e_test, c=100*np.abs((P_test_pred.numpy() - P_test)/P_test))
         cbar = plt.colorbar(cax, ax=ax)
         cbar.set_label(r'Pressure prediction error $(\epsilon_p)[\%]$', rotation=270, fontsize=label_fontsize)
@@ -632,7 +632,7 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
         plt.close(fig)
 
         fig = plt.figure(figsize=[10,10])
-        ax = plt.axes() 
+        ax = plt.axes()
         cax = ax.scatter(rho_test, e_test, c=100*np.abs((C2_test_pred.numpy() - C2_test)/C2_test))
         cbar = plt.colorbar(cax, ax=ax)
         ax.set_xlabel("Normalized Density",fontsize=plot_fontsize)
@@ -643,7 +643,7 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
         plt.close(fig)
 
         fig = plt.figure(figsize=[10,10])
-        ax = plt.axes() 
+        ax = plt.axes()
         ax.plot(P_test, T_test, 'b.',markersize=3,markerfacecolor='none',label=r'Labeled')
         ax.plot(P_test_pred.numpy(), T_test_pred.numpy(), 'r.',label=r'Predicted')
         ax.set_xscale('log')
@@ -657,7 +657,7 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
         plt.close(fig)
 
         fig = plt.figure(figsize=[10,10])
-        ax = plt.axes() 
+        ax = plt.axes()
         ax.plot(T_test, S_test, 'b.',markersize=3,markerfacecolor='none',label=r'Labeled')
         ax.plot(T_test_pred.numpy(), S_test_pred.numpy(), 'r.',markersize=2,label=r'Predicted')
         ax.grid()
@@ -673,12 +673,12 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
     
 class Train_Entropic_PINN(PhysicsInformedTrainer):
 
-    _s_scale:float = None 
-    _rho_scale:float = None 
-    _e_scale:float = None 
+    _s_scale:float = None
+    _rho_scale:float = None
+    _e_scale:float = None
 
     __custom_state_grid:bool = False
-    __state_grid_ref:np.ndarray[float] = None 
+    __state_grid_ref:np.ndarray[float] = None
 
     def __init__(self):
         PhysicsInformedTrainer.__init__(self)
@@ -704,7 +704,7 @@ class Train_Entropic_PINN(PhysicsInformedTrainer):
 
         self._dt = tf.float64
         self._dt_np = np.float64
-        return 
+        return
     
     def GetTrainData(self):
 
@@ -718,16 +718,16 @@ class Train_Entropic_PINN(PhysicsInformedTrainer):
         self._Y_state_scale_tf = tf.cast(self._Y_state_scale, self._dt)
         self._Y_state_offset_tf = tf.cast(self._Y_state_offset, self._dt)
 
-        return 
+        return
     
     def SetStateVars(self, state_vars_in:list[str]):
         self._state_vars = state_vars_in.copy()
-        return 
+        return
 
     def SetStateGrid_ref(self, state_grid_in:np.ndarray[float]):
         self.__custom_state_grid = True
         self.__state_grid_ref = state_grid_in.copy()
-        return 
+        return
     
     def CollectPIVars(self):
         val_lambda_default = super().CollectPIVars()
@@ -740,14 +740,14 @@ class Train_Entropic_PINN(PhysicsInformedTrainer):
             self.vals_lambda.append(val_lambda_default)
             self.lamba_labels.append(l)
         self._N_bc = len(self.vals_lambda)
-        return 
+        return
     
     def GetBoundaryData(self, y_vars=None):
         X_boundary, Y_boundary = GetReferenceData(self._filedata_train + "_val.csv", self._controlling_vars, self._train_vars)
         self._X_boundary_norm = self.scaler_function_x.transform(X_boundary)
         self._Y_boundary_norm = self.scaler_function_y.transform(Y_boundary)
         
-        return 
+        return
     
     def __SetRhoEProjection(self):
         
@@ -797,7 +797,7 @@ class Train_Entropic_PINN(PhysicsInformedTrainer):
             self._trainable_hyperparams.append(W)
         for b in self._biases:
             self._trainable_hyperparams.append(b)
-        return 
+        return
     
     @tf.function
     def ComputeEntropyGradients(self, rhoe_norm:tf.Tensor):
@@ -829,7 +829,7 @@ class Train_Entropic_PINN(PhysicsInformedTrainer):
         d2sdrho2e2 = [[d2sdrho2, d2sdedrho],[d2sdedrho, d2sde2]]
         return s_dim, dsdrhoe, d2sdrho2e2
     
-    @tf.function 
+    @tf.function
     def EntropicEOS(self,rho,e, s, dsdrhoe, d2sdrho2e2):
         dsdrho_e = dsdrhoe[0]
         dsde_rho = dsdrhoe[1]
@@ -839,8 +839,8 @@ class Train_Entropic_PINN(PhysicsInformedTrainer):
         T = tf.pow(dsde_rho, -1)
         rho2 = rho*rho
         P = -rho2 * T * dsdrho_e
-        dTde_rho = -T*T * d2sde2 
-        dTdrho_e = -T*T * d2sdedrho 
+        dTde_rho = -T*T * d2sde2
+        dTdrho_e = -T*T * d2sdedrho
 
         dPde_rho = -rho2 * (dTde_rho * dsdrho_e + T * d2sdedrho)
         dPdrho_e = -2 * rho * T * dsdrho_e - rho2 * (dTdrho_e * dsdrho_e + T * d2sdrho2)
@@ -863,7 +863,7 @@ class Train_Entropic_PINN(PhysicsInformedTrainer):
         Y_state_selected = tf.stack(tf.tuple(Y_state[:,EntropicVars[var].value] for var in self._state_vars),axis=1)
         return Y_state_selected
     
-    @tf.function 
+    @tf.function
     def TD_Evaluation(self, rhoe_norm:tf.Tensor):
         s, dsdrhoe, d2sdrho2e2 = self.ComputeEntropyGradients(rhoe_norm)
         rho_norm = tf.gather(rhoe_norm, indices=0, axis=1)
@@ -882,16 +882,16 @@ class Train_Entropic_PINN(PhysicsInformedTrainer):
         #s_dim, dsdrhoe, d2sdrho2e2 = self.ComputeEntropyGradients(X_norm)
         #print(s_dim.numpy()[:10])
         state = self.EvaluateState(X_norm).numpy()
-        return state 
+        return state
     
-    @tf.function 
+    @tf.function
     def ComputeStateError(self, X_label_norm:tf.constant,Y_state_label_norm:tf.constant):
         Y_state_pred = self.EvaluateState(X_label_norm)
         Y_state_pred_norm = (Y_state_pred - self._Y_state_offset_tf)/self._Y_state_scale_tf
         pred_error = tf.reduce_mean(tf.pow(Y_state_pred_norm - Y_state_label_norm, 2), axis=0)
         if self._include_regularization:
             reg_loss = self.RegularizationLoss()
-            pred_error += reg_loss 
+            pred_error += reg_loss
 
         return pred_error
     
@@ -899,7 +899,7 @@ class Train_Entropic_PINN(PhysicsInformedTrainer):
     def PrintEpochInfo(self, i_epoch, val_loss):
         if self._verbose > 0:
             print(("Epoch %i Validation loss " % i_epoch) + ", ".join((" %s: %.4e" % (self._state_vars[iVar], val_loss[iVar])) for iVar in range(len(self._state_vars))))
-        return 
+        return
     
     def CustomCallback(self):
 
@@ -933,7 +933,7 @@ class Train_Entropic_PINN(PhysicsInformedTrainer):
         fid.close()
 
         self.write_SU2_MLP(self._save_dir + "/Model_"+str(self._model_index)+"/"+self._mlp_output_file_name)
-        return 
+        return
     
     def __Generate_Error_Plots(self):
         """Make nice plots of the interpolated test data.
@@ -992,12 +992,12 @@ class Train_Entropic_PINN(PhysicsInformedTrainer):
             plt.close(fig)
 
             fig = plt.figure(figsize=[10,10])
-            ax = plt.axes() 
+            ax = plt.axes()
             if self.__custom_state_grid:
                 state_grid_error = 100*np.abs((state_test_pred[:, :, self._state_vars.index(var)] - self.__state_grid_ref[:, :, EntropicVars[var].value])/\
                                               (self.__state_grid_ref[:, :, EntropicVars[var].value]+1e-6))
                 cax = ax.contourf(self.__state_grid_ref[:, :, EntropicVars.Density.value], self.__state_grid_ref[:, :, EntropicVars.Energy.value], state_grid_error)
-            else:   
+            else:
                 e = 100*np.abs((Y_pred - Y_ref)/(Y_ref+1e-6))
                 cax = ax.scatter(rho_test, e_test, c=e)
             ax.set_xscale('log')
@@ -1036,7 +1036,7 @@ class Train_Entropic_Segregated(TensorFlowFit):
                             EntropicVars.d2sdrho2.name,\
                             EntropicVars.d2sdedrho.name,\
                             EntropicVars.d2sde2.name]
-        return 
+        return
     
     def TransformData(self, Y_untransformed):
         """Transform first and second entropy derivative w.r.t. density through logarithmic scaling.
@@ -1082,15 +1082,15 @@ class Train_Entropic_Segregated(TensorFlowFit):
     
     def add_additional_header_info(self, fid):
         fid.write("Inverse transform dsdrho_e: -exp(dsdrho_e)\nInverse transform d2sdrho2: exp(d2sdrho2)\n")
-        return 
+        return
     
 class TrainMLP_NICFD(TrainMLP):
     """Class for training MLP architectures
     """
     __trainer_PINN:Train_Entropic_PINN      # MLP trainer object responsible for training itself.
     _state_vars:list[str] = [EntropicVars.s.name, EntropicVars.T.name, EntropicVars.p.name, EntropicVars.c2.name]
-    __weights_direct:list[np.ndarray[float]] = None 
-    __biases_direct:list[np.ndarray[float]] = None 
+    __weights_direct:list[np.ndarray[float]] = None
+    __biases_direct:list[np.ndarray[float]] = None
 
     def __init__(self, Config_in:Config_NICFD):
         """Define TrainMLP instance and prepare MLP trainer with
@@ -1133,7 +1133,7 @@ class TrainMLP_NICFD(TrainMLP):
         self._state_vars = state_vars_in.copy()
         self.SynchronizeTrainer()
         
-        return 
+        return
     
     def SynchronizeTrainer(self):
         """Synchronize all MLP trainer settings with locally stored settings.
@@ -1158,7 +1158,7 @@ class TrainMLP_NICFD(TrainMLP):
         self.__trainer_PINN.SetVerbose(self.verbose)
         self.__trainer_PINN.SetFigFormat(self._fig_format)
         self.__trainer_PINN.SetScaler(self._scaler)
-        return 
+        return
     
     def CommenceTraining(self):
         """Initiate the training process.
@@ -1170,7 +1170,7 @@ class TrainMLP_NICFD(TrainMLP):
         fid = open(self.worker_dir + "/current_iter.txt", "w+")
         fid.write(str(self.current_iter) + "\n")
         fid.close()
-        return 
+        return
     def Train_DF(self):
         self.PrepareOutputDir()
         self._trainer_direct.SetMLPFileHeader("MLP_direct")
@@ -1184,7 +1184,7 @@ class TrainMLP_NICFD(TrainMLP):
         biases_entropy = self._trainer_direct.GetBiases()
         self.__weights_direct = weights_entropy.copy()
         self.__biases_direct = biases_entropy.copy()
-        return 
+        return
     def Train_PINN(self):
         self.PrepareOutputDir()
         state_grid_ref = ComputeRhoEGridData(self._Config)
@@ -1196,7 +1196,7 @@ class TrainMLP_NICFD(TrainMLP):
             self.__trainer_PINN.SetBiases(self.__biases_direct)
         self.__trainer_PINN.Train_MLP()
         self.__trainer_PINN.PostProcessing()
-        return 
+        return
     
     def TrainPostprocessing(self):
         self._test_score = self.__trainer_PINN.GetTestScore()
@@ -1204,11 +1204,11 @@ class TrainMLP_NICFD(TrainMLP):
             self._test_score = 1e2
         self._cost_parameter = self.__trainer_PINN.GetCostParameter()
         self.__trainer_PINN.Save_Relevant_Data()
-        return           
+        return
     
     def SetTrainStepType(self, train_step_type:str="Gauss-Seidel"):
         self.__trainer_PINN.SetTrainStepType(train_step_type)
-        return 
+        return
     def GetWeights(self):
         return self.__trainer_PINN.GetWeights()
     def GetBiases(self):
@@ -1237,5 +1237,5 @@ class TrainMLP_NICFD_Segregated(TrainMLP):
 
         TrainMLP.__init__(self, Config_in=Config_in)
         self.SynchronizeTrainer()
-        return 
+        return
     

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 ###############################################################################################
-#       #      _____ __  _____      ____        __        __  ____                   #        #  
-#       #     / ___// / / /__ \    / __ \____ _/ /_____ _/  |/  (_)___  ___  _____   #        #  
-#       #     \__ \/ / / /__/ /   / / / / __ `/ __/ __ `/ /|_/ / / __ \/ _ \/ ___/   #        #      
-#       #    ___/ / /_/ // __/   / /_/ / /_/ / /_/ /_/ / /  / / / / / /  __/ /       #        #  
+#       #      _____ __  _____      ____        __        __  ____                   #        #
+#       #     / ___// / / /__ \    / __ \____ _/ /_____ _/  |/  (_)___  ___  _____   #        #
+#       #     \__ \/ / / /__/ /   / / / / __ `/ __/ __ `/ /|_/ / / __ \/ _ \/ ___/   #        #
+#       #    ___/ / /_/ // __/   / /_/ / /_/ / /_/ /_/ / /  / / / / / /  __/ /       #        #
 #       #   /____/\____//____/  /_____/\__,_/\__/\__,_/_/  /_/_/_/ /_/\___/_/        #        #
 #       #                                                                            #        #
 ###############################################################################################
@@ -19,13 +19,13 @@
 #                                                                                             |
 # Description:                                                                                |
 #  Unit test for verifying the consistency of the equation of state based on entropy potential|
-#                                                                                             |  
+#                                                                                             |
 # Version: 3.1.0                                                                              |
 #                                                                                             |
 #=============================================================================================#
 
 
-import numpy as np 
+import numpy as np
 import CoolProp.CoolProp as CP
 import CoolProp as CoolP
 import matplotlib.pyplot as plt
@@ -63,8 +63,8 @@ def EntropicEOS(rho:float,e:float, s:float, dsdrhoe:list[float], d2sdrho2e2:list
     rho2 = rho*rho
     T = 1 / dsde_rho
     P = -rho2 * T * dsdrho_e
-    dTde_rho = -T*T * d2sde2 
-    dTdrho_e = -T*T * d2sdedrho 
+    dTde_rho = -T*T * d2sde2
+    dTdrho_e = -T*T * d2sdedrho
 
     dPde_rho = -rho2 * (dTde_rho * dsdrho_e + T * d2sdedrho)
     dPdrho_e = -2 * rho * T * dsdrho_e - rho2 * (dTdrho_e * dsdrho_e + T * d2sdrho2)
@@ -129,9 +129,9 @@ def GetFluidState(fluid:CP.AbstractState, rho:float, e:float):
             d2sdedrho = fluid.second_partial_deriv(CP.iSmass, CP.iUmass, CP.iDmass, CP.iDmass, CP.iUmass)
             d2sdrho2 = fluid.second_partial_deriv(CP.iSmass, CP.iDmass, CP.iUmass, CP.iDmass, CP.iUmass)
             state = EntropicEOS(rho, e, s, [dsdrho_e, dsde_rho], [[d2sdrho2, d2sdedrho],[d2sdedrho, d2sde2]])
-            return state 
-    else: 
-        return 0 
+            return state
+    else:
+        return 0
     
 # Retrieve all currently supported fluids
 fluids = get_global_param_string("FluidsList").split(',')
@@ -181,7 +181,7 @@ for fluid_name in fluids:
     delta_rho_FD = 1e-6*(__rho_max - __rho_min)
     delta_e_FD = 1e-6*(__e_max - __e_min)
 
-    consistent_EoS = True 
+    consistent_EoS = True
     # Check consistency for 500 random density-energy combinations within the established ranges.
     for i in range(500):
         val_rho_test = np.random.rand()*(__rho_max - __rho_min) + __rho_min
@@ -195,9 +195,9 @@ for fluid_name in fluids:
             state_rho_p = GetFluidState(fluid, val_rho_test + delta_rho_FD, val_e_test)
             state_rho_m = GetFluidState(fluid, val_rho_test - delta_rho_FD, val_e_test)
             if any([state_base == 0, state_e_p ==0, state_e_m == 0, state_rho_m==0, state_rho_p==0]):
-                valid_point = False 
+                valid_point = False
             else:
-                valid_point = True 
+                valid_point = True
         except:
             valid_point = False
 
@@ -243,8 +243,8 @@ for fluid_name in fluids:
     if not consistent_EoS:
         with open("consistency_check.txt","a+") as fid:
             fid.write("Entropic equation of state is inconsistent for %s\n" % fluid_name)
-        print("Entropic equation of state is inconsistent for %s" % fluid_name)      
-        all_fluids_are_consistent = False     
+        print("Entropic equation of state is inconsistent for %s" % fluid_name)
+        all_fluids_are_consistent = False
 if all_fluids_are_consistent:
     with open("consistency_check.txt","a+") as fid:
             fid.write("Consistent!")

@@ -25,14 +25,14 @@
 #                                                                                             |
 #=============================================================================================#
 
-import numpy as np 
+import numpy as np
 from os import path, listdir
-import csv 
+import csv
 from tqdm import tqdm
 np.random.seed(0)
-from random import sample 
-import os 
-import matplotlib.pyplot as plt 
+from random import sample
+import os
+import matplotlib.pyplot as plt
 prop_cycle = plt.rcParams["axes.prop_cycle"]
 colors = prop_cycle.by_key()['color']
 
@@ -72,7 +72,7 @@ class FlameletConcatenator:
                        FGMVars.ViscosityDyn.name, \
                        FGMVars.Cp.name]
     
-    __TD_flamelet_data:np.ndarray = None 
+    __TD_flamelet_data:np.ndarray = None
 
     # Differential diffusion data to search for in flamelet data.
     __PD_train_vars = [FGMVars.Beta_ProgVar.name, \
@@ -80,17 +80,17 @@ class FlameletConcatenator:
                        FGMVars.Beta_Enth.name, \
                        FGMVars.Beta_MixFrac.name]
     
-    __PD_flamelet_data:np.ndarray = None 
+    __PD_flamelet_data:np.ndarray = None
 
     __flamelet_ID_vars = ['FlameletID']
-    __flamelet_ID:np.ndarray = None 
+    __flamelet_ID:np.ndarray = None
 
     # Passive species names for which to save production and consumption terms.
     __Species_in_FGM = []
 
     # Passive look-up terms to include in the manifold.
     __LookUp_vars = []
-    __LookUp_flamelet_data:np.ndarray = None 
+    __LookUp_flamelet_data:np.ndarray = None
 
     # Progress variable source term name.
     __PPV_train_vars = [FGMVars.ProdRateTot_PV.name]
@@ -108,7 +108,7 @@ class FlameletConcatenator:
     __include_freeflames = True     # Read adiabatic flamelets.
     __include_burnerflames = True   # Read burner-stabilized flamelets.
     __include_equilibrium = True    # Read chemical equilibrium data.
-    __include_counterflame = False 
+    __include_counterflame = False
     __include_fuzzy = False
 
     __write_LUT_data:bool = False   # Apply source term and equilibrium data corrections for table data preparations.
@@ -127,7 +127,7 @@ class FlameletConcatenator:
         self.__Config = Config
         self.__SynchronizeSettings()
         
-        return 
+        return
     
     def __SynchronizeSettings(self):
         # Load settins from configuration:
@@ -151,11 +151,11 @@ class FlameletConcatenator:
             self.__controlling_variables.append(c)
         self.__N_control_vars = len(self.__controlling_variables)
 
-        return 
+        return
     
     def IgnoreMixtureBounds(self, ignore_bounds:bool=False):
         self.__ignore_mixture_bounds = ignore_bounds
-        return 
+        return
     
     def WriteLUTData(self, write_LUT_data:bool=False):
         """Apply corrections to chemical equilibrium data and source terms in order to ensure boundary
@@ -174,8 +174,8 @@ class FlameletConcatenator:
         if Np_per_flamelet < 2:
             raise Exception("Number of data points per flamelet should be higher than two.")
         self.__Np_per_flamelet = Np_per_flamelet
-        self.__custom_resolution = True 
-        return 
+        self.__custom_resolution = True
+        return
     
     def GetNFlameletNodes(self):
         return self.__Np_per_flamelet
@@ -190,7 +190,7 @@ class FlameletConcatenator:
         if skip_mixtures < 1:
             raise Exception("Mixture step size should be higher than one.")
         self.__mfrac_skip = skip_mixtures
-        return 
+        return
     
     def SetMixStatusBounds(self, mix_status_low:float, mix_status_high:float):
         """Define the mixture status bounds between which to read flamelet data.
@@ -205,7 +205,7 @@ class FlameletConcatenator:
             raise Exception("Lower mixture status should be lower than upper value.")
         self.__mix_status_min = mix_status_low
         self.__mix_status_max = mix_status_high
-        return 
+        return
     
     def SetAuxilarySpecies(self, species_input:list[str]):
         """Define the passive species names for which to collect source terms.
@@ -224,12 +224,12 @@ class FlameletConcatenator:
             self.__Sources_vars.append("Y_dot_neg-"+s)
             self.__Sources_vars.append("Y_dot_net-"+s)
             self.__Sources_vars.append("Y-"+s)
-        return 
+        return
 
     def SetControllingVariables(self, controlling_variables:list[str]=DefaultSettings_FGM.controlling_variables):
         self.__Config.SetControllingVariables(controlling_variables)
         self.__SynchronizeSettings()
-        return 
+        return
     
     def IncludeFreeFlames(self, input:bool):
         """Read adiabatic flamelet data.
@@ -237,7 +237,7 @@ class FlameletConcatenator:
         :param input: read adiabatic flamelets (True) or not (False)
         :type input: bool
         """
-        self.__include_freeflames = input 
+        self.__include_freeflames = input
         return
     
     def IncludeBurnerFlames(self, input:bool):
@@ -246,8 +246,8 @@ class FlameletConcatenator:
         :param input: read burner-stabilized flamelet data (True) or not (False)
         :type input: bool
         """
-        self.__include_burnerflames = input 
-        return 
+        self.__include_burnerflames = input
+        return
     
     def IncludeEquilibrium(self, input:bool):
         """Read chemical equilibrium data.
@@ -255,12 +255,12 @@ class FlameletConcatenator:
         :param input: read chemical equilibrium data (True) or not (False)
         :type input: bool
         """
-        self.__include_equilibrium = input  
-        return 
+        self.__include_equilibrium = input
+        return
     
     def Include_CounterFlames(self, input:bool):
-        self.__include_counterflame = input 
-        return 
+        self.__include_counterflame = input
+        return
     
     def SetLookUpVars(self, input:list[str]):
         """Define passive look-up variables to be included in the manifold data.
@@ -283,7 +283,7 @@ class FlameletConcatenator:
         if not path.isdir(input):
             raise Exception("Flamelet data directory does not exist.")
         self.__flameletdata_dir = input
-        return 
+        return
     
     def SetOutputFileName(self, input:str):
         """Define the manifold output file header.
@@ -291,12 +291,12 @@ class FlameletConcatenator:
         :param input: manifold file header.
         :type input: str
         """
-        self.__output_file_header = input 
-        return 
+        self.__output_file_header = input
+        return
     
     def SetBoundaryFileName(self, input:str):
-        self.__boundary_file_header = input 
-        return 
+        self.__boundary_file_header = input
+        return
     
     def SetTrainFraction(self, input:float=DefaultSettings_FGM.train_fraction):
         """Define the fraction of concatenated flamelet data to be used for training MLP's.
@@ -307,7 +307,7 @@ class FlameletConcatenator:
         """
         if (input <= 0) or (input >= 1):
             raise Exception("Train fraction should be between zero and one.")
-        self.__f_train = input 
+        self.__f_train = input
         return
     
     def SetTestFraction(self, input:float=DefaultSettings_FGM.test_fraction):
@@ -319,7 +319,7 @@ class FlameletConcatenator:
         """
         if (input <= 0) or (input >= 1):
             raise Exception("Test fraction should be between zero and one.")
-        self.__f_test = input 
+        self.__f_test = input
         return
 
     def ConcatenateFlameletData(self):
@@ -429,7 +429,7 @@ class FlameletConcatenator:
         self.IncludeEquilibrium(True)
         self.__output_file_header = self.__boundary_file_header
         self.ConcatenateFlameletData()
-        return 
+        return
     
     def __WriteOutputFiles(self):
         """Collect all flamelet data arrays, split into train, test, and validation portions, and write to appropriately named files.
@@ -498,7 +498,7 @@ class FlameletConcatenator:
         fid.close()
         if self.__verbose > 0:
             print("Done!")
-        return 
+        return
     
     def __SizeDataArrays(self):
         """Size the output data arrays according to the number of flamelets and manifold resolution.
@@ -626,14 +626,14 @@ class FlameletConcatenator:
         self.__flamelet_ID = np.zeros([n_flamelets_total * self.__Np_per_flamelet, len(self.__flamelet_ID_vars)],dtype=int)
 
         self.__N_p_total = n_flamelets_total * self.__Np_per_flamelet
-        return 
+        return
     
     
     def __InterpolateFlameletData(self, flamelet_dir:str, eq_file:str, i_start:int, i_flamelet_total:int, is_fuzzy:bool=False, is_equilibrium:bool=False):
 
         flamelets = listdir(flamelet_dir + "/" + eq_file)
         for i_flamelet, f in enumerate(flamelets):
-            BurningFlamelet:bool = True 
+            BurningFlamelet:bool = True
 
             # Get flamelet variables
             fid = open(flamelet_dir + "/" + eq_file + "/" + f, 'r')
@@ -661,7 +661,7 @@ class FlameletConcatenator:
             delta_CV = CV_norm[1:] - CV_norm[:-1]
             dS = np.sqrt(np.sum(np.power(delta_CV, 2), axis=1))
             S_flamelet = np.append(np.array([0]), np.cumsum(dS))
-            is_valid_flamelet = True 
+            is_valid_flamelet = True
 
             if (max(S_flamelet) == 0) and not is_equilibrium:
                 print("Dodgy flamelet data file: " + flamelet_dir + "/" + eq_file + "/" + f)
@@ -672,7 +672,7 @@ class FlameletConcatenator:
 
                 T_flamelet = D[:, variables.index(FGMVars.Temperature.name)]
                 if np.max(T_flamelet) < DefaultSettings_FGM.T_threshold:
-                    BurningFlamelet = False 
+                    BurningFlamelet = False
 
                 sourceterm_zero_line_numbers = [0, -1]
 
@@ -802,7 +802,7 @@ class FlameletConcatenator:
                     self.__CV_flamelet_data[start:end, :] = CV_sampled
                     self.__TD_flamelet_data[start:end, :] = TD_sampled
                     if self.__Config.PreferentialDiffusion():
-                        self.__PD_flamelet_data[start:end, :] = PD_sampled 
+                        self.__PD_flamelet_data[start:end, :] = PD_sampled
                     self.__LookUp_flamelet_data[start:end, :] = lookup_sampled
                     self.__Sources_flamelet_data[start:end, :] = sources_sampled
                     self.__flamelet_ID[start:end, :] = i_start + i_flamelet + i_flamelet_total
@@ -831,7 +831,7 @@ class GroupOutputs:
     __group_variables:list[list[str]]   # Variables in each group.
     __group_affinity:list[list[float]]  # Minimum affinity for each combination of groups.
 
-    # Combinations of variables for FGM evaluation. 
+    # Combinations of variables for FGM evaluation.
     __evaluations_TD:list[str] = [FGMVars.Temperature.name, FGMVars.ViscosityDyn.name, FGMVars.MolarWeightMix.name, FGMVars.Cp.name, FGMVars.Conductivity.name, FGMVars.DiffusionCoefficient.name]
     __evaluations_PD:list[str] = [FGMVars.Beta_ProgVar.name, FGMVars.Beta_Enth_Thermal.name, FGMVars.Beta_Enth.name, FGMVars.Beta_MixFrac.name]
     __evaluations_Sources:list[str] = [FGMVars.ProdRateTot_PV.name]
@@ -845,7 +845,7 @@ class GroupOutputs:
         :param Config_in: FlameletAI configuration for the current problem.
         :type Config_in: Config_FGM
         """
-        self.__Config = Config_in 
+        self.__Config = Config_in
         self.__flamelet_data_filepath = self.__Config.GetOutputDir()+"/"+self.__Config.GetConcatenationFileHeader()+"_full.csv"
         
         self.__controlling_variables = self.__Config.GetControllingVariables()
@@ -854,7 +854,7 @@ class GroupOutputs:
             self.__vars_to_exclude.append(var)
         self.__vars_to_exclude.append("FlameletID")
         self.__FilterVariables(self.__Config.GetControllingVariables() + ["FlameletID"])
-        return 
+        return
     
     def SetFlameletDataFile(self, filepath_in:str):
         """Define a custom flamelet data file for which to compute output groups.
@@ -865,7 +865,7 @@ class GroupOutputs:
         """
         if not os.path.isdir(filepath_in):
             raise Exception("Supplied flamelet data file does not exist.")
-        self.__flamelet_data_filepath = filepath_in 
+        self.__flamelet_data_filepath = filepath_in
         self.__FilterVariables(self.__vars_to_exclude)
 
     def SetControllingVariables(self, control_vars:list[str]):
@@ -901,7 +901,7 @@ class GroupOutputs:
             if var not in self.__flamelet_variables:
                 raise Exception("Variable "+var+" not present in flamelet data set.")
             self.__vars_to_exclude.append(var)
-        return 
+        return
     
     def SetAffinityThreshold(self, val_threshold:float=0.7):
         """Specify the threshold value for affinity below which groups are not considered.
@@ -912,7 +912,7 @@ class GroupOutputs:
         """
         if val_threshold <= 0 or val_threshold >= 1:
             raise Exception("Threshold value should be between zero and one.")
-        self.__theta_threshold = val_threshold 
+        self.__theta_threshold = val_threshold
 
     def SetGroupLeaders(self, group_leaders_in:list[str]):
         """Specify a set of variables which are forced into separate groups.
@@ -926,7 +926,7 @@ class GroupOutputs:
                 raise Exception("Variable " + g + " not present in flamelet data set.")
         self.__group_leaders_orig = []
         for g in group_leaders_in:
-            self.__group_leaders_orig.append(g) 
+            self.__group_leaders_orig.append(g)
 
     def __FilterVariables(self, vars_to_remove:list[str]):
         with open(self.__flamelet_data_filepath, 'r') as fid:
@@ -967,7 +967,7 @@ class GroupOutputs:
             group_variables.append([g])
             free_var_indices.remove(self.__free_variables.index(g))
             free_vars.remove(g)
-        return group_variables, group_indices, group_affinity, free_var_indices, free_vars 
+        return group_variables, group_indices, group_affinity, free_var_indices, free_vars
 
     def __AffinityFunction(self, group_indices:list[int], iVar:int):
         theta = 1
@@ -989,7 +989,7 @@ class GroupOutputs:
 
         # Repeat 1000 times to come up with plenty of potential groups.
         for _ in tqdm(range(10000)):
-            repeat = True 
+            repeat = True
 
             while repeat:
                 # Randomly select species from list of remaining species to act as additional group leaders.
@@ -1017,7 +1017,7 @@ class GroupOutputs:
                 repeat = False
                 for g in group_affinity:
                     if min(g) < self.__theta_threshold:
-                        repeat = True 
+                        repeat = True
             min_affinity = 1
             for g in group_affinity:
                 min_affinity = min(min_affinity, min(g))
@@ -1029,7 +1029,7 @@ class GroupOutputs:
             self.__group_affinity.append(min_affinity)
 
         self.PostProcessGroups()
-        return 
+        return
     
     def __ComputeNumberofEvaluations(self, group_variables:list[list[str]]):
         n_networks_eval = 0
@@ -1037,24 +1037,24 @@ class GroupOutputs:
         for g in group_variables:
             this_group_TD = False
             this_group_PD = False
-            this_group_sources = False 
+            this_group_sources = False
             for var in self.__evaluations_TD:
                 if var in g:
-                    this_group_TD = True 
+                    this_group_TD = True
             if self.__Config.PreferentialDiffusion():
                 for var in self.__evaluations_PD:
                     if var in g:
-                        this_group_PD = True 
+                        this_group_PD = True
             for var in self.__evaluations_Sources:
                 if var in g:
-                    this_group_sources = True 
+                    this_group_sources = True
 
             if this_group_TD:
                 n_networks_eval += 1
             if this_group_PD:
                 n_networks_eval += 1
             if this_group_sources:
-                n_networks_eval += 1 
+                n_networks_eval += 1
         return n_networks_eval
     
     def PostProcessGroups(self):
@@ -1082,7 +1082,7 @@ class GroupOutputs:
         print("Output combinations with fewest number of network evaluations:")
         for iGroup, g in enumerate(interesting_groups[group_fewest_evaluations]):
             print("Output group " + str(iGroup)+ ": [" + ",".join("\"" + s + "\"" for s in g) + "]")
-        self.__best_group = group_fewest_evaluations 
+        self.__best_group = group_fewest_evaluations
 
     def GetInterestingGroup(self, iGroup:int=-1):
         """Get the group or groups with the highest efficiency.
@@ -1150,7 +1150,7 @@ class GroupOutputs:
         plt.tight_layout()
         plt.show()
 
-        return 
+        return
     
     def UpdateConfig(self, combination_index:int=-1):
         """Update the output groups in the FlameletAI configuration
@@ -1159,7 +1159,7 @@ class GroupOutputs:
         :type combination_index: int, optional
         """
 
-        # By default, select the combination with the fewest number of function 
+        # By default, select the combination with the fewest number of function
         # evaluations.
         if combination_index == -1:
             combination_index = self.__best_group

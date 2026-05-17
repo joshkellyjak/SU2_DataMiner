@@ -1,5 +1,5 @@
-from TestCase import TestCase 
-import sys 
+from TestCase import TestCase
+import sys
 
 def main():
     MLPCpp_tests:list[TestCase] = []
