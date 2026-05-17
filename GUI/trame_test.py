@@ -1,5 +1,5 @@
-from trame.app import get_server 
-from trame.widgets import vuetify, paraview 
+from trame.app import get_server
+from trame.widgets import vuetify, paraview
 from trame.ui.vuetify import SinglePageLayout
 from trame.widgets import vuetify, vtk as vtk_widgets
 import vtk
@@ -16,13 +16,13 @@ from vtkmodules.vtkRenderingCore import (
 from vtkmodules.vtkRenderingAnnotation import vtkCubeAxesActor, vtkScalarBarActor
 from vtkmodules.vtkInteractionWidgets import vtkOrientationMarkerWidget, vtkScalarBarWidget
 from Common.Properties import DefaultSettings_FGM
-from Common.DataDrivenConfig import Config_FGM 
+from Common.DataDrivenConfig import Config_FGM
 
 #from .pipeline import PipelineManager
 from trame.assets.local import LocalFileManager
 
-import numpy as np 
-import time 
+import numpy as np
+import time
 
 server = get_server(client_type='vue2')
 renderer = vtkRenderer()
@@ -100,7 +100,7 @@ for ivar, var in enumerate(variables):
     ArrayObject.SetNumberOfTuples(nPoints)
     for i in range(nPoints):
         ArrayObject.SetValue(i, D[i, ivar])
-    
+
     pointcloud.GetPointData().AddArray(ArrayObject)
     datasetArrays.append(
         {
@@ -117,7 +117,7 @@ pointcloud.GetPointData().SetScalars(pointcloud.GetPointData().GetArray(variable
 pointcloud.GetPointData().SetActiveScalars(default_var)
 
 default_min, default_max = default_array.get("range")
-state.dataset_arrays = datasetArrays 
+state.dataset_arrays = datasetArrays
 
 mapper.SetInputData(pointcloud)
 mapper.SetColorMode(0)
@@ -185,7 +185,7 @@ def VisualizeVariable(varname):
     pointcloud.GetPointData().SetActiveScalars(varname)
 
     data_min, data_max = data_array.get("range")
-    state.dataset_arrays = datasetArrays 
+    state.dataset_arrays = datasetArrays
 
     mapper.SetScalarRange(data_min, data_max)
     mapper.GetLookupTable().SetRange(data_min, data_max)
@@ -241,7 +241,7 @@ def standard_buttons():
         vuetify.VIcon("mdi-crop-free")
 
 with SinglePageLayout(server) as layout:
-    
+
     layout.title.set_text("Test GUI for SU2 DataMiner")
     #
     with layout.toolbar:
@@ -276,7 +276,7 @@ with SinglePageLayout(server) as layout:
             #classes="mr-4",
         )
         ######################################################
-        
+
     # content components
     with layout.content:
         with vuetify.VContainer(fluid=True,classes="pa-0 fill-height",):
@@ -290,4 +290,3 @@ with SinglePageLayout(server) as layout:
             ctrl.on_server_ready.add(view.update)
 if __name__ == "__main__":
     server.start()
-    

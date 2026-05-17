@@ -1,9 +1,9 @@
-from TestCase import TestCase 
-import sys 
+from TestCase import TestCase
+import sys
 
 def main():
-    
-    test_list_NICFD:list[TestCase] = [] 
+
+    test_list_NICFD:list[TestCase] = []
     test_list_FGM:list[TestCase] = []
 
     fluid_air = TestCase("Fluid_Air")
@@ -37,8 +37,8 @@ def main():
     tabulation_NICFD.reference_files = ["LUT_test.ref"]
     tabulation_NICFD.test_files = ["LUT_test.drg"]
     test_list_NICFD.append(tabulation_NICFD)
-    
-    
+
+
     consistency_NICFD_PINN = TestCase("PIML training NICFD")
     consistency_NICFD_PINN.config_dir = "FluidTraining/MM_PINN/"
     consistency_NICFD_PINN.config_file = ""
@@ -55,7 +55,7 @@ def main():
     hydrogen_flamelet.reference_files = ["flamelet_data.ref"]
     hydrogen_flamelet.test_files = ["freeflame_data/phi_1.0/freeflamelet_phi1.0_Tu300.0.csv"]
     test_list_FGM.append(hydrogen_flamelet)
-    
+
     FGM_training = TestCase("ML FGM")
     FGM_training.config_dir="FGM_MLP/"
     FGM_training.config_file = ""
@@ -65,7 +65,7 @@ def main():
     FGM_training.test_files=["architectures_Group1/Worker_0/Model_0/TrainingHistory.csv"]
     test_list_FGM.append(FGM_training)
 
-    
+
     unittest_mixturefraction = TestCase("Mixture fraction")
     unittest_mixturefraction.config_dir = "Physics/MixtureFraction/"
     unittest_mixturefraction.config_file = ""
@@ -73,7 +73,7 @@ def main():
     unittest_mixturefraction.reference_files = ["mixture_fraction_verification.ref"]
     unittest_mixturefraction.test_files = ["mixture_fraction_verification.csv"]
     test_list_FGM.append(unittest_mixturefraction)
-    
+
     # test_list.append(training_MM_PINN)
     pass_list_NICFD = [test.run_test() for test in test_list_NICFD]
     pass_list_FGM = [test.run_test() for test in test_list_FGM]

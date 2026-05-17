@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
-import os 
+import os
 import sys
 from su2dataminer.config import Config_NICFD
-from su2dataminer.generate_data import DataGenerator_CoolProp 
+from su2dataminer.generate_data import DataGenerator_CoolProp
 
 Config = Config_NICFD()
 

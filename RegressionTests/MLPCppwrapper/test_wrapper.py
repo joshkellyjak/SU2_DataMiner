@@ -6,7 +6,7 @@ from su2dataminer.config import Config_FGM
 from su2dataminer.manifold import Train_FGM_PINN
 from su2dataminer.generate_data import ComputeFlameletData,ComputeBoundaryData
 from su2dataminer.process_data import FlameletConcatenator
-from mlpcppwrapper import MLPCppEvaluator 
+from mlpcppwrapper import MLPCppEvaluator
 
 np.random.seed(1)
 
@@ -45,7 +45,7 @@ pv_test = config.ComputeProgressVariable(vars_flamelet,flamelet_data)
 h_test = flamelet_data[:, vars_flamelet.index("EnthalpyTot")]
 Z_test = flamelet_data[:, vars_flamelet.index("MixtureFraction")]
 
-CV_flamelet_test = np.vstack((pv_test,h_test,Z_test)).T 
+CV_flamelet_test = np.vstack((pv_test,h_test,Z_test)).T
 controlling_vars = ["ProgressVariable","EnthalpyTot","MixtureFraction"]
 activation_functions = ["linear",'relu','elu','tanh','sigmoid']
 scalers = ['robust','standard']
@@ -54,7 +54,7 @@ def calc_error(MLP_output_Tensorflow:np.ndarray[float], MLP_output_MLPCpp:np.nda
     return(np.sqrt(np.average(np.power((MLP_output_Tensorflow-MLP_output_MLPCpp)/(MLP_output_MLPCpp),2))))
 
 max_error = 0.0
-passed = True 
+passed = True
 bad_combos = []
 for k in range(20):
     query_vars = sample(train_vars, np.random.randint(1, 6))
@@ -90,7 +90,7 @@ for k in range(20):
     output_mlpcpp = np.array(a.EvaluateMLP(CV_flamelet_test))
     diff_TF_MLPCpp = calc_error(output_TensorFlow, output_mlpcpp)
     if diff_TF_MLPCpp > 1e-12:
-        passed = False 
+        passed = False
         bad_combos.append([activation_function, scaler, query_vars, N_H, diff_TF_MLPCpp])
     max_error = max(max_error, calc_error(output_TensorFlow, output_mlpcpp))
 
@@ -102,4 +102,3 @@ else:
         print("Activation function: %s\nScaler: %s\nQuery variables: %s\nArchitecture: %s\nAverage error: %.5e\n" % (b[0],b[1], ",".join(s for s in b[2]), ",".join(str(i) for i in b[3]), b[4]))
 
     sys.exit(1)
-    

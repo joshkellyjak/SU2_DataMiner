@@ -24,7 +24,7 @@
 #=============================================================================================#
 
 import numpy as np
-import cantera as ct 
+import cantera as ct
 
 
 def ComputeLewisNumber(flame:ct.Solution):
@@ -33,11 +33,11 @@ def ComputeLewisNumber(flame:ct.Solution):
 
 def avg_Le_start_end(Le_sp:np.ndarray):
     Le_av = 0.5*(Le_sp[0] + Le_sp[-1])
-    return Le_av 
+    return Le_av
 
 def avg_Le_arythmic(Le_sp:np.ndarray):
     Le_av = np.average(Le_sp)
-    return Le_av 
+    return Le_av
 
 def avg_Le_min_max(Le_sp:np.ndarray):
     Le_av = 0.5*(np.min(Le_sp)+np.max(Le_sp))
@@ -49,7 +49,7 @@ def avg_Le_unity(Le_sp:np.ndarray):
 
 def avg_Le_const(Le_sp:np.ndarray, Le_const:float):
     Le_av = Le_const * np.ones(np.shape(Le_sp))
-    return Le_av 
+    return Le_av
 
 def avg_Le_local(Le_sp:np.ndarray):
     return Le_sp
@@ -80,7 +80,7 @@ def GetReferenceData(dataset_file:str, x_vars:list[str], train_variables:list[st
         varnames = [s[1:-1] for s in line_split]
     else:
         varnames = line_split
-    
+
     # Get indices of controlling and train variables
     iVar_x = [varnames.index(v) for v in x_vars]
     iVar_y = [varnames.index(v) for v in train_variables]
@@ -124,7 +124,7 @@ def write_SU2_MLP(file_out:str, weights:list[np.ndarray], biases:list[np.ndarray
     # Opening output file
     fid = open(file_out+'.mlp', 'w+')
     fid.write("<header>\n\n")
-    
+
     if additional_header_info_function:
         additional_header_info_function(fid)
 
@@ -153,7 +153,7 @@ def write_SU2_MLP(file_out:str, weights:list[np.ndarray], biases:list[np.ndarray
     fid.write('\n[input names]\n')
     for input in controlling_vars:
             fid.write(input + '\n')
-    
+
     fid.write('\n[input regularization method]\n%s\n' % scaler_function)
 
     fid.write('\n[input normalization]\n')
@@ -163,7 +163,7 @@ def write_SU2_MLP(file_out:str, weights:list[np.ndarray], biases:list[np.ndarray
     fid.write('\n[output names]\n')
     for output in train_vars:
         fid.write(output+'\n')
-    
+
     fid.write('\n[output regularization method]\n%s\n' % scaler_function)
 
     fid.write('\n[output normalization]\n')
@@ -177,10 +177,10 @@ def write_SU2_MLP(file_out:str, weights:list[np.ndarray], biases:list[np.ndarray
         for i in range(np.shape(W)[0]):
             fid.write("\t".join("%+.16e" % float(w) for w in W[i, :]) + "\n")
         fid.write("</layer>\n")
-    
+
     # Writing the biases of each layer
     fid.write('\n[biases per layer]\n')
-    
+
     # Input layer biases are set to zero
     fid.write("\t".join("%+.16e" % 0 for _ in controlling_vars) + "\n")
 
@@ -188,4 +188,4 @@ def write_SU2_MLP(file_out:str, weights:list[np.ndarray], biases:list[np.ndarray
         fid.write("\t".join("%+.16e" % float(b) for b in B) + "\n")
 
     fid.close()
-    return 
+    return
