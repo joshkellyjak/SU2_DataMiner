@@ -80,7 +80,7 @@ def GetReferenceData(dataset_file:str, x_vars:list[str], train_variables:list[st
         varnames = [s[1:-1] for s in line_split]
     else:
         varnames = line_split
-    
+
     # Get indices of controlling and train variables
     iVar_x = [varnames.index(v) for v in x_vars]
     iVar_y = [varnames.index(v) for v in train_variables]
@@ -124,7 +124,7 @@ def write_SU2_MLP(file_out:str, weights:list[np.ndarray], biases:list[np.ndarray
     # Opening output file
     fid = open(file_out+'.mlp', 'w+')
     fid.write("<header>\n\n")
-    
+
     if additional_header_info_function:
         additional_header_info_function(fid)
 
@@ -153,7 +153,7 @@ def write_SU2_MLP(file_out:str, weights:list[np.ndarray], biases:list[np.ndarray
     fid.write('\n[input names]\n')
     for input in controlling_vars:
             fid.write(input + '\n')
-    
+
     fid.write('\n[input regularization method]\n%s\n' % scaler_function)
 
     fid.write('\n[input normalization]\n')
@@ -163,7 +163,7 @@ def write_SU2_MLP(file_out:str, weights:list[np.ndarray], biases:list[np.ndarray
     fid.write('\n[output names]\n')
     for output in train_vars:
         fid.write(output+'\n')
-    
+
     fid.write('\n[output regularization method]\n%s\n' % scaler_function)
 
     fid.write('\n[output normalization]\n')
@@ -177,10 +177,10 @@ def write_SU2_MLP(file_out:str, weights:list[np.ndarray], biases:list[np.ndarray
         for i in range(np.shape(W)[0]):
             fid.write("\t".join("%+.16e" % float(w) for w in W[i, :]) + "\n")
         fid.write("</layer>\n")
-    
+
     # Writing the biases of each layer
     fid.write('\n[biases per layer]\n')
-    
+
     # Input layer biases are set to zero
     fid.write("\t".join("%+.16e" % 0 for _ in controlling_vars) + "\n")
 

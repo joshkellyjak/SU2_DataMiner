@@ -102,4 +102,3 @@ else:
         print("Activation function: %s\nScaler: %s\nQuery variables: %s\nArchitecture: %s\nAverage error: %.5e\n" % (b[0],b[1], ",".join(s for s in b[2]), ",".join(str(i) for i in b[3]), b[4]))
 
     sys.exit(1)
-    

@@ -27,7 +27,7 @@ import tensorflow as tf
 from enum import Enum, auto
 
 class DefaultProperties:
-    
+
     train_fraction:float = 0.8
     test_fraction:float = 0.1
 
@@ -129,17 +129,17 @@ class DefaultSettings_NICFD(DefaultProperties):
     T_min:float = 300
     T_max:float = 600
     Np_temp:float = 600
-    
+
     P_min:float = 2e4
     P_max:float = 2e6
     Np_p:float = 700
 
     Rho_min:float = 0.5
     Rho_max:float = 300
-    
+
     Energy_min:float = 3e5
     Energy_max:float = 5.5e5
-    
+
     fluid_name:str = "Air"
     EOS_type:str = "HEOS"
     conductivity_models:list[str] = ["volume", "mass"]
@@ -165,7 +165,7 @@ class DefaultSettings_NICFD(DefaultProperties):
 
     tabulation_options:list[str] = ["cartesian","adaptive"]
     tabulation_method:str="cartesian"
-    
+
 class DefaultSettings_FGM(DefaultProperties):
     config_name:str = "config_FGM"
 
@@ -176,7 +176,7 @@ class DefaultSettings_FGM(DefaultProperties):
     Np_temp:int = 30
 
     T_threshold:float = 600.0
-    
+
     eq_ratio_min:float = 0.2
     eq_ratio_max:float = 20.0
     Np_eq:int = 30
@@ -197,7 +197,7 @@ class DefaultSettings_FGM(DefaultProperties):
     name_pv:str = "ProgressVariable"
     name_enth:str = "EnthalpyTot"
     name_mixfrac:str = "MixtureFraction"
-    
+
     controlling_variables:list[str] = [name_pv, name_enth, name_mixfrac]
 
     init_learning_rate_expo:float = -2.8
@@ -213,7 +213,7 @@ class DefaultSettings_FGM(DefaultProperties):
     include_burnerflames:bool = True
     include_equilibrium:bool = True
     include_counterflames:bool = False
-    
+
     affinity_threshold:float = 0.7
     output_file_header:str = "flamelet_data"
     boundary_file_header:str = "boundary_data"

@@ -94,7 +94,7 @@ def VerifyMixtureFraction(fuel_species:list[str], fuel_weights:list[float], reac
     fid.write("%.6f\n" % abs(mixture_fraction_cantera_unb - mixture_fraction_config_unb))
     fid.write("%.6f\n" % abs(mixture_fraction_cantera_b - mixture_fraction_config_b))
     fid.write("%.6f\n" % abs(mixture_fraction_cantera_random - mixture_fraction_config_random))
-    
+
     return [mixture_fraction_cantera_unb, mixture_fraction_config_unb], \
            [mixture_fraction_cantera_b, mixture_fraction_config_b], \
            [mixture_fraction_cantera_random, mixture_fraction_config_random]

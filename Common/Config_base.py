@@ -34,7 +34,7 @@ from Common.CommonMethods import write_SU2_MLP
 class Config:
     """Base class for the SU2 DataMiner configuration.
     """
-    
+
     __banner_header:str = "SU2 DataMiner"            # Main banner message to be printed in fancy text.
 
     # Output settings
@@ -62,11 +62,11 @@ class Config:
     _MLP_biases:list[np.ndarray[float]]         # MLP biases values.
 
     _config_type:str= None  # SU2 DataMiner configuration type.
-    
+
     def __init__(self):
         self._output_dir = os.getcwd()
         return
-    
+
     def PrintBanner(self):
         """Print the main banner for the SU2 DataMiner configuration in the terminal.
         """
@@ -75,7 +75,7 @@ class Config:
         print(customfig.renderText(self.__banner_header))
 
         return
-    
+
     def SetOutputDir(self, output_dir:str):
         """Define the output directory where all raw and processed fluid data and manifold data are saved.
 
@@ -85,11 +85,11 @@ class Config:
         """
         if not os.path.isdir(output_dir):
             raise Exception("Invalid output data directory")
-        
+
         self._output_dir = output_dir
 
         return
-    
+
     def GetOutputDir(self):
         """Get the output directory where raw and processed fluid data and manifold data are stored.
 
@@ -102,7 +102,7 @@ class Config:
             raise Exception("Saved output directory not present on current machine.")
         else:
             return self._output_dir
-    
+
     def SetConcatenationFileHeader(self, header:str=DefaultProperties.output_file_header):
         """Define the file name header of the processed fluid manifold data.
 
@@ -113,7 +113,7 @@ class Config:
         self.__concatenated_file_header = header
 
         return
-    
+
     def GetConcatenationFileHeader(self):
         """Get the file name header of the processed fluid manifold data.
 
@@ -122,7 +122,7 @@ class Config:
         """
 
         return self.__concatenated_file_header
-    
+
     def SetConfigName(self, config_name:str):
         """Set the name for the current SU2 DataMiner configuration. When saving the configuration, it will be saved under this name.
 
@@ -133,7 +133,7 @@ class Config:
         self._config_name = config_name
 
         return
-    
+
     def GetConfigName(self):
         """Get the name of the current SU2 DataMiner configuration.
 
@@ -141,7 +141,7 @@ class Config:
         :rtype: str
         """
         return self._config_name
-    
+
     def SetControllingVariables(self, names_cv:list[str]):
         """Define the set of controlling variable names used as inputs for the networks of the data-driven fluid model.
 
@@ -154,7 +154,7 @@ class Config:
             self._controlling_variables.append(c)
 
         return
-    
+
     def GetControllingVariables(self):
         """Retrieve the set of controlling variable names used as inputs for the networks of the data-driven fluid model.
 
@@ -163,7 +163,7 @@ class Config:
         """
 
         return self._controlling_variables
-    
+
     def SetTrainFraction(self, input:float=DefaultProperties.train_fraction):
         """Define the fraction of fluid data used for MLP training.
 
@@ -177,7 +177,7 @@ class Config:
         self.__train_fraction = input
 
         return
-    
+
     def SetTestFraction(self, input:float=DefaultProperties.test_fraction):
         """Define the fraction of fluid data used for MLP prediction accuracy evaluation.
 
@@ -191,7 +191,7 @@ class Config:
         self.__test_fraction = input
 
         return
-    
+
     def GetTrainFraction(self):
         """Get the fraction of fluid data used for MLP training.
 
@@ -199,7 +199,7 @@ class Config:
         :rtype: float
         """
         return self.__train_fraction
-    
+
     def GetTestFraction(self):
         """Get the fraction of fluid data used for MLP accuracy evaluation.
 
@@ -208,16 +208,16 @@ class Config:
         """
 
         return self.__test_fraction
-    
+
     def GetAlphaExpo(self):
         """Get the initial learning rate exponent (base 10).
 
         :return: log10 of initial learning rate.
         :rtype: float
         """
-        
+
         return self._alpha_expo
-    
+
     def SetAlphaExpo(self, alpha_expo_in:float=DefaultProperties.init_learning_rate_expo):
         """Define the initial learning rate exponent (base 10).
 
@@ -230,7 +230,7 @@ class Config:
             raise Exception("Initial learning rate exponent should be negative.")
         self._alpha_expo = alpha_expo_in
         return
-    
+
     def GetLRDecay(self):
         """Get the exponential learning rate decay parameter for MLP training.
 
@@ -238,7 +238,7 @@ class Config:
         :rtype: float
         """
         return self._lr_decay
-    
+
     def SetLRDecay(self, lr_decay_in:float=DefaultProperties.learning_rate_decay):
         """Set the exponential learning rate decay parameter for MLP training.
 
@@ -246,12 +246,12 @@ class Config:
         :type lr_decay_in: float, optional
         :raises Exception: if the learning rate decay parameter is not within zero and one.
         """
-        
+
         if lr_decay_in <= 0 or lr_decay_in > 1.0:
             raise Exception("Learning rate decay parameter should be between zero and one.")
         self._lr_decay = lr_decay_in
         return
-    
+
     def SetNEpochs(self, n_epochs_in:int=DefaultProperties.N_epochs):
         """Specify the maximum number of epochs for training of the networks.
 
@@ -261,10 +261,10 @@ class Config:
         """
         if n_epochs_in < 1:
             raise Exception("Number of epochs should be higher than 1")
-        
+
         self._n_epochs = int(n_epochs_in)
         return
-    
+
     def GetNEpochs(self):
         """Retrieve the maximum number of epochs the networks are trained for.
 
@@ -272,7 +272,7 @@ class Config:
         :rtype: int
         """
         return self._n_epochs
-    
+
     def SetBatchExpo(self, batch_expo_in:int=DefaultProperties.batch_size_exponent):
         """Set the mini-batch size exponent (base 2) for MLP training.
 
@@ -285,7 +285,7 @@ class Config:
             raise Exception("Mini-batch size exponent should be positive.")
         self._batch_expo = int(batch_expo_in)
         return
-    
+
     def GetBatchExpo(self):
         """Get the MLP training mini-batch size exponent.
 
@@ -293,7 +293,7 @@ class Config:
         :rtype: int
         """
         return self._batch_expo
-    
+
     def __HiddenLayerChecks(self,hidden_layer_architecture:list[int]):
         if not hidden_layer_architecture:
             raise Exception("At least one hidden layer should be specified.")
@@ -303,7 +303,7 @@ class Config:
             if type(h) is not int:
                 raise Exception("Nodes in the hidden layers should be integers.")
         return
-    
+
     def SetHiddenLayerArchitecture(self, hidden_layer_architecture:list[int]=DefaultProperties.hidden_layer_architecture):
         """
         Define the hidden layer architecture of the multi-layer perceptron used for the MLP-based manifold.
@@ -319,7 +319,7 @@ class Config:
         for n in hidden_layer_architecture:
             self._hidden_layer_architecture.append(n)
         return
-    
+
     def GetHiddenLayerArchitecture(self):
         """Get the hidden layer architecture of the multi-layer perceptron used for the MLP-based manifold.
 
@@ -327,7 +327,7 @@ class Config:
         :rtype: list[str]
         """
         return self._hidden_layer_architecture
-    
+
     def __WeightsCheck(self, weights:list[np.ndarray[float]]):
         if not weights:
             raise Exception("Weights list should contain at least one array.")
@@ -337,8 +337,8 @@ class Config:
             if np.shape(w_i)[1] != np.shape(w_ip)[0]:
                 raise Exception("Weight arrays are improperly formatted. Check rows and columns.")
         return
-    
-        
+
+
     def SetWeights(self, weights:list[np.ndarray[float]]):
         """Store the weight values of the neural network.
 
@@ -352,7 +352,7 @@ class Config:
         for w in weights:
             self._MLP_weights.append(w)
         return
-    
+
     def __BiasesCheck(self, biases:list[np.ndarray[float]]):
         if not biases:
             raise Exception("Biases list should contain at least one entry.")
@@ -360,7 +360,7 @@ class Config:
             if b.size == 0:
                 raise Exception("Biases for hidden layers should contain at least one value.")
         return
-    
+
     def SetBiases(self, biases:list[np.ndarray[float]]):
         """Store the bias values of the neural network.
 
@@ -374,7 +374,7 @@ class Config:
         for w in biases:
             self._MLP_biases.append(w)
         return
-    
+
     def SetActivationFunction(self, activation_function_in:str=DefaultProperties.activation_function):
         """Define the hidden layer activation function for the MLP-based manifold. See Common.Properties.ActivationFunctionOptions for the supported options.
 
@@ -386,7 +386,7 @@ class Config:
             raise Exception("Activation function " + activation_function_in + " not in available options.")
         self._activation_function = activation_function_in
         return
-    
+
     def GetActivationFunction(self):
         """Get the hidden layer activation function name.
 
@@ -394,7 +394,7 @@ class Config:
         :rtype: str
         """
         return self._activation_function
-    
+
     def UpdateMLPHyperParams(self, trainer):
         """Retrieve the weights and biases from the MLP trainer class and store them in the configuration class.
 
@@ -417,9 +417,9 @@ class Config:
         self._MLP_weights = trainer.GetWeights().copy()
         self._MLP_biases = trainer.GetBiases().copy()
         self._hidden_layer_architecture =[h for h in trainer.architecture]
-        
+
         return
-    
+
     def GetWeightsBiases(self):
         """Return values for weights and biases for the hidden layers in the MLP.
 
@@ -427,7 +427,7 @@ class Config:
         :rtype: tuple(np.ndarray[float])
         """
         return self._MLP_weights, self._MLP_biases
-    
+
     def WriteSU2MLP(self, file_name_out:str):
         """Write ASCII MLP file containing the network weights and biases from the data stored in the configuration.
 
@@ -454,4 +454,3 @@ class Config:
         pickle.dump(self, file)
         file.close()
         return
-    

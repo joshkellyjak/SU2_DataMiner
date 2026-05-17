@@ -10,7 +10,7 @@ def is_float(test_string):
         return True
     except ValueError:
         return False
-    
+
 class TestCase:
     reference_files:list[str]
     test_files:list[str]
@@ -21,7 +21,7 @@ class TestCase:
     comp_threshold:float = 0.0
     tolerance:float = 1e-12
     num_decimals:int = 10
-    
+
     def __init__(self, tag_in:str):
           self.tag = tag_in
           self.config_dir = "."
@@ -38,7 +38,7 @@ class TestCase:
         logfilename = "%s.log" % os.path.splitext(self.config_file)[0]
 
         shell_command = "%s %s > %s" % (self.exec_command, self.config_file, logfilename)
-        
+
         workdir = os.getcwd()
         os.chdir(self.config_dir)
         print(shell_command)
@@ -57,7 +57,7 @@ class TestCase:
                     pass
                 timed_out = True
                 passed = False
-        
+
         if process.poll() != 0:
             passed = False
             print("ERROR")
@@ -68,12 +68,12 @@ class TestCase:
             diff = []
             for iFile, fromfile in enumerate(self.reference_files):
                 tofile = self.test_files[iFile]
-                
+
                 with open(fromfile,'r') as fid:
                     fromlines = fid.readlines()
                 with open(tofile, 'r') as fid:
                     tolines = fid.readlines()
-                
+
                 max_delta = 0
                 compare_counter = 0
                 ignore_counter = 0
@@ -106,7 +106,7 @@ class TestCase:
                                 passed = False
                                 delta = 0.0
                                 max_delta = "not applicable"
-                            
+
                             # Compare floats
                             elif from_isfloat and to_isfloat:
                                 try:
@@ -124,7 +124,7 @@ class TestCase:
                                 except ZeroDivisionError:
                                     ignore_counter += 1
                                     continue
-                            
+
                             else:
                                 delta = 0.0
 
@@ -137,7 +137,7 @@ class TestCase:
                             diff = ["ERROR: File entries '" + from_word + "' and '" + to_word + "' in line " + str(i_line+1) + ", word " + str(i_word+1) + " differ."]
                             passed = False
                             break
-                
+
                 if diff == []:
                     passed = True
                 else:

@@ -58,7 +58,7 @@ class DataPlotter_Base:
     _label_map = {}
 
     __val_pad:int = 20
-    
+
     def __init__(self, Config_in:Config=None):
         if Config_in is None:
             self._Config = Config()
@@ -66,11 +66,11 @@ class DataPlotter_Base:
             self._Config = Config_in
 
         return
-    
+
     def SetPlotTitle(self, title_in:str):
         self.__plot_title = title_in
         return
-    
+
     def SetPlotLabelX(self, input:str):
         """Set a custom x-axis label.
 
@@ -80,7 +80,7 @@ class DataPlotter_Base:
         self.__plot_label_custom_x = input
         self._custom_plot_label_x_set = True
         return
-    
+
     def SetPlotLabelY(self, input:str):
         """Set a custom y-axis label.
 
@@ -90,7 +90,7 @@ class DataPlotter_Base:
         self.__plot_label_custom_y = input
         self._custom_plot_label_y_set = True
         return
-    
+
     def SetPlotLabelZ(self, input:str):
         """Set a custom z-axis label.
 
@@ -100,7 +100,7 @@ class DataPlotter_Base:
         self.__plot_label_custom_z = input
         self._custom_plot_label_z_set = True
         return
-    
+
     def SaveImages(self, save:bool):
         """Save generated images.
 
@@ -113,28 +113,28 @@ class DataPlotter_Base:
     def SetFigFormat(self, fig_format:str="png"):
         self.__fig_format = fig_format
         return
-    
+
     def _PrepareOutputDir(self):
         if not os.path.isdir(self._Config.GetOutputDir()+"/Plots"):
             os.mkdir(self._Config.GetOutputDir()+"/Plots")
         return
-    
+
     def SetOutputDir(self, output_dir:str):
         self._Config.SetOutputDir(output_dir)
         return
-    
 
-    
+
+
     def _Initiate2DPlot(self):
         self.__fig_window= plt.figure(figsize=[10,10])
         self._ax = plt.axes()
         return
-    
+
     def _Initiate3DPlot(self):
         self.__fig_window= plt.figure(figsize=[10,10])
         self._ax = plt.axes(projection='3d')
         return
-    
+
     def _FinalizePlot(self, fig_title:str, show:bool=True):
         val_pad = self.__val_pad
         if self.__nDim_plot == 3:
@@ -155,7 +155,7 @@ class DataPlotter_Base:
                 self._ax.set_xlabel(self._label_map[self._x_variable], fontsize=20)
             except:
                 self._ax.set_xlabel(self._plot_label_default_x, fontsize=20)
-        
+
         self._ax.xaxis.set_major_formatter(ticker.StrMethodFormatter("{x:+.2e}"))
         self._ax.xaxis.labelpad=val_pad
         self._ax.yaxis.set_major_formatter(ticker.StrMethodFormatter("{x:+.2e}"))
@@ -184,12 +184,12 @@ class DataPlotter_Base:
         else:
             plt.close(self.__fig_window)
         return
-    
+
     def _PlotBody(self, plot_variables:list[str]):
         plot_3D = (len(plot_variables) == 3)
         return plot_3D
-    
-    
+
+
     def Plot3D(self, x_variable:str, y_variable:str, z_variable:str, show:bool=True):
         self._x_variable = x_variable
         self._y_variable = y_variable
@@ -199,7 +199,7 @@ class DataPlotter_Base:
         if self.__save_images:
             self._PrepareOutputDir()
         self._Initiate3DPlot()
-        
+
         plot_data = self._PlotBody([x_variable, y_variable, z_variable])
         self._FinalizePlot("_".join((x_variable,y_variable,z_variable)) + "_3D", show)
         return plot_data

@@ -82,7 +82,7 @@ elif args.type == 2:
         config.PrintBanner()
     except:
         raise Exception("Improper configuration file for SU2 DataMiner (NICFD)")
-    
+
     #---------------------------------------------------------------------------------------------#
     # Initiate NICFD data generator
     #---------------------------------------------------------------------------------------------#
