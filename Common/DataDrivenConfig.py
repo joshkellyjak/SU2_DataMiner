@@ -1263,7 +1263,7 @@ class Config_FGM(Config):
         """
         Set number of divisions between lean and rich mixture status for flamelet generation.
 
-        :param input: Number of divisions between leanest and richest pre-mixed solution. 
+        :param input: Number of divisions between leanest and richest pre-mixed solution.
         :type input: int
         :raise: Exception: If the number of divisions is lower than one.
 
@@ -1509,7 +1509,7 @@ class Config_FGM(Config):
         return self.__pv_weights
 
     def SetDefaultProgressVariable(self):
-        """Set progress variable to be weighted sum of fuel and oxidizer species (minus N2) and major product at stochiometry. 
+        """Set progress variable to be weighted sum of fuel and oxidizer species (minus N2) and major product at stochiometry.
            Weights are set as the inverse of specie molecular weight: negative for reactants, positive for product.
         """
 

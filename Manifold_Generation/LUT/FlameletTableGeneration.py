@@ -460,7 +460,7 @@ class SU2TableGenerator:
 
     def GenerateTableNodes(self):
         """
-        Generate the table nodes and connectivity. 
+        Generate the table nodes and connectivity.
         """
 
         self.__PrepareTableLevels()
@@ -646,7 +646,7 @@ class SU2TableGenerator:
         :type val_mix_frac: float
         :return Connectivity: Delaunay triangulation connectivity
         :rtype Connecivity: NDarray
-        :return MeshNodes: 
+        :return MeshNodes:
         """
         Coord_refinement, Coord_hull, hull_area,z_norm, CV_mesh, table_level_data  = self.__ComputeCurvature(val_mix_frac)
         MeshNodes_Norm, table_level_data = self.__Compute2DMesh(XY_hull=Coord_hull, XY_refinement=Coord_refinement,val_mixfrac_norm=z_norm, level_area=hull_area)
@@ -661,7 +661,7 @@ class SU2TableGenerator:
         Compute the curvature of the reaction rate surface at a constant mixture fraction level. Identify the locations of high curvature where table refinement is required.
 
         :param val_mix_frac: mixture fraction of current table level.
-        :type val_mix_frac: float 
+        :type val_mix_frac: float
         :return XY_refinement: normalized pv and enth coordinates where refinement should be applied.
         :rtype XY_refinement: array
         :return XY_hull: normalized pv and enth coordinates of the convex hull of the current table level.

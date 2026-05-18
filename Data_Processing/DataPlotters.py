@@ -58,7 +58,7 @@ class DataPlotter_FGM(DataPlotter_Base):
     def ManualSelection(self, input:bool=False):
         """Select flamelets to plot manually.
 
-        :param input: select flamelets manually(True) or all flamelets within 
+        :param input: select flamelets manually(True) or all flamelets within
         :type input: bool
         """
         self.__manual_select = input

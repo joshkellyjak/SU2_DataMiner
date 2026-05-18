@@ -1,4 +1,4 @@
-from su2dataminer.config import Config_NICFD 
+from su2dataminer.config import Config_NICFD
 from su2dataminer.manifold import SU2TableGenerator_NICFD
 
 # Generate properties of MM with REFPROP library.
@@ -12,7 +12,7 @@ config.EnableLiquidPhase(True)
 config.EnableGasPhase(True)
 config.EnableSuperCritical(True)
 
-# Include visosity, conductivity, and vapor quality. 
+# Include visosity, conductivity, and vapor quality.
 config.IncludeTransportProperties(True)
 config.UseAutoRange(False)
 config.SetDensityBounds(0.1, 460)

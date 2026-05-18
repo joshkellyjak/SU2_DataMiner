@@ -119,7 +119,7 @@ class DataGenerator_Base:
         Define the fraction of fluid data used for training multi-layer perceptrons.
 
         :param input: fluid data train fraction.
-        :type input: float 
+        :type input: float
         :raise: Exception: if provided fraction is equal or higher than one.
         """
         if input >= 1 or input <=0:
@@ -146,7 +146,7 @@ class DataGenerator_Base:
         Get fluid data fraction used for multi-layer perceptron training.
 
         :return: fluid data train fraction.
-        :rtype: float 
+        :rtype: float
         """
         return self.__train_fraction
 
@@ -155,7 +155,7 @@ class DataGenerator_Base:
         Get fluid data fraction used for determining accuracy after training.
 
         :return: fluid data test fraction.
-        :rtype: float 
+        :rtype: float
         """
         return self.__test_fraction
 

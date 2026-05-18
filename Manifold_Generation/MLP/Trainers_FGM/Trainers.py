@@ -138,7 +138,7 @@ class Train_FGM_PINN(PhysicsInformedTrainer):
         return
 
     def SetTrainVariables(self, train_vars: list[str]):
-        """Define the dependent variables to train for. For physics-informed FGM training, the state variables are the same 
+        """Define the dependent variables to train for. For physics-informed FGM training, the state variables are the same
         as the co-state variables.
 
         :param train_vars: dependent variables to train for.
@@ -621,7 +621,7 @@ class Train_FGM_PINN(PhysicsInformedTrainer):
         return super().add_additional_header_info(fid)
 
     def __SourcetermCorrection(self):
-        """Apply correction to source terms such that pv source term and heat release rate are 
+        """Apply correction to source terms such that pv source term and heat release rate are
         always interpolated correctly for equilibrium conditions.
         """
 
@@ -811,7 +811,7 @@ class TrainMLP_FGM(TrainMLP):
         return
 
     def CheckPINNVars(self):
-        """Check if any of the variables in the MLP output group contain physics-informed variables and 
+        """Check if any of the variables in the MLP output group contain physics-informed variables and
         initiate trainer object accordingly.
         """
         output_vars = self.__Config.GetMLPOutputGroup(self.__output_group)

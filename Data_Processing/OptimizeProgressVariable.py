@@ -290,7 +290,7 @@ class PVOptimizer:
 
 
     def penalty_function(self, x:np.array):
-        """Optimization penalty function computing the derivative of the 
+        """Optimization penalty function computing the derivative of the
         progress vector w.r.t. that of the progress variable increment.
 
         :param x: progress variable weights vector.
@@ -397,10 +397,10 @@ class PVOptimizer:
         self.__CurveStepTolerance = val_tol
 
     def SetSpeciesRangeTolerance(self, val_tol:float=1e-5):
-        """Specify the minimum change in species mass fraction for species to be 
+        """Specify the minimum change in species mass fraction for species to be
         considered in progress variable optimization.
 
-        :param val_tol: species mass fraction range threshold. 
+        :param val_tol: species mass fraction range threshold.
         :type val_tol: float
         :raises Exception: if threshold value is negative.
         """

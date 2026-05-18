@@ -1,8 +1,8 @@
 ###############################################################################################
-#       #      _____ __  _____      ____        __        __  ____                   #        #  
-#       #     / ___// / / /__ \    / __ \____ _/ /_____ _/  |/  (_)___  ___  _____   #        #  
-#       #     \__ \/ / / /__/ /   / / / / __ `/ __/ __ `/ /|_/ / / __ \/ _ \/ ___/   #        #      
-#       #    ___/ / /_/ // __/   / /_/ / /_/ / /_/ /_/ / /  / / / / / /  __/ /       #        #  
+#       #      _____ __  _____      ____        __        __  ____                   #        #
+#       #     / ___// / / /__ \    / __ \____ _/ /_____ _/  |/  (_)___  ___  _____   #        #
+#       #     \__ \/ / / /__/ /   / / / / __ `/ __/ __ `/ /|_/ / / __ \/ _ \/ ___/   #        #
+#       #    ___/ / /_/ // __/   / /_/ / /_/ / /_/ /_/ / /  / / / / / /  __/ /       #        #
 #       #   /____/\____//____/  /_____/\__,_/\__/\__,_/_/  /_/_/_/ /_/\___/_/        #        #
 #       #                                                                            #        #
 ###############################################################################################
@@ -17,7 +17,7 @@
 #                                                                                             |
 #                                                                                             |
 # Description:                                                                                |
-#  Routine for fluid data generation for the MM test case.                                    |  
+#  Routine for fluid data generation for the MM test case.                                    |
 # Version: 2.0.0                                                                              |
 #                                                                                             |
 #=============================================================================================#
@@ -48,7 +48,7 @@ D.VisualizeFluidData()
 D.SaveData()
 
 # By default, the options from the configuration are used in the fluid data generation
-# process. However, it's possible to overwrite these, allowing for the generation of 
+# process. However, it's possible to overwrite these, allowing for the generation of
 # different fluid data files.
 # For example, one could generate a data set of fluid data with a different resolution
 # compared to the resolution in the Config and save it under a different name.

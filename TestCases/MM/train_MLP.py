@@ -1,8 +1,8 @@
 ###############################################################################################
-#       #      _____ __  _____      ____        __        __  ____                   #        #  
-#       #     / ___// / / /__ \    / __ \____ _/ /_____ _/  |/  (_)___  ___  _____   #        #  
-#       #     \__ \/ / / /__/ /   / / / / __ `/ __/ __ `/ /|_/ / / __ \/ _ \/ ___/   #        #      
-#       #    ___/ / /_/ // __/   / /_/ / /_/ / /_/ /_/ / /  / / / / / /  __/ /       #        #  
+#       #      _____ __  _____      ____        __        __  ____                   #        #
+#       #     / ___// / / /__ \    / __ \____ _/ /_____ _/  |/  (_)___  ___  _____   #        #
+#       #     \__ \/ / / /__/ /   / / / / __ `/ __/ __ `/ /|_/ / / __ \/ _ \/ ___/   #        #
+#       #    ___/ / /_/ // __/   / /_/ / /_/ / /_/ /_/ / /  / / / / / /  __/ /       #        #
 #       #   /____/\____//____/  /_____/\__,_/\__/\__,_/_/  /_/_/_/ /_/\___/_/        #        #
 #       #                                                                            #        #
 ###############################################################################################
@@ -18,7 +18,7 @@
 #                                                                                             |
 # Description:                                                                                |
 #  Train a multi-layer perceptron for evaluation of thermodynamic properties through physics- |
-#  informed learning to be used for SU2 simulations.                                          |                                                             
+#  informed learning to be used for SU2 simulations.                                          |
 # Version: 2.0.0                                                                              |
 #                                                                                             |
 #=============================================================================================#
@@ -30,13 +30,13 @@ from su2dataminer.config import Config_NICFD
 # Load test case configuration.
 Config = Config_NICFD("MM_test.cfg")
 
-# Define MLP trainer class. This class first trains the MLP to predict the entropy based on 
+# Define MLP trainer class. This class first trains the MLP to predict the entropy based on
 # density and internal energy. Subsequently, it initiates a physics-informed training approach
 # where the MLP is trained to predict the temperature, pressure, and speed of sound based on
 # the entropic equation of state.
 Eval = TrainMLP_NICFD(Config)
 
-# Set activation function. For the physics-informed approach, the "exponential" function is 
+# Set activation function. For the physics-informed approach, the "exponential" function is
 # recommended as it saves computational resourses during SU2 simulations.
 Eval.SetActivationFunction("exponential")
 
@@ -44,10 +44,10 @@ Eval.SetActivationFunction("exponential")
 # layer with 30 perceptrons is used.
 Eval.SetHiddenLayers([30])
 
-# The step size during training is adjusted through an exponential decay algorithm. 
+# The step size during training is adjusted through an exponential decay algorithm.
 # The user can specify the initial learning rate exponent and learning rate decay
 # parameter. The default parameters work well, although the optimum set of parameters
-# depends on the data set and architecture! 
+# depends on the data set and architecture!
 
 # Set initial learning rate exponent (base 10).
 Eval.SetAlphaExpo(-1.8261e+00)
@@ -59,7 +59,7 @@ Eval.SetLRDecay(+9.8787e-01)
 # The optimum choice depends on the data set.
 Eval.SetBatchExpo(6)
 
-# Set output verbose level. A value of 1 displays training information per epoch in the terminal. 
+# Set output verbose level. A value of 1 displays training information per epoch in the terminal.
 # A value of 0 ommits all outputs.
 Eval.SetVerbose(1)
 
@@ -67,5 +67,5 @@ Eval.SetVerbose(1)
 Eval.SetNEpochs(1000)
 
 # Start the training process. During the training process, convergence history and other relevant
-# information are saved in the main output directory as specified in the configuration. 
+# information are saved in the main output directory as specified in the configuration.
 Eval.CommenceTraining()

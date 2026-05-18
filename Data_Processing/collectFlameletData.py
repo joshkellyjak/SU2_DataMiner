@@ -1058,7 +1058,7 @@ class GroupOutputs:
         return n_networks_eval
 
     def PostProcessGroups(self):
-        """Extract the combinations of variables with the highest affinity and fewest number of network evaluations. 
+        """Extract the combinations of variables with the highest affinity and fewest number of network evaluations.
         Groups with most potential are visualized in a figure.
         """
         min_group = min(self.__n_groups)
