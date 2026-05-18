@@ -20,3 +20,4 @@ pymoo==0.6.1.6
 pydata-sphinx-theme
 meshio==5.3.5
 concave_hull==0.1.2
+ruff==0.15.13
