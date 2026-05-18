@@ -877,9 +877,6 @@ class Train_Entropic_PINN(PhysicsInformedTrainer):
 
     def EvaluateMLP(self, X:np.ndarray[float]):
         X_norm = tf.Variable(self.scaler_function_x.transform(X))
-        s_norm = self._MLP_Evaluation(X_norm)
-        #s_dim, dsdrhoe, d2sdrho2e2 = self.ComputeEntropyGradients(X_norm)
-        #print(s_dim.numpy()[:10])
         state = self.EvaluateState(X_norm).numpy()
         return state
 

@@ -588,7 +588,7 @@ class Train_FGM_PINN(PhysicsInformedTrainer):
             cont = ax.contourf(self.h_unb, self.z_unb, Y_plot_unb, levels=20)
             ax.set_xlabel(r"Total enthalpy $(h)[J/kg]$",fontsize=20)
             ax.set_ylabel(r"Mixture fraction $(Z)[-]$",fontsize=20)
-            cbar = plt.colorbar(cont)
+            plt.colorbar(cont)
             ax.tick_params(which='both',labelsize=18)
             ax.set_title(r""+self._train_vars[iVar] + r" Prediction along reactants",fontsize=20)
             fig.savefig(self._save_dir+"/Model_"+str(self._model_index)+"/Unburnt_Pred_"+self._train_vars[iVar] +"."+self._figformat,format=self._figformat,bbox_inches='tight')
@@ -600,7 +600,7 @@ class Train_FGM_PINN(PhysicsInformedTrainer):
             cont = ax.contourf(self.h_b, self.z_b, Y_plot_b, levels=20)
             ax.set_xlabel(r"Total enthalpy $(h)[J/kg]$",fontsize=20)
             ax.set_ylabel(r"Mixture fraction $(Z)[-]$",fontsize=20)
-            cbar = plt.colorbar(cont)
+            plt.colorbar(cont)
             ax.tick_params(which='both',labelsize=18)
             ax.set_title(r""+self._train_vars[iVar] + r" Prediction along products",fontsize=20)
             fig.savefig(self._save_dir+"/Model_"+str(self._model_index)+"/Burnt_Pred_"+self._train_vars[iVar] +"."+self._figformat,format=self._figformat,bbox_inches='tight')
@@ -896,8 +896,6 @@ def PlotFlameletData(Trainer:MLPTrainer, Config:Config_FGM, train_name:str):
                 CV_flamelet[:, iCv] = Config.ComputeProgressVariable(variables_flamelet, flameletData)
             else:
                 CV_flamelet[:, iCv] = flameletData[:, variables_flamelet.index(Cv)]
-
-        CV_flamelet_norm = Trainer.scaler_function_x.transform(CV_flamelet)
 
         ref_data_flamelet = np.zeros([len(flameletData), len(Trainer._train_vars)])
 

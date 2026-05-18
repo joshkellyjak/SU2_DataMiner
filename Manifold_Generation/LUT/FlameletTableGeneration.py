@@ -174,7 +174,6 @@ class SU2TableGenerator_Base:
         return data_interp
 
     def Compute2DTable(self, CV_1:str, CV_2:str):
-        Np_grid = 300
 
         return
 
@@ -818,7 +817,6 @@ class SU2TableGenerator:
         gmsh.model.mesh.field.setNumbers(7, "FieldsList", [2])
         gmsh.model.mesh.field.setAsBackgroundMesh(7)
 
-        lc = base_cell_size
         def meshSizeCallback(dim,tag,x,y,z,lc):
             return lc
 

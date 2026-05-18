@@ -897,7 +897,6 @@ class PVOptimizer_Niu(PVOptimizer):
         else:
             update_strategy = "immediate"
 
-        A_constr = np.hstack((-self._progress_vector, self._delta_Y_flamelets))
         #self._monotonicity_full = LinearConstraint(A_constr, lb=-1e-4,keep_feasible=True)
         # Initiate evolutionary algorithm.
         print("Generation,Penalty," + ",".join(s for s in self._pv_definition_optim))
