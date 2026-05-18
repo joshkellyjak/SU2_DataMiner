@@ -22,3 +22,5 @@ jobs:
               run: ruff check --select=W291
             - name: Unused modules
               run: ruff check --select=F401
+            - name: Unused variables
+              run: ruff check --select=F841

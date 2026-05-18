@@ -10,3 +10,6 @@ repos:
     - id: ruff-check
       name: Unused modules
       args: [ --fix, --select=F401]
+    - id: ruff-check
+      name: Unused variables
+      args: [--select=F841]
