@@ -54,3 +54,12 @@ jobs:
         with:
           entrypoint: /bin/rm 
           args: -rf src/
+
+  Neatness:
+    name: Check formatting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Whitespaces check
+        uses: astral-sh/ruff-action@v3
+      - run: ruff check --select W291
+      
