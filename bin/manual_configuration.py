@@ -27,7 +27,6 @@
 from Common.Config_base import Config
 from Common.DataDrivenConfig import *
 
-import sys
 from shutil import get_terminal_size
 
 # General print methods

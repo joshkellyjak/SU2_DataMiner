@@ -485,7 +485,7 @@ class DataGenerator_Cantera(DataGenerator_Base):
                 pass
 
     def ComputeCounterFlowFlames(self, v_fuel:float, v_ox:float, T_ub:float):
-        """Generate counter-flow diffusion flamelet data for a given temperature, and reactant velocities. 
+        """Generate counter-flow diffusion flamelet data for a given temperature, and reactant velocities.
         Strain rate is gradually increased until extinction in order to distribute data over the progress variable spectrum.
 
         :param v_fuel: Fuel reactant velocity in meters per second.

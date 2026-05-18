@@ -31,12 +31,10 @@ import sys,os
 from Common.DataDrivenConfig import Config_FGM, Config
 from Common.CommonMethods import GetReferenceData
 from Common.Properties import DefaultSettings_FGM
-import cantera as ct
 import gmsh
 import pickle
 from multiprocessing import Pool
 from Common.Interpolators import Invdisttree
-from random import sample
 
 class SU2TableGenerator_Base:
     _Config = None
@@ -176,7 +174,6 @@ class SU2TableGenerator_Base:
         return data_interp
 
     def Compute2DTable(self, CV_1:str, CV_2:str):
-        Np_grid = 300
 
         return
 
@@ -460,7 +457,7 @@ class SU2TableGenerator:
 
     def GenerateTableNodes(self):
         """
-        Generate the table nodes and connectivity. 
+        Generate the table nodes and connectivity.
         """
 
         self.__PrepareTableLevels()
@@ -646,7 +643,7 @@ class SU2TableGenerator:
         :type val_mix_frac: float
         :return Connectivity: Delaunay triangulation connectivity
         :rtype Connecivity: NDarray
-        :return MeshNodes: 
+        :return MeshNodes:
         """
         Coord_refinement, Coord_hull, hull_area,z_norm, CV_mesh, table_level_data  = self.__ComputeCurvature(val_mix_frac)
         MeshNodes_Norm, table_level_data = self.__Compute2DMesh(XY_hull=Coord_hull, XY_refinement=Coord_refinement,val_mixfrac_norm=z_norm, level_area=hull_area)
@@ -661,7 +658,7 @@ class SU2TableGenerator:
         Compute the curvature of the reaction rate surface at a constant mixture fraction level. Identify the locations of high curvature where table refinement is required.
 
         :param val_mix_frac: mixture fraction of current table level.
-        :type val_mix_frac: float 
+        :type val_mix_frac: float
         :return XY_refinement: normalized pv and enth coordinates where refinement should be applied.
         :rtype XY_refinement: array
         :return XY_hull: normalized pv and enth coordinates of the convex hull of the current table level.
@@ -820,7 +817,6 @@ class SU2TableGenerator:
         gmsh.model.mesh.field.setNumbers(7, "FieldsList", [2])
         gmsh.model.mesh.field.setAsBackgroundMesh(7)
 
-        lc = base_cell_size
         def meshSizeCallback(dim,tag,x,y,z,lc):
             return lc
 

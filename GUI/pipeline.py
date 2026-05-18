@@ -377,7 +377,7 @@ class PipelineManager:
             if self._nodes[k]['parent']==_id:
               #child_name = self._nodes[k]['name']
               descendants_list.append(k)
-              child = self.get_descendants(k,descendants_list)
+              self.get_descendants(k,descendants_list)
 
         #print("descendants=",descendants_list)
         #return descendants_list

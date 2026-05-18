@@ -462,8 +462,6 @@ class MLPOptimizer:
             raise Exception("At least one of the hyper-parameter options should be considered for optimization.")
         # Prepare optimization history output file.
         self._history_extension = self._get_optim_extension()
-        n_params = sum([self._optimizebatch,self._optimizeLR, self._optimizeNN,self._optimizephi])
-
         self.CreateOutputs()
 
         return
@@ -1415,8 +1413,6 @@ class PlotHPOResults:
         P_last_scaled = np.hstack((last_gen_size_scaled[:,np.newaxis],last_gen_score_scaled[:,np.newaxis]))
         last_gen_groups.append(np.hstack((last_gen_size[:,np.newaxis],last_gen_score[:,np.newaxis])))
 
-        max_score_scaled = (np.max(history_score) - min_score)/(max_score - min_score)
-        max_size_scaled = (np.max(history_size) - min_size)/(max_size - min_size)
 
         #ref_point_scaled = np.array([max_size_scaled, max_score_scaled])
         ref_point_scaled = 0.5 * (np.min(P_last_scaled,axis=0) + np.max(P_last_scaled,axis=0))
@@ -1437,9 +1433,6 @@ class PlotHPOResults:
             hypervolume.append(HV_gen)
 
 
-        HV_last = hypervolume[-1]
-        HV_pref = hypervolume[np.argwhere(np.array(hypervolume) < HV_last)[-1][0]]
-        HV_change = 100*(HV_pref - HV_last)/HV_last
         fig, axs = plt.subplots(nrows=1,ncols=2,figsize=[16,7])
         ax = axs[0]
         ax.plot(general_distance, 'o-')

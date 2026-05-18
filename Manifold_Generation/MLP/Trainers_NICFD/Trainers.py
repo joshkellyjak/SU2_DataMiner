@@ -40,7 +40,6 @@ config = tf.compat.v1.ConfigProto()
 config.gpu_options.allow_growth = True
 import matplotlib.pyplot as plt
 from matplotlib import ticker
-from enum import Enum
 
 import CoolProp as CoolP
 import CoolProp.CoolProp as CP
@@ -48,7 +47,7 @@ import CoolProp.CoolProp as CP
 from Common.DataDrivenConfig import Config_NICFD
 from Common.CommonMethods import GetReferenceData
 from Common.Properties import DefaultSettings_NICFD, EntropicVars
-from Manifold_Generation.MLP.Trainer_Base import MLPTrainer, TensorFlowFit,PhysicsInformedTrainer,TrainMLP,CustomTrainer
+from Manifold_Generation.MLP.Trainer_Base import TensorFlowFit,PhysicsInformedTrainer,TrainMLP
 
 LabelPairing = {EntropicVars.s.name:r"Entropy $(s)[J/kg]$",\
                 EntropicVars.T.name:r"Temperature $(T)[K]$",\
@@ -158,7 +157,6 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
     __rho_max:float=0
     __e_max:float=0
     __rho_min:float=0
-    __e_max:float
     __TD_vars:list[float]
 
     def __init__(self):
@@ -878,9 +876,6 @@ class Train_Entropic_PINN(PhysicsInformedTrainer):
 
     def EvaluateMLP(self, X:np.ndarray[float]):
         X_norm = tf.Variable(self.scaler_function_x.transform(X))
-        s_norm = self._MLP_Evaluation(X_norm)
-        #s_dim, dsdrhoe, d2sdrho2e2 = self.ComputeEntropyGradients(X_norm)
-        #print(s_dim.numpy()[:10])
         state = self.EvaluateState(X_norm).numpy()
         return state
 
