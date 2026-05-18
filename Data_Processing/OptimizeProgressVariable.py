@@ -32,7 +32,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 from scipy.optimize import differential_evolution, Bounds, LinearConstraint, minimize
 from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler, RobustScaler, MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler
 
 from Common.Properties import FGMVars, DefaultSettings_FGM
 from Common.DataDrivenConfig import Config_FGM

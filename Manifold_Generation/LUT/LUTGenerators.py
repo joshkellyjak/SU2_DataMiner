@@ -32,7 +32,6 @@ from Common.DataDrivenConfig import Config_NICFD
 import gmsh
 from concave_hull import concave_hull, concave_hull_indexes
 import meshio
-import matplotlib.pyplot as plt
 
 def shoelace(XY:np.ndarray[float]):
     """Shoelace algorithm for area computations

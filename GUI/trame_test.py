@@ -1,28 +1,22 @@
 from trame.app import get_server
-from trame.widgets import vuetify, paraview
+from trame.widgets import vuetify
 from trame.ui.vuetify import SinglePageLayout
 from trame.widgets import vuetify, vtk as vtk_widgets
 import vtk
 from vtkmodules.vtkCommonDataModel import vtkDataObject
 from vtkmodules.vtkCommonColor import vtkNamedColors
 from vtkmodules.vtkRenderingCore import (
-    vtkActor,
-    vtkDataSetMapper,
     vtkRenderer,
     vtkRenderWindow,
     vtkRenderWindowInteractor,
-    vtkColorTransferFunction,
 )
-from vtkmodules.vtkRenderingAnnotation import vtkCubeAxesActor, vtkScalarBarActor
-from vtkmodules.vtkInteractionWidgets import vtkOrientationMarkerWidget, vtkScalarBarWidget
+from vtkmodules.vtkRenderingAnnotation import vtkScalarBarActor
+from vtkmodules.vtkInteractionWidgets import vtkScalarBarWidget
 from Common.Properties import DefaultSettings_FGM
-from Common.DataDrivenConfig import Config_FGM
 
 #from .pipeline import PipelineManager
-from trame.assets.local import LocalFileManager
 
 import numpy as np
-import time
 
 server = get_server(client_type='vue2')
 renderer = vtkRenderer()
@@ -138,7 +132,6 @@ renderWindow.AddRenderer(renderer)
 
 DEFAULT_Z=0.5
 
-from vtk import vtkPlaneSource
 planeSource = vtk.vtkPlaneSource()
 planeSource.SetCenter(0.5,0.5,0.5)
 planeSource.SetNormal(0,0,1.0)

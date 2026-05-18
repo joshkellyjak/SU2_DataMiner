@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import os
-from su2dataminer.manifold import Train_Entropic_PINN,TrainMLP_NICFD
+from su2dataminer.manifold import TrainMLP_NICFD
 from su2dataminer.generate_data import DataGenerator_CoolProp
 from Common.DataDrivenConfig import Config_NICFD
 

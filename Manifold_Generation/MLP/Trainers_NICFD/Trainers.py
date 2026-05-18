@@ -40,7 +40,6 @@ config = tf.compat.v1.ConfigProto()
 config.gpu_options.allow_growth = True
 import matplotlib.pyplot as plt
 from matplotlib import ticker
-from enum import Enum
 
 import CoolProp as CoolP
 import CoolProp.CoolProp as CP
@@ -48,7 +47,7 @@ import CoolProp.CoolProp as CP
 from Common.DataDrivenConfig import Config_NICFD
 from Common.CommonMethods import GetReferenceData
 from Common.Properties import DefaultSettings_NICFD, EntropicVars
-from Manifold_Generation.MLP.Trainer_Base import MLPTrainer, TensorFlowFit,PhysicsInformedTrainer,TrainMLP,CustomTrainer
+from Manifold_Generation.MLP.Trainer_Base import TensorFlowFit,PhysicsInformedTrainer,TrainMLP
 
 LabelPairing = {EntropicVars.s.name:r"Entropy $(s)[J/kg]$",\
                 EntropicVars.T.name:r"Temperature $(T)[K]$",\

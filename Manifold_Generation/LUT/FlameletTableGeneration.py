@@ -31,12 +31,10 @@ import sys,os
 from Common.DataDrivenConfig import Config_FGM, Config
 from Common.CommonMethods import GetReferenceData
 from Common.Properties import DefaultSettings_FGM
-import cantera as ct
 import gmsh
 import pickle
 from multiprocessing import Pool
 from Common.Interpolators import Invdisttree
-from random import sample
 
 class SU2TableGenerator_Base:
     _Config = None
