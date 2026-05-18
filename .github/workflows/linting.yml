@@ -6,8 +6,8 @@ on:
       - 'develop'
 
 jobs:
-    Whitespaces:
-        name: Check trailing whitespaces
+    Ruff:
+        name: Code linting with Ruff
         runs-on: ubuntu-latest
         steps:
             - name: Checkout code
