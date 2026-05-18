@@ -1,2 +1,2 @@
 [tool.ruff.lint]
-select=["W291"]
+select=["W291", "F401"]
