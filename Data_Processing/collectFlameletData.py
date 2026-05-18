@@ -46,6 +46,7 @@ class FlameletConcatenator:
     __Config:Config_FGM = None # FlameletAI configuration for current workflow.
 
     __Np_per_flamelet:int = 2**DefaultSettings_FGM.batch_size_exponent          # Number of data points to extract per flamelet.
+    __Np_equilibrium:int = 1            # Number of rows to read from each equilibrium file (1 = only the cold boundary point).
     __custom_resolution:bool = False    # Overwrite average number of data points per flamelet with a specified value.
 
     __mfrac_skip:int = 1        # Number of mixture status folder to skip while concatenating flamelet data.
@@ -179,6 +180,22 @@ class FlameletConcatenator:
 
     def GetNFlameletNodes(self):
         return self.__Np_per_flamelet
+
+    def SetNEquilibriumNodes(self, Np_equilibrium:int):
+        """Define the number of rows to sample from each equilibrium file.
+
+        A value of 1 (default) reads only the fully-cooled boundary point.
+        Higher values sample the full equilibrium curve from cold to adiabatic,
+        giving the table or MLP denser coverage of the equilibrium arm.
+
+        :param Np_equilibrium: number of points per equilibrium file (>= 1).
+        :type Np_equilibrium: int
+        :raises Exception: if the value is lower than one.
+        """
+        if Np_equilibrium < 1:
+            raise Exception("Number of equilibrium nodes must be at least 1.")
+        self.__Np_equilibrium = Np_equilibrium
+        return
 
     def SetMixStep(self, skip_mixtures:int):
         """Skip a number of mixture status values when reading flamelet data to reduce the concatenated file size.
@@ -572,16 +589,14 @@ class FlameletConcatenator:
                 if self.__ignore_mixture_bounds:
                     n_files = len(listdir(self.__flameletdata_dir + "/equilibrium_data/" + z))
                     n_eq += n_files
-                    # Each equilibrium file contributes exactly 1 point (the fully cooled
-                    # endpoint); the rest of the curve is covered by interpolated flames.
-                    Np_tot += n_files
+                    Np_tot += n_files * self.__Np_equilibrium
                 else:
                     if z[:len(folder_header)] == folder_header:
                         mixture_status = float(z[len(folder_header):])
                         if (mixture_status <= self.__mix_status_max) and (mixture_status >= self.__mix_status_min):
                             n_files = len(listdir(self.__flameletdata_dir + "/equilibrium_data/" + z))
                             n_eq += n_files
-                            Np_tot += n_files
+                            Np_tot += n_files * self.__Np_equilibrium
 
         # Count the number of chemical equilibrium data files.
         if self.__include_fuzzy:
@@ -645,7 +660,7 @@ class FlameletConcatenator:
             # boundary point (T=T_unburnt).  The rest of the equilibrium curve is
             # redundant with the interpolated burner flames.
             D = np.loadtxt(flamelet_dir + "/" + eq_file + "/" + f, delimiter=',',
-                           skiprows=1, max_rows=1 if is_equilibrium else None)
+                           skiprows=1, max_rows=self.__Np_equilibrium if is_equilibrium else None)
             D = np.atleast_2d(D)
 
             # Set flamelet controlling variables
@@ -738,7 +753,7 @@ class FlameletConcatenator:
                                 species_production_rate[:, iSp] += D[:, variables.index("Y_dot_pos-"+NOsp)]
                                 species_destruction_rate[:, iSp] += D[:, variables.index("Y_dot_neg-"+NOsp)]
                                 species_net_rate[:, iSp] += D[:, variables.index("Y_dot_net-"+NOsp)]
-                                species_mass_fraction[:, iSp] += D[:, variables.index("Y-"+Sp)]
+                                species_mass_fraction[:, iSp] += D[:, variables.index("Y-"+NOsp)]
                         else:
                             species_mass_fraction[:, iSp] = D[:, variables.index("Y-"+Sp)]
                             species_production_rate[:, iSp] = D[:, variables.index("Y_dot_pos-"+Sp)]

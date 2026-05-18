@@ -30,6 +30,8 @@ import cantera as ct
 import numpy as np
 import csv
 from os import path, mkdir
+from os import listdir as _listdir
+
 from joblib import Parallel, delayed
 from threadpoolctl import threadpool_limits
 
@@ -81,6 +83,10 @@ class DataGenerator_Cantera(DataGenerator_Base):
 
     __u_fuel:float = 1.0       # Fuel stream velocity in counter-flow diffusion flame.
     __u_oxidizer:float = None   # Oxidizer stream velocity in counter-flow diffusion flame.
+
+    __free_flame_refine:dict    = {"ratio": 3, "slope": 0.03, "curve": 0.03, "prune": 0.01}  # Refine criteria for free-flame solver.
+    __burner_flame_refine:dict  = {"ratio": 3, "slope": 0.15, "curve": 0.15, "prune": 0.05}  # Refine criteria for burner-stabilized flame solver.
+    __counter_flame_refine:dict = {"ratio": 3, "slope": 0.04, "curve": 0.06, "prune": 0.02}  # Refine criteria for counter-flow flame solver.
 
     def __init__(self, Config:Config_FGM=None):
         """Constructur, load flamelet generation settings from Config_FGM.
@@ -141,6 +147,48 @@ class DataGenerator_Cantera(DataGenerator_Base):
     def SetInitialGridLength(self, length:float):
         """Set the initial domain length (in metres) for new flamelet grids."""
         self.__initial_grid_length = length
+
+    def SetFreeFlameRefineCriteria(self, ratio:float=3, slope:float=0.03, curve:float=0.03, prune:float=0.01):
+        """Set the grid refinement criteria for the free-flame (adiabatic) solver.
+
+        :param ratio: Maximum ratio of adjacent grid spacings, defaults to 3.
+        :param slope: Maximum relative slope of the solution, defaults to 0.03.
+        :param curve: Maximum relative curvature of the solution, defaults to 0.03.
+        :param prune: Threshold for grid point removal, defaults to 0.01.
+        :raises Exception: if any value is not strictly positive.
+        """
+        if any(v <= 0 for v in (ratio, slope, curve, prune)):
+            raise Exception("All refine criteria values must be strictly positive.")
+        self.__free_flame_refine = {"ratio": ratio, "slope": slope, "curve": curve, "prune": prune}
+        return
+
+    def SetBurnerFlameRefineCriteria(self, ratio:float=3, slope:float=0.15, curve:float=0.15, prune:float=0.05):
+        """Set the grid refinement criteria for the burner-stabilized flame solver.
+
+        :param ratio: Maximum ratio of adjacent grid spacings, defaults to 3.
+        :param slope: Maximum relative slope of the solution, defaults to 0.15.
+        :param curve: Maximum relative curvature of the solution, defaults to 0.15.
+        :param prune: Threshold for grid point removal, defaults to 0.05.
+        :raises Exception: if any value is not strictly positive.
+        """
+        if any(v <= 0 for v in (ratio, slope, curve, prune)):
+            raise Exception("All refine criteria values must be strictly positive.")
+        self.__burner_flame_refine = {"ratio": ratio, "slope": slope, "curve": curve, "prune": prune}
+        return
+
+    def SetCounterFlameRefineCriteria(self, ratio:float=3, slope:float=0.04, curve:float=0.06, prune:float=0.02):
+        """Set the grid refinement criteria for the counter-flow diffusion flame solver.
+
+        :param ratio: Maximum ratio of adjacent grid spacings, defaults to 3.
+        :param slope: Maximum relative slope of the solution, defaults to 0.04.
+        :param curve: Maximum relative curvature of the solution, defaults to 0.06.
+        :param prune: Threshold for grid point removal, defaults to 0.02.
+        :raises Exception: if any value is not strictly positive.
+        """
+        if any(v <= 0 for v in (ratio, slope, curve, prune)):
+            raise Exception("All refine criteria values must be strictly positive.")
+        self.__counter_flame_refine = {"ratio": ratio, "slope": slope, "curve": curve, "prune": prune}
+        return
 
     def SetFuelDefinition(self, fuel_species:list[str], fuel_weights:list[float]):
         """Manually define the fuel composition
@@ -382,29 +430,29 @@ class DataGenerator_Cantera(DataGenerator_Base):
         if prev_flame is None:
             # First flame: create a new object from scratch.
             initialgrid = np.linspace(0, self.__initial_grid_length, self.__initial_grid_Np)
-            flame = ct.FreeFlame(self.gas, grid=initialgrid)
-            flame.set_refine_criteria(ratio=3, slope=0.03, curve=0.03, prune=0.01)
-            flame.transport_model = self.__transport_model
-            flame.set_initial_guess(locs=[0.0, 0.3, 0.5, 1.0])
+            freeflame = ct.FreeFlame(self.gas, grid=initialgrid)
+            freeflame.set_refine_criteria(**self.__free_flame_refine)
+            freeflame.transport_model = self.__transport_model
+            freeflame.set_initial_guess(locs=[0.0, 0.3, 0.5, 1.0])
         else:
             # Subsequent flames: reuse the previous flame object directly.
-            flame = prev_flame
-            flame.inlet.T = T_ub
-            flame.inlet.Y = self.gas.Y
+            freeflame = prev_flame
+            freeflame.inlet.T = T_ub
+            freeflame.inlet.Y = self.gas.Y
 
         # Try to solve the flamelet solution. If solution diverges, move on to next flamelet.
         try:
-            flame.solve(loglevel=self.__loglevel, refine_grid=True, auto=False)
+            freeflame.solve(loglevel=self.__loglevel, refine_grid=True, auto=(prev_flame is None))
 
             # Computing mass flow rate for later burner flame evaluation
-            self.m_dot_free_flame = flame.velocity[0]*flame.density[0]
+            self.m_dot_free_flame = freeflame.velocity[0]*freeflame.density[0]
 
             # Check if mixture is burning
-            if np.max(flame.T) <= DefaultSettings_FGM.T_threshold:
+            if np.max(freeflame.T) <= DefaultSettings_FGM.T_threshold:
                 print("Flamelet at %s %.3e, Tu %.3f is not burning" % (folder_header, mix_status, T_ub))
                 return None
 
-            variables, data_calc = self.__SaveFlameletData(flame, self.gas)
+            variables, data_calc = self.__SaveFlameletData(freeflame, self.gas)
 
             # Generate sub-directory if it's not there.
             if not path.isdir(self.GetOutputDir()+'/freeflame_data/'):
@@ -424,12 +472,12 @@ class DataGenerator_Cantera(DataGenerator_Base):
                 if not path.isdir(self.__matlab__output_dir+'/freeflame_data_MATLAB/'+folder_header+'_'+str(round(mix_status, 6))):
                         mkdir(self.__matlab__output_dir+'/freeflame_data_MATLAB/'+folder_header+'_'+str(round(mix_status, 6)))
                 self.__TranslateToMatlabFile(filename_plus_folder,freeflame_filename, self.__matlab__output_dir + "/freeflame_data_MATLAB/"+folder_header+'_'+str(round(mix_status, 6)) + "/")
-            self.last_Y_flamelet = flame.Y
-            self.last_h_flamelet = flame.enthalpy_mass
-            self.last_T_flamelet = flame.T
+            self.last_Y_flamelet = freeflame.Y
+            self.last_h_flamelet = freeflame.enthalpy_mass
+            self.last_T_flamelet = freeflame.T
 
-            print("Successfull Freeflame simulation at "+folder_header+": "+str(mix_status)+ " T_u: " +str(T_ub) + " Np=%d" % len(flame.grid) + " ("+str(i_freeflame+1)+"/"+str(self.__n_flamelets)+")")
-            return flame
+            print("Successfull Freeflame simulation at "+folder_header+": "+str(mix_status)+ " T_u: " +str(T_ub) + " Np=%d" % len(freeflame.grid) + " ("+str(i_freeflame+1)+"/"+str(self.__n_flamelets)+")")
+            return freeflame
 
         except:
             print("Unsuccessfull Freeflame simulation at "+folder_header+": "+str(mix_status)+ " T_u: " +str(T_ub) + " ("+str(i_freeflame+1)+"/"+str(self.__n_flamelets)+")")
@@ -464,7 +512,7 @@ class DataGenerator_Cantera(DataGenerator_Base):
             initialgrid = np.linspace(0, self.__initial_grid_length, self.__initial_grid_Np)
             burner_flame = ct.BurnerFlame(self.gas, grid=initialgrid)
             burner_flame.burner.T = T_burner
-            burner_flame.set_refine_criteria(ratio=3, slope=0.15, curve=0.15, prune=0.05)
+            burner_flame.set_refine_criteria(**self.__burner_flame_refine)
             burner_flame.transport_model = self.__transport_model
         else:
             # Subsequent burner flames: reuse the previous flame object directly.
@@ -575,7 +623,7 @@ class DataGenerator_Cantera(DataGenerator_Base):
             raise Exception("Reactant velocities should be higher than zero.")
         if T_ub < 200:
             raise Exception("Reactant temperature should be higher than 200K.")
-        flame = ct.CounterflowDiffusionFlame(self.gas, width=18e-3)
+        counterflame = ct.CounterflowDiffusionFlame(self.gas, width=18e-3)
 
         self.gas.set_mixture_fraction(1.0, self.__fuel_string, self.__oxidizer_string)
         self.gas.TP = T_ub, ct.one_atm
@@ -585,17 +633,17 @@ class DataGenerator_Cantera(DataGenerator_Base):
         self.gas.TP = T_ub, ct.one_atm
         rho_oxidizer = self.gas.density
 
-        flame.P = ct.one_atm
-        flame.fuel_inlet.Y = self.__fuel_string
-        flame.fuel_inlet.T = T_ub
-        flame.fuel_inlet.mdot = rho_fuel*v_fuel
-        flame.oxidizer_inlet.Y = self.__oxidizer_string
-        flame.oxidizer_inlet.T = T_ub
-        flame.oxidizer_inlet.mdot = rho_oxidizer*v_ox
-        flame.set_refine_criteria(ratio=3, slope=0.04, curve=0.06, prune=0.02)
+        counterflame.P = ct.one_atm
+        counterflame.fuel_inlet.Y = self.__fuel_string
+        counterflame.fuel_inlet.T = T_ub
+        counterflame.fuel_inlet.mdot = rho_fuel*v_fuel
+        counterflame.oxidizer_inlet.Y = self.__oxidizer_string
+        counterflame.oxidizer_inlet.T = T_ub
+        counterflame.oxidizer_inlet.mdot = rho_oxidizer*v_ox
+        counterflame.set_refine_criteria(**self.__counter_flame_refine)
 
-        flame.solve(loglevel=self.__loglevel, auto=True)
-        variables, data_calc = self.__SaveFlameletData(flame, self.gas)
+        counterflame.solve(loglevel=self.__loglevel, auto=True)
+        variables, data_calc = self.__SaveFlameletData(counterflame, self.gas)
 
         counterflame_filename = "counterflamelet_strain_0_Tu"+str(round(T_ub, 4))+".csv"
         if not path.isdir(self.GetOutputDir()+"/counterflame_data"):
@@ -622,24 +670,24 @@ class DataGenerator_Cantera(DataGenerator_Base):
         while not strain_overload:
             # Create an initial guess based on the previous solution
             # Update grid
-            flame.flame.grid *= strain_factor ** exp_d_a
-            normalized_grid = flame.grid / (flame.grid[-1] - flame.grid[0])
+            counterflame.flame.grid *= strain_factor ** exp_d_a
+            normalized_grid = counterflame.grid / (counterflame.grid[-1] - counterflame.grid[0])
             # Update mass fluxes
-            flame.fuel_inlet.mdot *= strain_factor ** exp_mdot_a
-            flame.oxidizer_inlet.mdot *= strain_factor ** exp_mdot_a
+            counterflame.fuel_inlet.mdot *= strain_factor ** exp_mdot_a
+            counterflame.oxidizer_inlet.mdot *= strain_factor ** exp_mdot_a
             # Update velocities
-            flame.set_profile('velocity', normalized_grid,
-                        flame.velocity * strain_factor ** exp_u_a)
-            flame.set_profile('spread_rate', normalized_grid,
-                        flame.spread_rate * strain_factor ** exp_V_a)
+            counterflame.set_profile('velocity', normalized_grid,
+                        counterflame.velocity * strain_factor ** exp_u_a)
+            counterflame.set_profile('spread_rate', normalized_grid,
+                        counterflame.spread_rate * strain_factor ** exp_V_a)
             # Update pressure curvature
-            flame.set_profile('lambda', normalized_grid, flame.L * strain_factor ** exp_lam_a)
+            counterflame.set_profile('lambda', normalized_grid, counterflame.L * strain_factor ** exp_lam_a)
 
             try:
                 # Try solving the flame
-                flame.solve(loglevel=self.__loglevel)
-                self.last_counterflame_massfraction = flame.Y
-                variables, data_calc = self.__SaveFlameletData(flame, self.gas)
+                counterflame.solve(loglevel=self.__loglevel)
+                self.last_counterflame_massfraction = counterflame.Y
+                variables, data_calc = self.__SaveFlameletData(counterflame, self.gas)
 
                 counterflame_filename = "counterflamelet_strain_"+str(n_iter)+"_Tu"+str(round(T_ub, 4))+".csv"
                 fid = open(self.GetOutputDir()+"/counterflame_data/"+counterflame_filename, 'w+')
@@ -790,20 +838,26 @@ class DataGenerator_Cantera(DataGenerator_Base):
                 return
 
             # Find the burner flame file with the lowest mass flux.
-            from os import listdir as _listdir
             burner_files = [f for f in _listdir(burnerfolder)
                             if f.startswith("burnerflamelet_") and f.endswith(".csv")
                             and "_int" not in f]
             if not burner_files:
                 return
 
-            def _mdot_from_filename(fname):
+            def _mdot_from_file(fname):
                 try:
-                    return float(fname.split("_mdot")[1].replace(".csv", ""))
+                    fpath = burnerfolder + "/" + fname
+                    with open(fpath, newline='') as _f:
+                        _reader = csv.reader(_f)
+                        _header = next(_reader)
+                        _row = list(map(float, next(_reader)))
+                    _idx_vel = _header.index("Velocity")
+                    _idx_rho = _header.index(FGMVars.Density.name)
+                    return _row[_idx_vel] * _row[_idx_rho]
                 except Exception:
                     return float("inf")
 
-            last_file = min(burner_files, key=_mdot_from_filename)
+            last_file = min(burner_files, key=_mdot_from_file)
             last_filepath = burnerfolder + "/" + last_file
             print("Interpolating from lowest-mdot burner flame: " + last_file)
 
