@@ -157,7 +157,6 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
     __rho_max:float=0
     __e_max:float=0
     __rho_min:float=0
-    __e_max:float
     __TD_vars:list[float]
 
     def __init__(self):
