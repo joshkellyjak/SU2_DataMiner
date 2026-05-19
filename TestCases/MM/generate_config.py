@@ -1,8 +1,8 @@
 ###############################################################################################
-#       #      _____ __  _____      ____        __        __  ____                   #        #  
-#       #     / ___// / / /__ \    / __ \____ _/ /_____ _/  |/  (_)___  ___  _____   #        #  
-#       #     \__ \/ / / /__/ /   / / / / __ `/ __/ __ `/ /|_/ / / __ \/ _ \/ ___/   #        #      
-#       #    ___/ / /_/ // __/   / /_/ / /_/ / /_/ /_/ / /  / / / / / /  __/ /       #        #  
+#       #      _____ __  _____      ____        __        __  ____                   #        #
+#       #     / ___// / / /__ \    / __ \____ _/ /_____ _/  |/  (_)___  ___  _____   #        #
+#       #     \__ \/ / / /__/ /   / / / / __ `/ __/ __ `/ /|_/ / / __ \/ _ \/ ___/   #        #
+#       #    ___/ / /_/ // __/   / /_/ / /_/ / /_/ /_/ / /  / / / / / /  __/ /       #        #
 #       #   /____/\____//____/  /_____/\__,_/\__/\__,_/_/  /_/_/_/ /_/\___/_/        #        #
 #       #                                                                            #        #
 ###############################################################################################
@@ -18,16 +18,16 @@
 #                                                                                             |
 # Description:                                                                                |
 #  Configuration generator for generating a data-driven manifold for MM.                      |
-#                                                                                             |  
+#                                                                                             |
 # Version: 2.0.0                                                                              |
 #                                                                                             |
 #=============================================================================================#
 
-# Test case for MM fluid: generate manifold generation configuration 
+# Test case for MM fluid: generate manifold generation configuration
 
 # Import EntropicAI configuration module
 from su2dataminer.config import Config_NICFD
-import os 
+import os
 
 # Initiating empty configuration
 Config = Config_NICFD()
@@ -48,14 +48,14 @@ Config.SetNpEnergy(Np_Energy=600)
 # Define data grid in the density-energy space rather than pressure-temperature.
 Config.UsePTGrid(False)
 
-# Set file header for fluid data. Four files are generated: full, train, 
-# validation, and test data. 
+# Set file header for fluid data. Four files are generated: full, train,
+# validation, and test data.
 Config.SetConcatenationFileHeader("fluid_data")
 
 # The fraction of the fluid data used for hyper-parameter training.
 Config.SetTrainFraction(0.8)
 
-# The fraction of the fluid data used for accuracy evaluation upon completion of 
+# The fraction of the fluid data used for accuracy evaluation upon completion of
 # the training process. The fraction of data apart from training and testing is
 # used for monitoring the convergence of the training process (validation).
 Config.SetTestFraction(0.1)

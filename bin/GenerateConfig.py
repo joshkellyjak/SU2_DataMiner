@@ -26,7 +26,7 @@
 #=============================================================================================#
 
 import pyfiglet
-from Common.DataDrivenConfig import Config_FGM, Config_NICFD
+from Common.DataDrivenConfig import Config_FGM
 
 from manual_configuration import *
 customfig = pyfiglet.Figlet(font="slant")

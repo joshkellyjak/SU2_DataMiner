@@ -1,0 +1,28 @@
+name: Linting
+
+on:
+  pull_request:
+    branches:
+      - 'develop'
+
+jobs:
+    Ruff:
+        name: Code linting with Ruff
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                python-version: '3.13'
+            - name: Install Ruff
+              run: pip install ruff 
+            - name: Trailing whitespaces
+              run: ruff check --select=W291
+            - name: Unused modules
+              run: ruff check --select=F401
+            - name: Unused variables
+              run: ruff check --select=F841
+            - name: Duplicate class members
+              run: ruff check --select=PIE794
