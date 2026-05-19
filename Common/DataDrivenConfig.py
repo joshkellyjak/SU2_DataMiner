@@ -2225,7 +2225,7 @@ class Config_FGM(Config):
     def WriteSU2MLP(self, file_name_out:str, group_idx:int=-1):
         if group_idx == -1:
             for iGroup in range(self.GetNMLPOutputGroups()):
-                write_SU2_MLP(file_name_out+"_"+str(iGroup+1),\
+                writeMLPForSU2(file_name_out+"_"+str(iGroup+1),\
                              weights=self._MLP_weights[iGroup],\
                              biases=self._MLP_biases[iGroup],\
                              activation_function_name=self.__activation_function[iGroup],\
@@ -2237,7 +2237,7 @@ class Config_FGM(Config):
                              additional_header_info_function=self.__write_progress_variable_definition)
         else:
             iGroup = group_idx
-            write_SU2_MLP(file_name_out+"_"+str(iGroup+1),\
+            writeMLPForSU2(file_name_out+"_"+str(iGroup+1),\
                              weights=self._MLP_weights[iGroup],\
                              biases=self._MLP_biases[iGroup],\
                              activation_function_name=self.__activation_function[iGroup],\
@@ -2259,7 +2259,7 @@ class Config_FGM(Config):
         scaler_function="robust"
         scaler_function_vals_in = self._scaler_function_vals_in[0]
         scaler_function_vals_out = np.zeros([1,2])
-        write_SU2_MLP(header+"_NULL",weights=weights,biases=biases,activation_function_name=activation_function,controlling_vars=control_vars,train_vars=train_vars,scaler_function=scaler_function,scaler_function_vals_in=scaler_function_vals_in,scaler_function_vals_out=scaler_function_vals_out,additional_header_info_function=self.__write_progress_variable_definition)
+        writeMLPForSU2(header+"_NULL",weights=weights,biases=biases,activation_function_name=activation_function,controlling_vars=control_vars,train_vars=train_vars,scaler_function=scaler_function,scaler_function_vals_in=scaler_function_vals_in,scaler_function_vals_out=scaler_function_vals_out,additional_header_info_function=self.__write_progress_variable_definition)
         return
     def __write_progress_variable_definition(self, fid):
         fid.write("Progress variable definition: " + "+".join(("%+.6e*%s" % (w, s)) for w, s in zip(self.__pv_weights, self.__pv_definition)))

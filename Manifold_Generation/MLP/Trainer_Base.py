@@ -49,7 +49,7 @@ import csv
 
 from Common.Config_base import Config
 from Common.Properties import DefaultProperties
-from Common.CommonMethods import GetReferenceData, write_SU2_MLP
+from Common.CommonMethods import readStateDataFromFile, writeMLPForSU2
 
 # Activation function options
 activation_function_names_options:list[str] = ["linear","elu","relu","tanh","exponential","gelu","sigmoid", "swish"]
@@ -532,10 +532,10 @@ class MLPTrainer:
             print("Reading train, test, and validation data...")
 
         if is_nullMLP:
-            X_full, _ = GetReferenceData(MLPData_filepath + "_full.csv", x_vars, [],dtype=self._dt_np)
+            X_full, _ = readStateDataFromFile(MLPData_filepath + "_full.csv", x_vars, [],dtype=self._dt_np)
             Y_full = np.zeros(np.shape(X_full)[0])
         else:
-            X_full, Y_full = GetReferenceData(MLPData_filepath + "_full.csv", x_vars, y_vars,dtype=self._dt_np)
+            X_full, Y_full = readStateDataFromFile(MLPData_filepath + "_full.csv", x_vars, y_vars,dtype=self._dt_np)
         Y_full = self.TransformData(Y_full)
 
         scaler_x.fit(X_full)
@@ -548,9 +548,9 @@ class MLPTrainer:
         if is_nullMLP:
             return
         else:
-            X_train, Y_train = GetReferenceData(MLPData_filepath + "_train.csv", x_vars, y_vars,dtype=self._dt_np)
-            X_test, Y_test = GetReferenceData(MLPData_filepath + "_test.csv", x_vars, y_vars,dtype=self._dt_np)
-            X_val, Y_val = GetReferenceData(MLPData_filepath + "_val.csv",x_vars, y_vars,dtype=self._dt_np)
+            X_train, Y_train = readStateDataFromFile(MLPData_filepath + "_train.csv", x_vars, y_vars,dtype=self._dt_np)
+            X_test, Y_test = readStateDataFromFile(MLPData_filepath + "_test.csv", x_vars, y_vars,dtype=self._dt_np)
+            X_val, Y_val = readStateDataFromFile(MLPData_filepath + "_val.csv",x_vars, y_vars,dtype=self._dt_np)
             if self._verbose > 0:
                 print("Done!")
 
@@ -579,7 +579,7 @@ class MLPTrainer:
             scaler_function_vals_out = [[mi,ma] for mi, ma in zip(self._Y_offset, self._Y_scale)]
         return self.scaler_function_name, scaler_function_vals_in, scaler_function_vals_out
 
-    def write_SU2_MLP(self, file_out:str):
+    def writeMLPForSU2(self, file_out:str):
         """Write the network to ASCII format readable by the MLPCpp module in SU2.
 
         :param file_out: MLP output path and file name.
@@ -593,7 +593,7 @@ class MLPTrainer:
         else:
             scaler_function_vals_in = [[mi,ma] for mi, ma in zip(self._X_offset, self._X_scale)]
             scaler_function_vals_out = [[mi,ma] for mi, ma in zip(self._Y_offset, self._Y_scale)]
-        return write_SU2_MLP(file_out, weights=weights,\
+        return writeMLPForSU2(file_out, weights=weights,\
                                        biases=biases, \
                                        activation_function_name=self._activation_function_name,\
                                        train_vars=self._train_vars,\
@@ -624,7 +624,7 @@ class MLPTrainer:
         fid.write("Architecture: " + " ".join(str(n) for n in self._hidden_layers) + "\n")
         fid.close()
 
-        self.write_SU2_MLP(self._save_dir + "/Model_"+str(self._model_index)+"/"+self._mlp_output_file_name)
+        self.writeMLPForSU2(self._save_dir + "/Model_"+str(self._model_index)+"/"+self._mlp_output_file_name)
         return
 
     def Plot_Architecture(self):
@@ -1239,7 +1239,7 @@ class PhysicsInformedTrainer(CustomTrainer):
         if y_vars == None:
             y_vars = self._train_vars
         # Load controlling and train variables from boundary data.
-        X_boundary, Y_boundary = GetReferenceData(self._boundary_data_file, x_vars=self._controlling_vars, train_variables=y_vars,dtype=self._dt_np)
+        X_boundary, Y_boundary = readStateDataFromFile(self._boundary_data_file, self._controlling_vars, y_vars,dtype=self._dt_np)
 
 
         # Normalize controlling and labeled data with respect to domain data.

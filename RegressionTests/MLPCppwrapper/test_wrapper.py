@@ -80,7 +80,7 @@ for k in range(20):
     T.InitializeWeights_and_Biases()
     T.Preprocessing()
     MLP_file_header = "MLP_test"
-    T.write_SU2_MLP(MLP_file_header)
+    T.writeMLPForSU2(MLP_file_header)
     output_TensorFlow = T.EvaluateMLP(CV_flamelet_test)
     a = MLPCppEvaluator()
     a.AddMLP("%s.mlp" % MLP_file_header)

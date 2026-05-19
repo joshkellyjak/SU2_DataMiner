@@ -29,7 +29,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 import sys,os
 from Common.DataDrivenConfig import Config_FGM, Config
-from Common.CommonMethods import GetReferenceData
+from Common.CommonMethods import readStateDataFromFile
 from Common.Properties import DefaultSettings_FGM
 import gmsh
 import pickle
@@ -123,7 +123,7 @@ class SU2TableGenerator_Base:
             self._manifold_variables = fid.readline().strip().split(',')
         #D_full = np.loadtxt(full_data_file,delimiter=',',skiprows=1)
         self._control_var_scaler = MinMaxScaler()
-        CV_full, D_full = GetReferenceData(full_data_file, self._controlling_variables, self._manifold_variables)
+        CV_full, D_full = readStateDataFromFile(full_data_file, self._controlling_variables, self._manifold_variables)
         data_scaler = MinMaxScaler()
         data_scaler.fit_transform(D_full)
 
@@ -133,8 +133,8 @@ class SU2TableGenerator_Base:
         train_data_file = self._Config.GetOutputDir()+"/"+self._Config.GetConcatenationFileHeader()+"_train.csv"
         test_data_file = self._Config.GetOutputDir()+"/"+self._Config.GetConcatenationFileHeader()+"_test.csv"
 
-        CV_train, D_train = GetReferenceData(train_data_file, self._controlling_variables, self._manifold_variables)
-        CV_test, D_test = GetReferenceData(test_data_file, self._controlling_variables, self._manifold_variables)
+        CV_train, D_train = readStateDataFromFile(train_data_file, self._controlling_variables, self._manifold_variables)
+        CV_test, D_test = readStateDataFromFile(test_data_file, self._controlling_variables, self._manifold_variables)
 
         CV_train_scaled = self._control_var_scaler.transform(CV_train)
         CV_test_scaled = self._control_var_scaler.transform(CV_test)

@@ -45,7 +45,7 @@ import CoolProp as CoolP
 import CoolProp.CoolProp as CP
 
 from Common.DataDrivenConfig import Config_NICFD
-from Common.CommonMethods import GetReferenceData
+from Common.CommonMethods import readStateDataFromFile
 from Common.Properties import DefaultSettings_NICFD, EntropicVars
 from Manifold_Generation.MLP.Trainer_Base import TensorFlowFit,PhysicsInformedTrainer,TrainMLP
 
@@ -182,10 +182,10 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
         self.__rho_scale = self._X_max[0] - self._X_min[0]
         self.__e_scale = self._X_max[1] - self._X_min[1]
 
-        _, TD_data_full = GetReferenceData(self._filedata_train+"_full.csv", self._controlling_vars, self.__TD_vars)
-        _, TD_data_train = GetReferenceData(self._filedata_train+"_train.csv", self._controlling_vars, self.__TD_vars)
-        _, TD_data_test = GetReferenceData(self._filedata_train+"_test.csv", self._controlling_vars, self.__TD_vars)
-        _, TD_data_val = GetReferenceData(self._filedata_train+"_val.csv", self._controlling_vars, self.__TD_vars)
+        _, TD_data_full = readStateDataFromFile(self._filedata_train+"_full.csv", self._controlling_vars, self.__TD_vars)
+        _, TD_data_train = readStateDataFromFile(self._filedata_train+"_train.csv", self._controlling_vars, self.__TD_vars)
+        _, TD_data_test = readStateDataFromFile(self._filedata_train+"_test.csv", self._controlling_vars, self.__TD_vars)
+        _, TD_data_val = readStateDataFromFile(self._filedata_train+"_val.csv", self._controlling_vars, self.__TD_vars)
         self.__TD_max, self.__TD_min = np.max(TD_data_full,axis=0),np.min(TD_data_full,axis=0)
 
         self.__TD_data_norm_train = tf.constant((TD_data_train - self.__TD_min)/(self.__TD_max - self.__TD_min),dtype=self._dt)
@@ -526,7 +526,7 @@ class Train_Entropic_Derivatives(PhysicsInformedTrainer):
         fid.write("Architecture: " + " ".join(str(n) for n in self._hidden_layers) + "\n")
         fid.close()
 
-        self.write_SU2_MLP(self._save_dir + "/Model_"+str(self._model_index)+"/"+self._mlp_output_file_name)
+        self.writeMLPForSU2(self._save_dir + "/Model_"+str(self._model_index)+"/"+self._mlp_output_file_name)
         return
 
     def __Generate_Error_Plots(self):
@@ -741,7 +741,7 @@ class Train_Entropic_PINN(PhysicsInformedTrainer):
         return
 
     def GetBoundaryData(self, y_vars=None):
-        X_boundary, Y_boundary = GetReferenceData(self._filedata_train + "_val.csv", self._controlling_vars, self._train_vars)
+        X_boundary, Y_boundary = readStateDataFromFile(self._filedata_train + "_val.csv", self._controlling_vars, self._train_vars)
         self._X_boundary_norm = self.scaler_function_x.transform(X_boundary)
         self._Y_boundary_norm = self.scaler_function_y.transform(Y_boundary)
 
@@ -749,7 +749,7 @@ class Train_Entropic_PINN(PhysicsInformedTrainer):
 
     def __SetRhoEProjection(self):
 
-        X_val, Y_val = GetReferenceData(self._filedata_train + "_val.csv", self._controlling_vars, [EntropicVars.p.name, EntropicVars.T.name, EntropicVars.dsdrho_e.name, EntropicVars.dsde_rho.name])
+        X_val, Y_val = readStateDataFromFile(self._filedata_train + "_val.csv", self._controlling_vars, [EntropicVars.p.name, EntropicVars.T.name, EntropicVars.dsdrho_e.name, EntropicVars.dsde_rho.name])
 
         rho_val = X_val[:, self._controlling_vars.index(EntropicVars.Density.name)]
         p_val = Y_val[:, 0]
@@ -927,7 +927,7 @@ class Train_Entropic_PINN(PhysicsInformedTrainer):
         fid.write("Architecture: " + " ".join(str(n) for n in self._hidden_layers) + "\n")
         fid.close()
 
-        self.write_SU2_MLP(self._save_dir + "/Model_"+str(self._model_index)+"/"+self._mlp_output_file_name)
+        self.writeMLPForSU2(self._save_dir + "/Model_"+str(self._model_index)+"/"+self._mlp_output_file_name)
         return
 
     def __Generate_Error_Plots(self):
