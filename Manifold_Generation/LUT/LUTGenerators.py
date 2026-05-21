@@ -118,7 +118,7 @@ class SU2TableGenerator_NICFD:
     _table_connectivity = []    # Table node connectivity per table level.
     _table_hullnodes = []   # Hull node indices per table level.
 
-    __saturation_curve_table_points:np.ndarray[float] = [] 
+    __saturation_curve_table_points:np.ndarray[float] = []
 
     _conditional_refinement_vars:list[str] = []     # Thermophysical quantities for which refinement is applied within specified bounds
     _conditional_refinement_indices:list[int] = []  # Column indices of refinement quantities
@@ -156,7 +156,7 @@ class SU2TableGenerator_NICFD:
         if not self._Config.CalcTransportProperties():
             self._table_vars.remove(EntropicVars.ViscosityDyn.name)
             self._table_vars.remove(EntropicVars.Conductivity.name)
-        return 
+        return
     
     def tableBoundsFromPointCloud(self, pointcloud_filename:str):
         """Determine the table limits from a point cloud of density-static energy pairs stored in a comma-separated file.
@@ -357,7 +357,7 @@ class SU2TableGenerator_NICFD:
         self._fluid_data_scaler.fit(self._data_in_table)
 
         self.__prepareInterpolator()
-        return 
+        return
     
 
     def __CartesianTriangulation(self):
@@ -408,7 +408,7 @@ class SU2TableGenerator_NICFD:
         self._data_in_table = table_fluid_data
         self._table_connectivity = tria
         self._table_hullnodes = hullTags
-        return 
+        return
     
     def __computeMeshAndTableData(self):
 
