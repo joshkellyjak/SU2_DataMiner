@@ -28,9 +28,10 @@ from su2dataminer.generate_data import DataGenerator_CoolProp
 from scipy.spatial import Delaunay
 from sklearn.preprocessing import MinMaxScaler
 from tqdm import tqdm
+from Common.Interpolators import Invdisttree
 from Common.DataDrivenConfig import Config_NICFD
 import gmsh
-from concave_hull import concave_hull, concave_hull_indexes
+from concave_hull import concave_hull
 import meshio
 
 def shoelace(XY:np.ndarray[float]):
@@ -108,20 +109,29 @@ class SU2TableGenerator_NICFD:
 
     _base_cell_size:float = 2e-2      # Table level base cell size.
 
-    _refined_cell_size:float = 5e-3#2.5e-3#1.5e-3   # Table level refined cell size.
-    _refinement_radius:float = 1e-2#5e-2     # Table level radius within which refinement is applied.
-    __refinement_vars:list[str] = []
-    __refinement_norm_min:list[float] = []
-    __refinement_norm_max:list[float] = []
+    __target_node_count:bool=False  # Refine grid based on target number of nodes.
+    __Np_target:int=3000    # Target number of nodes per table level.
+
     _table_vars:list[str] = [s.name for s in EntropicVars][:-1]
-    _table_nodes = []       # Progress variable, total enthalpy, and mixture fraction node values for each table level.
-    _table_nodes_norm = []  # Normalized table nodes for each level.
+    _data_in_table = []       # Progress variable, total enthalpy, and mixture fraction node values for each table level.
+    _data_in_table_norm = []  # Normalized table nodes for each level.
     _table_connectivity = []    # Table node connectivity per table level.
     _table_hullnodes = []   # Hull node indices per table level.
 
-    _controlling_variables:list[str]=["Density",\
-                                      "Energy"]  # FGM controlling variables
+    __saturation_curve_table_points:np.ndarray[float] = [] 
+
+    _conditional_refinement_vars:list[str] = []     # Thermophysical quantities for which refinement is applied within specified bounds
+    _conditional_refinement_indices:list[int] = []  # Column indices of refinement quantities
+    _conditional_lower_bound:list[float] = []       # Lower bounds of conditional refinement quantities.
+    _conditional_upper_bound:list[float] = []       # Upper bounds of conditional refinement quantities.
+    _conditional_refinement_factor:list[float] = [] # Refinement factors to apply within the bounds
+
     _fluid_data_scaler:MinMaxScaler= MinMaxScaler()  # Scaler for flamelet data controlling variables.
+         
+    __initiate_from_pointcloud:bool = False # Fit table bounds to reference data set.
+    __initial_solution_filename:str = None  # File name from which reference data are read.
+    
+    _lookup_tree:Invdisttree = None # Inverse-distance KD tree used for evaluating conditional refinement criteria.
 
     def __init__(self, Config:Config_NICFD):
         """
@@ -131,9 +141,14 @@ class SU2TableGenerator_NICFD:
         :type Config: Config_FGM
         """
         self._Config = Config
-        self._controlling_variables= [c for c in self._Config.GetControllingVariables()]
 
         self._DataGenerator = DataGenerator_CoolProp(self._Config)
+        
+        self.__setTableOutputVariables()
+
+        return
+
+    def __setTableOutputVariables(self):
         entropic_vars = [a.name for a in EntropicVars][:-1]
         self._table_vars = entropic_vars.copy()
         if not self._Config.TwoPhase():
@@ -141,9 +156,27 @@ class SU2TableGenerator_NICFD:
         if not self._Config.CalcTransportProperties():
             self._table_vars.remove(EntropicVars.ViscosityDyn.name)
             self._table_vars.remove(EntropicVars.Conductivity.name)
-        return
+        return 
+    
+    def tableBoundsFromPointCloud(self, pointcloud_filename:str):
+        """Determine the table limits from a point cloud of density-static energy pairs stored in a comma-separated file.
 
-    def SetFDStepSize(self, val_step_size:float=3e-7):
+        :param pointcloud_filename: file name from which density-static energy data are read.
+        :type pointcloud_filename: str
+        :raises Exception: if the labels for density and static energy cannot be found in the file header.
+        """
+        with open(pointcloud_filename,'r') as fid:
+            variables_in_header = fid.readline().strip().split(',')
+            variables_in_header = [v.strip("\"") for v in variables_in_header]
+        
+        if EntropicVars.Density.name not in variables_in_header or EntropicVars.Energy.name not in variables_in_header:
+            raise Exception("Density and static energy not found in point cloud data")
+        
+        self.__initial_solution_filename = pointcloud_filename
+        self.__initiate_from_pointcloud = True
+        return
+    
+    def setFDStepSize(self, val_step_size:float=3e-7):
         """Set the relative step size for density and static energy for evaluating fluid properties in the two-phase region.
 
         :param val_step_size: relative finite-difference step size, defaults to 3e-7
@@ -154,8 +187,22 @@ class SU2TableGenerator_NICFD:
             raise Exception("Relative step size for finite-differences should be positive.")
         self._DataGenerator.SetFDStepSizes(val_step_size,val_step_size)
         return
+    
+    def setTargetNumberOfNodes(self, N_nodes_target:int=4000):
+        """Define the total number of points in the thermodynamic table.
 
-    def SetNpDensity(self, Np_x:int=DefaultSettings_NICFD.Np_p):
+        :param N_nodes_target: desired number of nodes per table level, defaults to 4000
+        :type N_nodes_target: int, optional
+        :raises Exception: if non-positive values are provided.
+        """
+        if N_nodes_target <= 0:
+            raise Exception("Target number of table nodes should be positive")
+        self.__Np_target = N_nodes_target
+        self.__target_node_count = True
+
+        return
+    
+    def setNpDensity(self, Np_x:int=DefaultSettings_NICFD.Np_p):
         """Specify the number of table nodes in the x-direction of the Cartesian table.
 
         :param Np_x: number of nodes, defaults to DefaultSettings_NICFD.Np_p
@@ -164,7 +211,7 @@ class SU2TableGenerator_NICFD:
         self._Config.SetNpDensity(Np_x)
         return
 
-    def SetNpEnergy(self, Np_y:int=DefaultSettings_NICFD.Np_temp):
+    def setNpEnergy(self, Np_y:int=DefaultSettings_NICFD.Np_temp):
         """Specify the number of table nodes in the y-direction of the Cartesian table.
 
         :param Np_y: number of nodes, defaults to DefaultSettings_NICFD.Np_temp
@@ -173,7 +220,7 @@ class SU2TableGenerator_NICFD:
         self._Config.SetNpEnergy(Np_y)
         return
 
-    def SetDensityBounds(self, Rho_lower:float=DefaultSettings_NICFD.Rho_min, Rho_upper:float=DefaultSettings_NICFD.Rho_max):
+    def setTableLimitsDensity(self, Rho_lower:float=DefaultSettings_NICFD.Rho_min, Rho_upper:float=DefaultSettings_NICFD.Rho_max):
         """Define the density bounds of the density-energy based fluid data grid.
 
         :param Rho_lower: lower limit density value, defaults to DefaultSettings_NICFD.Rho_min
@@ -186,7 +233,7 @@ class SU2TableGenerator_NICFD:
         self._DataGenerator.SetDensityBounds(Rho_lower, Rho_upper)
         return
 
-    def SetEnergyBounds(self, E_lower:float=DefaultSettings_NICFD.Energy_min, E_upper:float=DefaultSettings_NICFD.Energy_max):
+    def setTableLimitsEnergy(self, E_lower:float=DefaultSettings_NICFD.Energy_min, E_upper:float=DefaultSettings_NICFD.Energy_max):
         """Define the internal energy bounds of the density-energy based fluid data grid.
 
         :param E_lower: lower limit internal energy value, defaults to DefaultSettings_NICFD.Energy_min
@@ -198,7 +245,8 @@ class SU2TableGenerator_NICFD:
         self._DataGenerator.UseAutoRange(False)
         self._DataGenerator.SetEnergyBounds(E_lower, E_upper)
         return
-    def SetCellSize_Coarse(self, cell_size_coarse:float=1e-2):
+    
+    def setMaximumCellSize(self, cell_size_coarse:float=1e-2):
         """Specify the coarse level cell size of the table
 
         :param cell_size_coarse: coarse cell size, defaults to 1e-2
@@ -209,32 +257,37 @@ class SU2TableGenerator_NICFD:
             raise Exception("Cell size value should be positive")
         self._base_cell_size = cell_size_coarse
         return
+    
+    def addRefinementCriterion(self, varname:str, lowerbound:float=-np.inf, upperbound:float=np.inf, coef:float=0.5):
+        """Specify conditional refinement based on interpolated thermochemical state data. Cell sizes are reduced by a factor "coef" where the table data lies between the specified lower bound and upper bound (inclusive)
 
-    def SetCellSize_Refined(self, cell_size_ref:float=5e-3):
-        """Specify the refined level cell size of the table
-
-        :param cell_size_ref: refined cell size, defaults to 1e-2
-        :type cell_size_ref: float, optional
-        :raises Exception: if specified cell size is negative or zero
+        :param varname: thermochemical state variable name.
+        :type varname: str
+        :param lowerbound: lower bound above which refinement is applied, defaults to -np.inf
+        :type lowerbound: float, optional
+        :param upperbound: upper bound below which refinement is applied, defaults to np.inf
+        :type upperbound: float, optional
+        :param coef: mesh refinement factor, defaults to 0.5
+        :type coef: float, optional
+        :raises Exception: if variable is not in the set of flamelet thermochemical state variables.
+        :raises Exception: if lower bound value exceeds upper bound value.
+        :raises Exception: if the coefficient value is negative.
         """
-        if cell_size_ref <= 0:
-            raise Exception("Cell size value should be positive")
-        self._refined_cell_size = cell_size_ref
+        fluid_vars = [a.name for a in EntropicVars][:-1]
+        if varname not in fluid_vars:
+            raise Exception("%s is not in the list of available thermophysical state variables" % varname)
+        if lowerbound > upperbound:
+            raise Exception("Upper bound value should exceed lower bound value")
+        if coef <= 0:
+            raise Exception("Refinement coeffcient should be positive")
+        self._conditional_refinement_vars.append(varname)
+        self._conditional_refinement_indices.append(fluid_vars.index(varname))
+        self._conditional_lower_bound.append(lowerbound)
+        self._conditional_upper_bound.append(upperbound)
+        self._conditional_refinement_factor.append(coef)
         return
-
-    def SetRefinement_Radius(self, refinement_radius:float=1e-2):
-        """Specify the radius around each refinement point within which the refined cell size is applied
-
-        :param refinement_radius: refinement radius, defaults to 1e-2
-        :type refinement_radius: float, optional
-        :raises Exception: if specified value is negative or zero
-        """
-        if refinement_radius <= 0:
-            raise Exception("Refinement radius should be positive")
-        self._refinement_radius = refinement_radius
-        return
-
-    def SetTableDiscretization(self, method:str=DefaultSettings_NICFD.tabulation_method):
+    
+    def setDiscretizationMethod(self, method:str=DefaultSettings_NICFD.tabulation_method):
         """Overwrite the thermodynamic state space discretization method from the configuration.
 
         :param method: discratization method, defaults to 'cartesian'
@@ -243,7 +296,7 @@ class SU2TableGenerator_NICFD:
         self._Config.SetTableDiscretization(method)
         return
 
-    def SetTableVars(self, table_vars_in:list[str]):
+    def setTableVars(self, table_vars_in:list[str]):
         """Specify the thermophysical variables to be included in the table file. All quantities are included by default. The list shoud at least contain "Density" and "Energy".
         
         :param table_vars_in: list with thermophysical variables to be included in the table.
@@ -283,25 +336,167 @@ class SU2TableGenerator_NICFD:
             raise Exception("Some specified thermophysical variables are not supported.")
         return
 
-    def __Compute2DMesh(self, points:np.ndarray[float], ref_pts:np.ndarray[float]=[],show:bool=False,sat_curve_pts:np.ndarray[float]=[]):
-        """Populate two-dimensional thermodynamic state space with table nodes according to refinement settings.
 
-        :param points: initial point cloud.
-        :type points: np.ndarray[float]
-        :param ref_pts: locations to apply refinement to, defaults to []
-        :type ref_pts: np.ndarray[float], optional
-        :param show: show the discretization generated by Gmesh, defaults to False
-        :type show: bool, optional
-        :param sat_curve_pts: saturation curve points, defaults to []
-        :type sat_curve_pts: np.ndarray[float], optional
-        :return: table nodes, table connectivity.
-        :rtype: tuple
+    def generateTable(self):
+        """Initiate table generation process
         """
-        # Create concave hull of normalized table coordinates.
-        add_sat_curve = (len(sat_curve_pts) > 0)
-        XY_hull = concave_hull(np.unique(points,axis=0), length_threshold=self._base_cell_size)
-        nans = np.isnan(XY_hull).all(1)
-        XY_hull = XY_hull[np.invert(nans), :]
+
+        self.__tablePreProcessing()
+
+        # Load initial fluid data and scale it
+        if self._Config.GetTableDiscretization()=="cartesian":
+            self.__CartesianTriangulation()
+        else:
+            self.__unstructuredTriangulation()
+        return
+    
+    def __tablePreProcessing(self):
+        self.__generateCoarseTable()
+
+        self._fluid_data_scaler = MinMaxScaler()
+        self._fluid_data_scaler.fit(self._data_in_table)
+
+        self.__prepareInterpolator()
+        return 
+    
+
+    def __CartesianTriangulation(self):
+        """
+        Create Delaunay triangulation of valid grid points.
+        """
+        print("Creating Delaunay triangulation...")
+
+        # Extract valid points
+        rho_table = self.state_data[:,:,EntropicVars.Density.value]
+        e_table = self.state_data[:,:,EntropicVars.Energy.value]
+        rho_valid = rho_table[self.valid_mask].flatten()
+        e_valid = e_table[self.valid_mask].flatten()
+
+        # Stack as (N, 2) array
+        cv_table = np.column_stack([rho_valid, e_valid])
+
+        #self._data_in_table = np.column_stack(tuple(self.state_data[:,:,EntropicVars[v].value][self.valid_mask].flatten() for v in self._table_vars))
+        self._data_in_table = np.column_stack(tuple(self.state_data[:,:,i][self.valid_mask].flatten() for i in range(EntropicVars.N_STATE_VARS.value)))
+
+        # Create Delaunay triangulation
+        tri = Delaunay(cv_table)
+        self._table_connectivity = tri.simplices
+
+        # Identify hull nodes
+        edges = np.vstack([tri.simplices[:, [0, 1]],
+                           tri.simplices[:, [1, 2]],
+                           tri.simplices[:, [2, 0]]])
+        edges = np.sort(edges, axis=1)
+        unique_edges, counts = np.unique(edges, axis=0, return_counts=True)
+        boundary_edges = unique_edges[counts == 1]
+        self._table_hullnodes= np.unique(boundary_edges.flatten())
+
+        print(f"  Triangulation nodes: {len(self._data_in_table):,}")
+        print(f"  Triangles: {len(self._table_connectivity):,}")
+        print(f"  Hull nodes: {len(self._table_hullnodes):,}")
+        print()
+        return
+    
+    def __unstructuredTriangulation(self):
+        print("Generating unstructured table with adaptive refinement...")
+
+        if self._Config.TwoPhase():
+            self.__saturation_curve_table_points = self.__CreateSaturationCurve()
+
+        table_fluid_data, tria, hullTags = self.__computeMeshAndTableData()
+
+        self._data_in_table = table_fluid_data
+        self._table_connectivity = tria
+        self._table_hullnodes = hullTags
+        return 
+    
+    def __computeMeshAndTableData(self):
+
+        scaled_fluid_data = self._fluid_data_scaler.transform(self._data_in_table)
+        rhoe_norm = scaled_fluid_data[:, [EntropicVars.Density.value, EntropicVars.Energy.value]]
+
+        rhoe_norm_mesh_nodes,tria, hullTags = self.__discretize2DTable(rhoe_norm)
+
+        # Calculate thermodynamic state variables of initial table nodes
+        fluid_data_norm = np.zeros([len(rhoe_norm_mesh_nodes), EntropicVars.N_STATE_VARS.value])
+        fluid_data_norm[:, EntropicVars.Density.value] = rhoe_norm_mesh_nodes[:,0]
+        fluid_data_norm[:, EntropicVars.Energy.value] = rhoe_norm_mesh_nodes[:,1]
+        fluid_data_mesh = self._fluid_data_scaler.inverse_transform(fluid_data_norm)
+        fluid_data_mesh = self.__evaluateFluidPropertiesOnMesh(fluid_data_mesh)
+        return fluid_data_mesh, tria, hullTags
+
+
+    def __discretize2DTable(self, rhoe_init:np.ndarray[float]):
+
+        # Discretize thermochemical state space with target node count or user-defined cell sizes.
+        if self.__target_node_count:
+            nodes, tris, hulltags = self.__optimizeTableNodes(rhoe_init)
+        else:
+            nodes, tris, hulltags = self.__create2DMesh(rhoe_init)
+        
+        return nodes, tris, hulltags
+    
+    def __optimizeTableNodes(self, rhoe_init:np.ndarray[float]):
+        print("Refining table based on target node count")
+        print("Target node count: %i" % self.__Np_target)
+
+        # Iterate base cell size to reach within 1% of target number of table nodes.
+        sufficient_refinement = False
+        niter_max = 20
+        relaxation = 0.35
+
+        # Initial guess
+        self._base_cell_size = 2 * np.sqrt(1.0 / self.__Np_target)
+        print("| Iteration | Node count | Base cell size | Diff from target(%) |")
+        iter = 0
+        while not sufficient_refinement and iter < niter_max:
+            nodes, tris, hulltags = self.__create2DMesh(rhoe_init)
+            n_nodes = len(nodes)
+            rel_diff = abs(float(n_nodes - self.__Np_target)/self.__Np_target)
+            print("| %i | %i | %.3e | %.1f |" % (iter, n_nodes, self._base_cell_size, 100*rel_diff))
+            # Terminate if relative difference is less than 1%
+            if rel_diff > 0.01:
+                self._base_cell_size *= (1 + relaxation * (float(n_nodes / self.__Np_target) - 1))
+            else:
+                sufficient_refinement = True
+            iter += 1
+        
+        if iter == niter_max:
+            print("Target node count was not reached within %i iterations" % niter_max)
+        return nodes, tris, hulltags
+    
+    def __create2DMesh(self, rhoe_init:np.ndarray[float]):
+        XY_hull = self.__findHullNodes(rhoe_init)
+
+        gmsh.initialize()
+        gmsh.model.add("table_level")
+        gmsh.option.setNumber("General.Verbosity", 0)
+        gmsh.option.setNumber("Mesh.MeshSizeFromPoints",0)
+        gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary",0)
+
+        factory = gmsh.model.geo
+        mesher = gmsh.model.mesh
+
+        hull_curvloop, hull_lines = self.__createHullCurvLoop(XY_hull, factory)
+
+        self.__createFluidPlane(XY_hull, hull_curvloop, factory)
+
+        self.__prepareMesher(mesher)
+
+        mesher.generate(2)
+
+        nodeTags, triaTags = self.__extractNodesTriangles()
+        hullTags = self.__extractHulltags(hull_lines)
+        
+        gmsh.finalize()
+        
+        return nodeTags, triaTags, hullTags
+    
+    def __findHullNodes(self, initial_point_cloud:np.ndarray[float]):
+        unique_pts_init = np.unique(initial_point_cloud, axis=0)
+        nans = np.isnan(unique_pts_init).all(1)
+        pts_wo_nans = unique_pts_init[np.invert(nans)]
+        XY_hull = concave_hull(pts_wo_nans, length_threshold=self._base_cell_size)
 
         i = 0
         hull_indices = [i]
@@ -317,17 +512,13 @@ class SU2TableGenerator_NICFD:
             i = i_next
             hull_indices.append(i_next)
         XY_hull = XY_hull[hull_indices, :]
-
-        # Initiate gmsh
-        gmsh.initialize()
-        gmsh.model.add("table_level")
-        gmsh.option.setNumber("General.Verbosity", 0)
-        factory = gmsh.model.geo
-
+        return XY_hull
+    
+    def __createHullCurvLoop(self, XY_hull:np.ndarray[float], factory:gmsh.model.geo):
         # Create hull points
         hull_pts = []
         for i in range(int(len(XY_hull))):
-            hull_pts.append(factory.addPoint(XY_hull[i, 0], XY_hull[i, 1], 0, self._base_cell_size))
+            hull_pts.append(factory.addPoint(XY_hull[i, 0], XY_hull[i, 1], 0))
 
         # Connect hull points to a closed multi-component curve
         hull_lines = []
@@ -339,150 +530,162 @@ class SU2TableGenerator_NICFD:
         curvloop = factory.addCurveLoop(hull_lines)
 
         # Apply refinement points
-        area_ref = shoelace(concave_hull(XY_hull, length_threshold=self._base_cell_size))
-        ref_pt_ids = []
-        if len(ref_pts)>0:
-            for i in range(len(ref_pts)):
-                XY_with_pt = np.vstack((XY_hull, ref_pts[i,:]))
-                hull_n = concave_hull(XY_with_pt, length_threshold=self._base_cell_size)
-                area_n = shoelace(hull_n)
-                within_hull = (area_n <= area_ref)
-                if within_hull:
-                    ref_pt_ids.append(factory.addPoint(ref_pts[i,0], ref_pts[i, 1], 0.0))
+        self.__table_hull_area = shoelace(concave_hull(XY_hull, length_threshold=self._base_cell_size))
 
         factory.synchronize()
 
+        return curvloop, hull_lines
+    
+    def __createFluidPlane(self, rhoe_hull:np.ndarray[float], hull_crvloop:int, factory:gmsh.model.geo):
+
+        add_sat_curve = len(self.__saturation_curve_table_points) > 0
         if add_sat_curve:
-
-            # Create normal vector to saturation curve.
-            dedrho_sat_norm = FiniteDifferenceDerivative(sat_curve_pts[:,0], sat_curve_pts[:,1])
-            norm_vector = np.column_stack((-1.0 / dedrho_sat_norm, np.ones(len(dedrho_sat_norm))))
-            norm_vector = norm_vector / np.sqrt(np.sum(np.power(norm_vector, 2), axis=1))[:,np.newaxis]
-
-            # Create offset curves to ensure that no nodes are generated on the saturation curve itself.
-            sat_curve_upper_pts = []
-            sat_curve_lower_pts = []
-            dx = 1e-3*self._refined_cell_size
-
-            sat_curve_rhoe_upper = sat_curve_pts + dx * norm_vector
-            sat_curve_rhoe_lower = sat_curve_pts - dx * norm_vector
-            inside_upper = np.logical_and(sat_curve_rhoe_upper > 0, sat_curve_rhoe_upper < 1).all(1)
-            inside_lower = np.logical_and(sat_curve_rhoe_lower > 0, sat_curve_rhoe_lower< 1).all(1)
-            valid_sat_curve_pts = np.logical_and(inside_upper, inside_lower)
-            nans_lower = np.isnan(sat_curve_rhoe_lower).all(1)
-            nans_upper = np.isnan(sat_curve_rhoe_upper).all(1)
-            valid_nans = np.logical_and(np.invert(nans_lower), np.invert(nans_upper))
-            valid_pts = np.logical_and(valid_sat_curve_pts, valid_nans)
-
-            # Clip the saturation curve points to the bounds of the thermodynamic mesh
-
-            within_hull = np.zeros(len(sat_curve_pts),dtype=np.bool)
-            for i in range(len(sat_curve_pts)):
-                XY_with_pt = np.vstack((XY_hull, sat_curve_rhoe_upper[i,:]))
-                hull_n = concave_hull(XY_with_pt, length_threshold=self._base_cell_size)
-                area_n = shoelace(hull_n)
-                within_hull_upper = (area_n <= area_ref)
-                XY_with_pt = np.vstack((XY_hull, sat_curve_rhoe_lower[i,:]))
-                hull_n = concave_hull(XY_with_pt, length_threshold=self._base_cell_size)
-                area_n = shoelace(hull_n)
-                within_hull_lower = (area_n <= area_ref)
-                within_hull[i] = (within_hull_upper and within_hull_lower)
-            valid_pts = np.logical_and(valid_pts, within_hull)
-
-            sat_curve_pts = sat_curve_pts[valid_pts, :]
-            norm_vector = norm_vector[valid_pts, :]
-
-            i = 0
-            j = 1
-            sat_curve_upper_pts.append(factory.addPoint(sat_curve_pts[i,0] + dx*norm_vector[i, 0],\
-                                                        sat_curve_pts[i,1] + dx*norm_vector[i, 1],0))
-            sat_curve_lower_pts.append(factory.addPoint(sat_curve_pts[i,0] - dx*norm_vector[i, 0],\
-                                                        sat_curve_pts[i,1] - dx*norm_vector[i, 1],0))
-            dists = []
-            while j < len(sat_curve_pts):
-                dist = np.sqrt(np.sum(np.power(sat_curve_pts[j,:] - sat_curve_pts[i,:],2)))
-                if dist < 0.6*self._refined_cell_size:
-                    j += 1
-                else:
-                    i = j
-                    j += 1
-                    dists.append(dist)
-                    sat_curve_upper_pts.append(factory.addPoint(sat_curve_pts[i,0] + dx*norm_vector[i, 0],\
-                                                                sat_curve_pts[i,1] + dx*norm_vector[i, 1],0))
-                    sat_curve_lower_pts.append(factory.addPoint(sat_curve_pts[i,0] - dx*norm_vector[i, 0],\
-                                                                sat_curve_pts[i,1] - dx*norm_vector[i, 1],0))
-            sat_curve_connecting_lines = []
-            for i in range(len(sat_curve_upper_pts)):
-                sat_curve_connecting_lines.append(factory.addLine(sat_curve_lower_pts[i], sat_curve_upper_pts[i]))
-            sat_curve_upper_lines = []
-            sat_curve_lower_lines = []
-
-            sat_curve_crvloops = []
-            sat_curve_cornertags = []
-            for i in range(len(sat_curve_lower_pts)-1):
-                if dists[i] < self._base_cell_size:
-                    c_upper=factory.addLine(sat_curve_upper_pts[i],sat_curve_upper_pts[i+1])
-                    c_lower=factory.addLine(sat_curve_lower_pts[i],sat_curve_lower_pts[i+1])
-                    sat_curve_upper_lines.append(c_upper)
-                    sat_curve_lower_lines.append(c_lower)
-                    sat_curve_crvloops.append(factory.addCurveLoop([c_upper, -sat_curve_connecting_lines[i+1], -c_lower, sat_curve_connecting_lines[i]]))
-                    sat_curve_cornertags.append([sat_curve_lower_pts[i], sat_curve_lower_pts[i+1], sat_curve_upper_pts[i+1], sat_curve_upper_pts[i]])
-            factory.synchronize()
-            fluid_plane_crvloops = [curvloop] + [-c for c in sat_curve_crvloops]
-            fluid_surf = factory.addPlaneSurface(fluid_plane_crvloops)
-            sat_surfs = [factory.addPlaneSurface([c]) for c in sat_curve_crvloops]
-            factory.addPhysicalGroup(2, [fluid_surf] + sat_surfs)
+            sat_curve_crvloops = self.__createSaturationCurveGeom(rhoe_hull, factory)
         else:
-            factory.synchronize()
-            fluid_surf = factory.addPlaneSurface([curvloop])
-            factory.addPhysicalGroup(2, [fluid_surf])
-        # Apply conditional refinement, where the refined cell size is applied in proximity to the refinement points
+            sat_curve_crvloops = []
+
+        fluid_plane_crvloops = [hull_crvloop] + [-c for c in sat_curve_crvloops]
+        fluid_surf = factory.addPlaneSurface(fluid_plane_crvloops)
+        sat_surfs = [factory.addPlaneSurface([c]) for c in sat_curve_crvloops]
+        factory.addPhysicalGroup(2, [fluid_surf] + sat_surfs)
         factory.synchronize()
-        threshold_fields = []
-        dist_field_ref_pt = gmsh.model.mesh.field.add("Attractor")
-        gmsh.model.mesh.field.setNumbers(dist_field_ref_pt, "NodesList", ref_pt_ids)
-        t_field_ref_pt = gmsh.model.mesh.field.add("Threshold")
-        gmsh.model.mesh.field.setNumber(t_field_ref_pt, "InField", dist_field_ref_pt)
-        gmsh.model.mesh.field.setNumber(t_field_ref_pt, "SizeMin", self._refined_cell_size)
-        gmsh.model.mesh.field.setNumber(t_field_ref_pt, "SizeMax", self._base_cell_size)
-        gmsh.model.mesh.field.setNumber(t_field_ref_pt, "DistMin", 0.5*self._refinement_radius)
-        gmsh.model.mesh.field.setNumber(t_field_ref_pt, "DistMax", 1.5*self._refinement_radius)
-        threshold_fields.append(t_field_ref_pt)
+        return fluid_surf
+    
+    
+    def __createSaturationCurveGeom(self, rhoe_hull:np.ndarray[float],  factory:gmsh.model.geo):
+        
+        sat_curve_pts, sat_curve_lower, sat_curve_upper = self.__saturationOffsetCurves(rhoe_hull)
+        
+        sat_curve_lower_pts, sat_curve_upper_pts = self.__samplePointsAlongSaturationCurve(sat_curve_pts, sat_curve_lower, sat_curve_upper, factory)
 
-        if add_sat_curve:
-            dist_field_sat_crv = gmsh.model.mesh.field.add("Distance")
-            gmsh.model.mesh.field.setNumbers(dist_field_sat_crv, \
-                                             "PointsList", sat_curve_upper_pts + sat_curve_lower_pts)
-            gmsh.model.mesh.field.setNumber(dist_field_sat_crv, "Sampling", 10)
-            t_field_sat_crv = gmsh.model.mesh.field.add("Threshold")
-            gmsh.model.mesh.field.setNumber(t_field_sat_crv, "InField", dist_field_sat_crv)
-            gmsh.model.mesh.field.setNumber(t_field_sat_crv, "SizeMin", self._refined_cell_size)
-            gmsh.model.mesh.field.setNumber(t_field_sat_crv, "SizeMax", self._base_cell_size)
-            gmsh.model.mesh.field.setNumber(t_field_sat_crv, "DistMin", 0.5*self._refinement_radius)
-            gmsh.model.mesh.field.setNumber(t_field_sat_crv, "DistMax", 1.5*self._refinement_radius)
-            threshold_fields.append(t_field_sat_crv)
+        return self.__encloseSaturationCurve(sat_curve_lower_pts, sat_curve_upper_pts, factory)
+    
+    def __encloseSaturationCurve(self, lower_offset_pts:np.ndarray[int], upper_offset_pts:np.ndarray[int], factory:gmsh.model.geo):
+        connecting_lines = []
+        Npoints = len(lower_offset_pts)
+        for i in range(Npoints):
+            connecting_lines.append(factory.addLine(lower_offset_pts[i], upper_offset_pts[i]))
 
-        back_field = gmsh.model.mesh.field.add("Min")
-        gmsh.model.mesh.field.setNumbers(back_field, "FieldsList", threshold_fields)
-        gmsh.model.mesh.field.setAsBackgroundMesh(back_field)
+        sat_curve_crvloops = []
+        for i in range(Npoints-1):
+            tangent_line_upper=factory.addLine(upper_offset_pts[i],upper_offset_pts[i+1])
+            tangent_line_lower=factory.addLine(lower_offset_pts[i],lower_offset_pts[i+1])
 
+            sat_curve_crvloops.append(factory.addCurveLoop([tangent_line_upper, connecting_lines[i+1], tangent_line_lower, connecting_lines[i]], reorient=True))
         factory.synchronize()
-        if add_sat_curve:
-            for i in range(len(sat_curve_connecting_lines)):
-                gmsh.model.mesh.setTransfiniteCurve(sat_curve_connecting_lines[i], 2)
-            for i in range(len(sat_curve_lower_lines)):
-                gmsh.model.mesh.setTransfiniteCurve(sat_curve_lower_lines[i], 2)
-                gmsh.model.mesh.setTransfiniteCurve(sat_curve_upper_lines[i], 2)
+        return sat_curve_crvloops
+    
+    def __samplePointsAlongSaturationCurve(self, saturation_curve_points:np.ndarray[float], offset_lower:np.ndarray[float], offset_upper:np.ndarray[float], factory:gmsh.model.geo):
+        i = 0
+        j = 1
+        sat_curve_upper_pts = []
+        sat_curve_lower_pts = []
+        sat_curve_upper_pts.append(factory.addPoint(offset_upper[0,0], offset_upper[0,1],0))
+        sat_curve_lower_pts.append(factory.addPoint(offset_lower[0,0], offset_lower[0,1],0))
+        dists = []
+        while j < len(saturation_curve_points):
+            dist = np.sqrt(np.sum(np.power(saturation_curve_points[j] - saturation_curve_points[i],2)))
+            local_refinement_factor = self.__refinelocation(saturation_curve_points[j, 0], saturation_curve_points[j, 1], 0)
+            if dist < 0.5*local_refinement_factor*self._base_cell_size:
+                j += 1
+            else:
+                i = j
+                j += 1
+                dists.append(dist)
+                sat_curve_upper_pts.append(factory.addPoint(offset_upper[i, 0], offset_upper[i,1],0))
+                sat_curve_lower_pts.append(factory.addPoint(offset_lower[i, 0], offset_lower[i,1],0))
+        return sat_curve_lower_pts, sat_curve_upper_pts
+    
+    def __saturationOffsetCurves(self, rhoe_hull:np.ndarray[float]):
 
-            for s, c in zip(sat_surfs, sat_curve_cornertags):
-                gmsh.model.mesh.setTransfiniteSurface(s, cornerTags=c)
-                gmsh.model.mesh.setRecombine(2, s)
-        # Generate 2D mesh and extract table nodes
-        gmsh.model.mesh.generate(2)
+        norm_vector = self.__getSaturationCurveNormal()
 
-        if show:
-            gmsh.fltk.run()
-        # Global nodes
+        # Create offset curves to ensure that no nodes are generated on the saturation curve itself.
+        sat_curve_rhoe_lower, sat_curve_rhoe_upper = self.__createSaturationCurveOffsets(norm_vector)
+
+        valid_pts = self.__clipCurveToTableLimits(rhoe_hull, sat_curve_rhoe_lower, sat_curve_rhoe_upper)
+
+        sat_curve_pts = self.__saturation_curve_table_points[valid_pts, :]
+        norm_vector = norm_vector[valid_pts, :]
+        sat_curve_rhoe_lower = sat_curve_rhoe_lower[valid_pts]
+        sat_curve_rhoe_upper = sat_curve_rhoe_upper[valid_pts]
+
+        return sat_curve_pts, sat_curve_rhoe_lower, sat_curve_rhoe_upper
+    
+    def __getSaturationCurveNormal(self):
+        dedrho_sat_norm = FiniteDifferenceDerivative(self.__saturation_curve_table_points[:,0], self.__saturation_curve_table_points[:,1])
+        norm_vector = np.column_stack((-1.0 / dedrho_sat_norm, np.ones(len(dedrho_sat_norm))))
+        norm_vector = norm_vector / np.sqrt(np.sum(np.power(norm_vector, 2), axis=1))[:,np.newaxis]
+        return norm_vector
+    
+    def __createSaturationCurveOffsets(self, normal_vector:np.ndarray[float]):
+        offset = 1e-4*self._base_cell_size
+
+        sat_curve_rhoe_upper = self.__saturation_curve_table_points + offset * normal_vector
+        sat_curve_rhoe_lower = self.__saturation_curve_table_points - offset * normal_vector
+
+        return sat_curve_rhoe_lower, sat_curve_rhoe_upper
+    
+
+    def __clipCurveToTableLimits(self, rhoe_hull:np.ndarray[float], pts_offset_lower:np.ndarray[float], pts_offset_upper:np.ndarray[float]):
+
+        within_bounds_lower = np.logical_and(pts_offset_lower > 0, pts_offset_lower < 1).all(1)
+        within_bounds_upper = np.logical_and(pts_offset_upper > 0, pts_offset_upper< 1).all(1)
+        valid_sat_curve_pts = np.logical_and(within_bounds_lower, within_bounds_upper)
+
+        nans_lower = np.isnan(pts_offset_lower).all(1)
+        nans_upper = np.isnan(pts_offset_upper).all(1)
+
+        valid_nans = np.logical_and(np.invert(nans_lower), np.invert(nans_upper))
+        valid_pts = np.logical_and(valid_sat_curve_pts, valid_nans)
+
+        within_hull = np.zeros(len(self.__saturation_curve_table_points),dtype=np.bool)
+        for i in range(len(self.__saturation_curve_table_points)):
+            XY_with_pt = np.vstack((rhoe_hull, pts_offset_upper[i,:]))
+            hull_n = concave_hull(XY_with_pt, length_threshold=self._base_cell_size)
+            area_n = shoelace(hull_n)
+            within_hull_upper = (area_n <= self.__table_hull_area )
+            XY_with_pt = np.vstack((rhoe_hull, pts_offset_lower[i,:]))
+            hull_n = concave_hull(XY_with_pt, length_threshold=self._base_cell_size)
+            area_n = shoelace(hull_n)
+            within_hull_lower = (area_n <= self.__table_hull_area )
+            within_hull[i] = (within_hull_upper and within_hull_lower)
+        valid_pts = np.logical_and(valid_pts, within_hull)
+
+        return valid_pts
+    
+    def __prepareMesher(self, mesher:gmsh.model.mesh):
+        mesher.clear()
+        gmsh.option.setNumber("Mesh.MeshSizeMax", self._base_cell_size)
+        def meshSizeCallback(dim,tag,x,y,z,lc):
+            fac = self.__refinelocation(x, y, z)
+            return self._base_cell_size * fac
+        
+        mesher.setSizeCallback(meshSizeCallback)
+        return
+    
+    def __refinelocation(self, x:float,y:float,z:float):
+        state_fluid_norm = np.zeros([1, EntropicVars.N_STATE_VARS.value])
+        state_fluid_norm[0, EntropicVars.Density.value] = x
+        state_fluid_norm[0, EntropicVars.Energy.value] = y
+        state_fluid_dimensional = self._fluid_data_scaler.inverse_transform(state_fluid_norm)
+        val_density = state_fluid_dimensional[0, EntropicVars.Density.value]
+        val_static_energy = state_fluid_dimensional[0, EntropicVars.Energy.value]
+
+        refinement_factor = 1.0
+
+        if len(self._conditional_refinement_indices) > 0:
+            fluid_state_data = self.__interpolateFluidData(val_density, val_static_energy)
+            valid_pt = len(fluid_state_data) > 0
+            
+            if valid_pt:
+                for ivar, lower, upper, c in zip(self._conditional_refinement_indices, self._conditional_lower_bound, self._conditional_upper_bound, self._conditional_refinement_factor):
+                    test_val = fluid_state_data[ivar]
+                    if (test_val >= lower) and (test_val <= upper):
+                        refinement_factor = min(refinement_factor, c)
+        return refinement_factor
+    
+    def __extractNodesTriangles(self):
         nodeTags, coords, _ = gmsh.model.mesh.getNodes()
         nodeTags = np.asarray(nodeTags, dtype=np.int64)
         MeshPoints = np.asarray(coords, dtype=float).reshape(-1, 3)[:, :2]
@@ -491,11 +694,8 @@ class SU2TableGenerator_NICFD:
         nodeTags_sorted = nodeTags[order]
 
         # 2) 2D elements
-        if fluid_surf is None:
-            elemTypes, _, elemNodeTags = gmsh.model.mesh.getElements(2)
-        else:
-            elemTypes, _, elemNodeTags = gmsh.model.mesh.getElements(2, fluid_surf)
-
+        elemTypes, _, elemNodeTags = gmsh.model.mesh.getElements(2)
+       
         tris = []
         quads = []
 
@@ -517,9 +717,20 @@ class SU2TableGenerator_NICFD:
                 quads[:, [0, 1, 2]],
                 quads[:, [0, 2, 3]],
             ])
-        gmsh.finalize()
 
         return MeshPoints, tris
+    
+    def __extractHulltags(self, hull_curves:list[int]):
+        allHullTags = []
+        for line in hull_curves:
+            nodeTags, nodes, _ = gmsh.model.mesh.getNodes(includeBoundary=True,tag=line,dim=1)
+            nodes = np.asarray(nodes, dtype=float).reshape(-1, 3)
+            nodeTags = np.asarray(nodeTags, dtype=np.int64)
+
+            allHullTags = np.append(allHullTags, nodeTags)
+        hullTags = np.unique(np.int64(allHullTags))
+        return hullTags
+    
 
     def __map_tags(self,tags,nodeTags_sorted,order):
         tags = np.asarray(tags, dtype=np.int64).ravel()
@@ -530,7 +741,7 @@ class SU2TableGenerator_NICFD:
             raise RuntimeError(f"Node tags non trovati in getNodes(): {missing[:20]} (tot missing={len(missing)})")
         return order[pos]
 
-    def __CalcMeshData(self, fluid_data_mesh:np.ndarray[float]):
+    def __evaluateFluidPropertiesOnMesh(self, fluid_data_mesh:np.ndarray[float]):
         """Calculate the fluid thermodynamic state variables for the table nodes
 
         :param fluid_data_mesh: table mesh nodes of density and static energy
@@ -610,47 +821,11 @@ class SU2TableGenerator_NICFD:
                 self.state_data[idx_2d[0], idx_2d[1], :] = None
         return
 
-    def __CartesianTriangulation(self):
-        """
-        Create Delaunay triangulation of valid grid points.
-        """
-        print("Creating Delaunay triangulation...")
-
-        # Extract valid points
-        rho_table = self.state_data[:,:,EntropicVars.Density.value]
-        e_table = self.state_data[:,:,EntropicVars.Energy.value]
-        rho_valid = rho_table[self.valid_mask].flatten()
-        e_valid = e_table[self.valid_mask].flatten()
-
-        # Stack as (N, 2) array
-        cv_table = np.column_stack([rho_valid, e_valid])
-
-        #self._table_nodes = np.column_stack(tuple(self.state_data[:,:,EntropicVars[v].value][self.valid_mask].flatten() for v in self._table_vars))
-        self._table_nodes = np.column_stack(tuple(self.state_data[:,:,i][self.valid_mask].flatten() for i in range(EntropicVars.N_STATE_VARS.value)))
-
-        # Create Delaunay triangulation
-        tri = Delaunay(cv_table)
-        self._table_connectivity = tri.simplices
-
-        # Identify hull nodes
-        edges = np.vstack([tri.simplices[:, [0, 1]],
-                           tri.simplices[:, [1, 2]],
-                           tri.simplices[:, [2, 0]]])
-        edges = np.sort(edges, axis=1)
-        unique_edges, counts = np.unique(edges, axis=0, return_counts=True)
-        boundary_edges = unique_edges[counts == 1]
-        self._table_hullnodes= np.unique(boundary_edges.flatten())
-
-        print(f"  Triangulation nodes: {len(self._table_nodes):,}")
-        print(f"  Triangles: {len(self._table_connectivity):,}")
-        print(f"  Hull nodes: {len(self._table_hullnodes):,}")
-        print()
-        return
 
     def __CreateSaturationCurve(self):
         rhoe_sat_curve = self._DataGenerator.ComputeSaturationCurve()
-        rho_min, rho_max = self._DataGenerator.GetDensityBounds()
-        e_min, e_max = self._DataGenerator.GetEnergyBounds()
+        [rho_min, rho_max] = self._Config.GetDensityBounds()
+        [e_min, e_max] = self._Config.GetEnergyBounds()
         within_bounds_density = np.logical_and(rhoe_sat_curve[:,0] > rho_min, rhoe_sat_curve[:,0] < rho_max)
         within_bounds_energy = np.logical_and(rhoe_sat_curve[:,1] > e_min, rhoe_sat_curve[:,1] < e_max)
         within_bounds = np.logical_and(within_bounds_density, within_bounds_energy)
@@ -664,86 +839,43 @@ class SU2TableGenerator_NICFD:
         sat_curve_pts_norm = state_sat_curve_norm[:, [EntropicVars.Density.value,EntropicVars.Energy.value]]
         return sat_curve_pts_norm
 
-    def __GenerateMeshAndData(self, rhoe_norm:np.ndarray[float], sat_curve_pts:np.ndarray[float],ix_ref=[]):
+    
 
-        rhoe_norm_mesh_nodes,tria = self.__Compute2DMesh(rhoe_norm, ref_pts=rhoe_norm[ix_ref,:], show=False, sat_curve_pts=sat_curve_pts)
-
-        # Calculate thermodynamic state variables of initial table nodes
-        fluid_data_norm = np.zeros([len(rhoe_norm_mesh_nodes), EntropicVars.N_STATE_VARS.value])
-        fluid_data_norm[:, EntropicVars.Density.value] = rhoe_norm_mesh_nodes[:,0]
-        fluid_data_norm[:, EntropicVars.Energy.value] = rhoe_norm_mesh_nodes[:,1]
-        fluid_data_mesh = self._fluid_data_scaler.inverse_transform(fluid_data_norm)
-        fluid_data_mesh = self.__CalcMeshData(fluid_data_mesh)
-        return fluid_data_mesh, tria
-
-    def GenerateTable(self):
-        """Initiate table generation process
-        """
-
+    def __generateCoarseTable(self):
+        if self.__initiate_from_pointcloud:
+            with open(self.__initial_solution_filename,'r') as fid:
+                variables_in_header = fid.readline().strip().split(',')
+                variables_in_header = [v.strip("\"") for v in variables_in_header]
+            pointCloudData = np.loadtxt(self.__initial_solution_filename,delimiter=',',skiprows=1)[::10, :]
+            rhoe_pointCloud = pointCloudData[:, [variables_in_header.index(EntropicVars.Density.name),\
+                                                 variables_in_header.index(EntropicVars.Energy.name)]]
+            rhoe_min, rhoe_max = np.min(rhoe_pointCloud, axis=0), np.max(rhoe_pointCloud,axis=0)
+            rho_min = rhoe_min[0]*0.9
+            rho_max = 1.1*rhoe_max[0]
+            e_min = rhoe_min[1]*0.99
+            e_max = 1.01*rhoe_max[1]
+            
+            self._Config.SetDensityBounds(rho_min, rho_max)
+            self._Config.SetEnergyBounds(e_min, e_max)
+            
         self.__CartesianTableData()
-        self._table_nodes = np.column_stack(tuple(self.state_data[:,:,i][self.valid_mask].flatten() for i in range(EntropicVars.N_STATE_VARS.value)))
-        self._fluid_data_scaler = MinMaxScaler()
-        self._fluid_data_scaler.fit(self._table_nodes)
-
-        # Load initial fluid data and scale it
-        if self._Config.GetTableDiscretization()=="cartesian":
-            self.__CartesianTriangulation()
-        else:
-            print("Generating table with adaptive refinement")
-
-            self._table_nodes = np.column_stack(tuple(self.state_data[:,:,i][self.valid_mask].flatten() for i in range(EntropicVars.N_STATE_VARS.value)))
-
-            fluid_data_norm = self._fluid_data_scaler.fit_transform(self._table_nodes)
-
-            sat_curve_pts_norm = []
-            if self._Config.TwoPhase():
-                sat_curve_pts_norm = self.__CreateSaturationCurve()
-
-            # Generate initial coarse table of fluid data
-            rhoe_norm = fluid_data_norm[:, [EntropicVars.Density.value, EntropicVars.Energy.value]]
-            print("Generating coarse thermodynamic mesh...")
-            fluid_data_coarse, _ = self.__GenerateMeshAndData(rhoe_norm, sat_curve_pts_norm)
-            print("Done!")
-            # Identify refinement locations
-            fluid_data_norm = self._fluid_data_scaler.transform(fluid_data_coarse)
-            ix_ref = self.__ApplyRefinement(fluid_data_norm)
-
-            # # Regenerate table including refinement locations
-            rhoe_norm_mesh = fluid_data_norm[:, [EntropicVars.Density.value, EntropicVars.Energy.value]]
-
-            # Create triangulation of filtered thermodynamic state data
-            print("Generating refined thermodynamic mesh...")
-            fluid_data_ref, _ = self.__GenerateMeshAndData(rhoe_norm_mesh, sat_curve_pts_norm, ix_ref=ix_ref)
-            print("Done!")
-            fluid_data_norm_ref = self._fluid_data_scaler.transform(fluid_data_ref)
-
-            DT = Delaunay(fluid_data_norm_ref[:, [EntropicVars.Density.value,EntropicVars.Energy.value]])
-
-            # Extract triangulation, hull nodes, and table data
-            Tria = DT.simplices
-            HullNodes = concave_hull_indexes(fluid_data_norm_ref[:, [EntropicVars.Density.value,EntropicVars.Energy.value]])
-            #plt.triplot(DT.points[:,0],DT.points[:,1], Tria)
-            #plt.show()
-            self._table_nodes = fluid_data_ref
-            self._table_connectivity = Tria
-            self._table_hullnodes = HullNodes
-
+        self._data_in_table = np.column_stack(tuple(self.state_data[:,:,i][self.valid_mask].flatten() for i in range(EntropicVars.N_STATE_VARS.value)))
         return
-
-    def __remove_invalid_nodes_from_mesh(self, connectivity, valid_mask, rhoe_mesh_norm):
-
-        conn = np.asarray(connectivity, dtype=np.int64)
-
-        tri_keep = np.all(valid_mask[conn], axis=1)
-        conn2 = conn[tri_keep]
-
-        keep_nodes = np.flatnonzero(valid_mask)
-        old_to_new = -np.ones(len(rhoe_mesh_norm), dtype=np.int64)
-        old_to_new[keep_nodes] = np.arange(len(keep_nodes), dtype=np.int64)
-
-        conn2 = old_to_new[conn2]
-
-        return conn2
+            
+    def __prepareInterpolator(self):
+        fluid_data_normalized = self._fluid_data_scaler.transform(self._data_in_table)
+        controlling_variable_data = fluid_data_normalized[:, [EntropicVars.Density.value, EntropicVars.Energy.value]]
+        self._lookup_tree = Invdisttree(controlling_variable_data, self._data_in_table)
+        return
+    
+    def __interpolateFluidData(self, density:float, staticEnergy:float):
+        cv_data = np.zeros([1, EntropicVars.N_STATE_VARS.value])
+        cv_data[0, EntropicVars.Density.value] = density
+        cv_data[0, EntropicVars.Energy.value] = staticEnergy
+        cv_data_norm = self._fluid_data_scaler.transform(cv_data)
+        rhoe_norm = cv_data_norm[0, [EntropicVars.Density.value, EntropicVars.Energy.value]]
+        return self._lookup_tree(rhoe_norm)
+    
     def WriteOutParaview(self,file_name_out:str="vtk_table"):
         """
         write a file containing all the LuT data that can be opened with Paraview
@@ -751,8 +883,8 @@ class SU2TableGenerator_NICFD:
         :param file_name_out: string indicating the name and extension of the saved file
         """
 
-        #x, y = self._table_nodes[:, EntropicVars.Density.value], self._table_nodes[:, EntropicVars.Energy.value]
-        table_data_norm = self._fluid_data_scaler.transform(self._table_nodes)
+        #x, y = self._data_in_table[:, EntropicVars.Density.value], self._data_in_table[:, EntropicVars.Energy.value]
+        table_data_norm = self._fluid_data_scaler.transform(self._data_in_table)
         x, y = table_data_norm[:, EntropicVars.Density.value], table_data_norm[:, EntropicVars.Energy.value]
         # scale_x= self._fluid_data_scaler.data_max_[EntropicVars.Density.value] - self._fluid_data_scaler.data_min_[EntropicVars.Density.value]
         # scale_y= self._fluid_data_scaler.data_max_[EntropicVars.Energy.value] - self._fluid_data_scaler.data_min_[EntropicVars.Energy.value]
@@ -766,7 +898,7 @@ class SU2TableGenerator_NICFD:
         point_data = {}
         for var in self._table_vars:
             ivar = EntropicVars[var].value
-            point_data[var] = np.asarray(self._table_nodes[:, ivar])
+            point_data[var] = np.asarray(self._data_in_table[:, ivar])
 
         mesh = meshio.Mesh(
             points=pts,
@@ -777,24 +909,24 @@ class SU2TableGenerator_NICFD:
 
         return
 
-    def AddRefinementCriterion(self, TD_variable:str, norm_val_min:float=np.inf, norm_val_max:float=-np.inf):
-        """Apply refinement in the table where the normalized value of the thermodynamic variable lies between the specified bounds.
+    # def AddRefinementCriterion(self, TD_variable:str, norm_val_min:float=np.inf, norm_val_max:float=-np.inf):
+    #     """Apply refinement in the table where the normalized value of the thermodynamic variable lies between the specified bounds.
 
-        :param TD_variable: name of the thermodynamic variable for which to apply refinement
-        :type TD_variable: str
-        :param norm_val_min: lower bound of the normalized thermodynamic variable, defaults to np.inf
-        :type norm_val_min: float, optional
-        :param norm_val_max: upper bound of the normalized thermodynamic variable, defaults to -np.inf
-        :type norm_val_max: float, optional
-        :raises Exception: if thermodynamic state variable is unknown to SU2 DataMiner
-        """
-        if TD_variable not in self._table_vars:
-            raise Exception("%s is not present in fluid data" % TD_variable)
+    #     :param TD_variable: name of the thermodynamic variable for which to apply refinement
+    #     :type TD_variable: str
+    #     :param norm_val_min: lower bound of the normalized thermodynamic variable, defaults to np.inf
+    #     :type norm_val_min: float, optional
+    #     :param norm_val_max: upper bound of the normalized thermodynamic variable, defaults to -np.inf
+    #     :type norm_val_max: float, optional
+    #     :raises Exception: if thermodynamic state variable is unknown to SU2 DataMiner
+    #     """
+    #     if TD_variable not in self._table_vars:
+    #         raise Exception("%s is not present in fluid data" % TD_variable)
 
-        self.__refinement_vars.append(TD_variable)
-        self.__refinement_norm_min.append(norm_val_min)
-        self.__refinement_norm_max.append(norm_val_max)
-        return
+    #     self.__refinement_vars.append(TD_variable)
+    #     self.__refinement_norm_min.append(norm_val_min)
+    #     self.__refinement_norm_max.append(norm_val_max)
+    #     return
 
     def __ApplyRefinement(self, fluid_data_norm_ref:np.ndarray[float]):
         ix_ref = np.array([],dtype=np.int64)
@@ -831,7 +963,7 @@ class SU2TableGenerator_NICFD:
         fid.write("[Version]\n1.0.1\n\n")
 
         fid.write("[Number of points]\n")
-        fid.write("%i\n" % np.shape(self._table_nodes)[0])
+        fid.write("%i\n" % np.shape(self._data_in_table)[0])
         fid.write("\n")
 
         fid.write("[Number of triangles]\n")
@@ -852,10 +984,10 @@ class SU2TableGenerator_NICFD:
 
         print("Writing table data...")
         fid.write("<Data>\n")
-        for iNode in range(len(self._table_nodes)):
+        for iNode in range(len(self._data_in_table)):
             for var in self._table_vars:
                 ivar = EntropicVars[var].value
-                fid.write("\t%+.14e" % self._table_nodes[iNode, ivar])
+                fid.write("\t%+.14e" % self._data_in_table[iNode, ivar])
             fid.write("\n")
         fid.write("</Data>\n\n")
         print("Done!")
