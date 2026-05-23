@@ -774,6 +774,8 @@ class Config_FGM(Config):
     __Np_T_unb:int = DefaultSettings_FGM.Np_temp      # Number of unburnt temperature samples between bounds.
     __Np_mdot:int = DefaultSettings_FGM.Np_mdot            # Number of mass flux divisions for burner-stabilized flamelets.
     __Np_mdot_extra:int = 20                                # Number of interpolation steps for extra interpolated burner-stabilized flamelets.
+    __mdot_dH_target:float = 0.0                            # Target enthalpy step between successive burner flames (0 = linspace, >0 = adaptive).
+    __src_interp_exponent:float = 2.0                       # Power-law exponent for source-term decay in extra interpolated burner flamelets.
     __initial_grid_length:float = DefaultSettings_FGM.initial_grid_length  # Initial flamelet domain length in metres.
 
     __mix_status_lower:float = DefaultSettings_FGM.eq_ratio_min  # Lower bound of premixed status
@@ -1391,6 +1393,57 @@ class Config_FGM(Config):
 
         """
         return self.__Np_mdot_extra
+
+    def SetMdotDHTarget(self, dH_target:float=0.0):
+        """
+        Set the target enthalpy step between successive burner-stabilized flamelets.
+        When greater than zero, the mass-flux stepping is adaptive: after each solved flame
+        the next mdot step is scaled so that the enthalpy drop matches this target.
+        When zero (default), the traditional uniform linspace spacing is used.
+
+        :param dH_target: Target |ΔH| between successive burner flames in J/kg. 0 disables adaptive mode.
+        :type dH_target: float
+        :raises Exception: If the value is negative.
+        """
+        if dH_target < 0:
+            raise Exception("mdot ΔH target must be non-negative (0 = linspace mode).")
+        self.__mdot_dH_target = dH_target
+        return
+
+    def GetMdotDHTarget(self):
+        """
+        Get the target enthalpy step between successive burner-stabilized flamelets.
+
+        :return: Target |ΔH| in J/kg (0 = linspace mode).
+        :rtype: float
+        """
+        return self.__mdot_dH_target
+
+    def SetSrcInterpExponent(self, exponent:float=2.0):
+        """
+        Set the power-law exponent used to scale source terms (Y_dot_net, Y_dot_pos, Y_dot_neg,
+        and heat release rate) in the extra interpolated burner-stabilized flamelets.
+        A value of 1 gives linear interpolation; values greater than 1 make the source terms
+        decay faster toward the cold equilibrium endpoint, which is more physically realistic
+        given Arrhenius kinetics.
+
+        :param exponent: Power-law exponent (>= 1). Default is 2.
+        :type exponent: float
+        :raises Exception: If the exponent is less than 1.
+        """
+        if exponent < 1.0:
+            raise Exception("Source term interpolation exponent must be >= 1.")
+        self.__src_interp_exponent = exponent
+        return
+
+    def GetSrcInterpExponent(self):
+        """
+        Get the power-law exponent for source-term decay in interpolated burner flamelets.
+
+        :return: Power-law exponent.
+        :rtype: float
+        """
+        return self.__src_interp_exponent
 
     def SetInitialGridLength(self, length:float=DefaultSettings_FGM.initial_grid_length):
         """

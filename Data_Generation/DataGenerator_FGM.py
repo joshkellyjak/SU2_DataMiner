@@ -87,6 +87,8 @@ class DataGenerator_Cantera(DataGenerator_Base):
     __free_flame_refine:dict    = {"ratio": 3, "slope": 0.03, "curve": 0.03, "prune": 0.01}  # Refine criteria for free-flame solver.
     __burner_flame_refine:dict  = {"ratio": 3, "slope": 0.15, "curve": 0.15, "prune": 0.05}  # Refine criteria for burner-stabilized flame solver.
     __counter_flame_refine:dict = {"ratio": 3, "slope": 0.04, "curve": 0.06, "prune": 0.02}  # Refine criteria for counter-flow flame solver.
+    __mdot_dH_target:float = 0.0  # Target enthalpy step between successive burner flames (0 = linspace, >0 = adaptive).
+    __src_interp_exponent:float = 2.0  # Power-law exponent for source-term decay in extra interpolated burner flamelets.
 
     def __init__(self, Config:Config_FGM=None):
         """Constructur, load flamelet generation settings from Config_FGM.
@@ -120,6 +122,8 @@ class DataGenerator_Cantera(DataGenerator_Base):
         self.__n_flamelets = self._Config.GetNpTemp()
         self.__n_mdot_flamelets = self._Config.GetNpMdot()
         self.__n_mdot_extra_flamelets = self._Config.GetNpMdotExtra()
+        self.__mdot_dH_target = self._Config.GetMdotDHTarget()
+        self.__src_interp_exponent = self._Config.GetSrcInterpExponent()
         self.__initial_grid_length = self._Config.GetInitialGridLength()
         [self.__T_unburnt_lower, self.__T_unburnt_upper] = self._Config.GetUnbTempBounds()
 
@@ -188,6 +192,34 @@ class DataGenerator_Cantera(DataGenerator_Base):
         if any(v <= 0 for v in (ratio, slope, curve, prune)):
             raise Exception("All refine criteria values must be strictly positive.")
         self.__counter_flame_refine = {"ratio": ratio, "slope": slope, "curve": curve, "prune": prune}
+        return
+
+    def SetMdotDHTarget(self, dH_target:float):
+        """Set the target enthalpy step between successive burner-stabilized flamelets.
+        When greater than zero, mdot stepping is adaptive: after each solved flame the next
+        Δmdot is rescaled so that |ΔH| matches this target.  When zero, the traditional
+        uniform linspace spacing is used.
+
+        :param dH_target: Target |ΔH| between successive burner flames in J/kg. 0 disables adaptive mode.
+        :type dH_target: float
+        :raises Exception: if the value is negative.
+        """
+        if dH_target < 0:
+            raise Exception("mdot ΔH target must be non-negative (0 = linspace mode).")
+        self.__mdot_dH_target = dH_target
+        return
+
+    def SetSrcInterpExponent(self, exponent:float=2.0):
+        """Set power-law exponent for source-term decay in extra interpolated burner flamelets.
+        1 = linear; > 1 = faster decay toward zero at the cold equilibrium end.
+
+        :param exponent: Power-law exponent (>= 1), defaults to 2.
+        :type exponent: float
+        :raises Exception: If exponent is less than 1.
+        """
+        if exponent < 1.0:
+            raise Exception("Source term interpolation exponent must be >= 1.")
+        self.__src_interp_exponent = exponent
         return
 
     def SetFuelDefinition(self, fuel_species:list[str], fuel_weights:list[float]):
@@ -536,13 +568,15 @@ class DataGenerator_Cantera(DataGenerator_Base):
 
         return burner_flame
 
-    def ComputeBurnerFlames(self, mix_status:float, m_dot:np.ndarray[float], T_burner:float=None, free_flame:ct.FreeFlame=None):
+    def ComputeBurnerFlames(self, mix_status:float, m_dot:np.ndarray=None, T_burner:float=None, free_flame:ct.FreeFlame=None):
         """Generate burner-stabilized flamelet data for a specific mixture fraction or equivalence ratio and mass flux.
 
         :param mix_status: Equivalence ratio or mixture fraction value.
         :type mix_status: float
-        :param m_dot: Mass flux array (kg s^{-1} m^{-1})
-        :type m_dot: np.ndarray[float]
+        :param m_dot: Pre-built mass flux array (kg s^{-1} m^{-1}). When None and
+            ``__mdot_dH_target > 0`` adaptive ΔH stepping is used; when None and
+            ``__mdot_dH_target == 0`` a uniform linspace array is generated automatically.
+        :type m_dot: np.ndarray, optional
         :param free_flame: Converged FreeFlame used to seed the first burner flame and set
             its domain length. When None the first burner flame is solved from scratch.
         :type free_flame: ct.FreeFlame, optional
@@ -562,12 +596,44 @@ class DataGenerator_Cantera(DataGenerator_Base):
         else:
             self.gas.set_mixture_fraction(mix_status, self.__fuel_string, self.__oxidizer_string)
 
+        m_dot_start = 0.98 * self.m_dot_free_flame
+        m_dot_stop  = 0.001 * self.m_dot_free_flame
+
+        if m_dot is None:
+            if self.__mdot_dH_target > 0:
+                # Adaptive ΔH stepping: step mdot so that successive flames are
+                # separated by approximately __mdot_dH_target J/kg in enthalpy.
+                m_dot_iter = None  # sentinel: adaptive path
+            else:
+                m_dot_iter = np.linspace(m_dot_start, m_dot_stop, self.__n_mdot_flamelets + 1)[:-1]
+        else:
+            m_dot_iter = m_dot
+
         prev_burner_flame = None
-        for i_burnerflame, m_dot_next in enumerate(m_dot):
+        H_prev = None
+        delta_mdot = (m_dot_start - m_dot_stop) / self.__n_mdot_flamelets  # initial seed step
+        m_dot_current = m_dot_start
+        i_burnerflame = 0
+
+        def _iterate_mdot():
+            """Yield (index, m_dot_value) for either the pre-built or adaptive path."""
+            nonlocal m_dot_current, delta_mdot, H_prev, prev_burner_flame
+            if m_dot_iter is not None:
+                for idx, val in enumerate(m_dot_iter):
+                    yield idx, val
+            else:
+                idx = 0
+                while m_dot_current >= m_dot_stop:
+                    yield idx, m_dot_current
+                    idx += 1
+
+        for i_burnerflame, m_dot_next in _iterate_mdot():
             try:
                 burner_flame = self.compute_SingleBurnerFlame(mix_status, T_burner, m_dot_next, prev_burner_flame)
                 if np.max(burner_flame.T) <= DefaultSettings_FGM.T_threshold:
                     print("Burnerflame at %s %.3e, mdot %.2e is not burning" % (folder_header, mix_status, m_dot_next))
+                    if m_dot_iter is None:
+                        m_dot_current -= delta_mdot
                     continue
 
                 # Extracting flamelet data
@@ -599,12 +665,24 @@ class DataGenerator_Cantera(DataGenerator_Base):
                     self.last_h_flamelet = burner_flame.enthalpy_mass
                     self.last_T_flamelet = burner_flame.T
 
+                # Adaptive ΔH step control: rescale delta_mdot to target __mdot_dH_target.
+                if m_dot_iter is None:
+                    H_current = float(burner_flame.enthalpy_mass[0])
+                    if H_prev is not None:
+                        dH_actual = abs(H_prev - H_current)
+                        if dH_actual > 0:
+                            scale = float(np.clip(self.__mdot_dH_target / dH_actual, 0.2, 5.0))
+                            delta_mdot *= scale
+                    H_prev = H_current
+                    m_dot_current -= delta_mdot
+
                 prev_burner_flame = burner_flame
                 print("Successfull burnerflame simulation at "+folder_header+": "+ str(mix_status)+" mdot: " + str(m_dot_next)+ " ("+str(i_burnerflame+1)+"/"+str(self.__n_mdot_flamelets)+")")
 
             except:
                 print("Unsuccessfull burnerflame simulation at "+folder_header+": "+ str(mix_status)+" mdot: " + str(m_dot_next)+ " ("+str(i_burnerflame+1)+"/"+str(self.__n_mdot_flamelets)+")")
-                pass
+                if m_dot_iter is None:
+                    m_dot_current -= delta_mdot
 
     def ComputeCounterFlowFlames(self, v_fuel:float, v_ox:float, T_ub:float):
         """Generate counter-flow diffusion flamelet data for a given temperature, and reactant velocities.
@@ -806,12 +884,10 @@ class DataGenerator_Cantera(DataGenerator_Base):
             if not self.__run_freeflames:
                 prev_free_flame = self.ComputeFreeFlames(mix_status=mix_status, T_ub=self.__T_unburnt_lower, i_freeflame=0)
 
-            # Define mass flow rate range.
-            m_dot_range = np.linspace(0.98*self.m_dot_free_flame, 0.001*self.m_dot_free_flame, self.__n_mdot_flamelets+1)
-            m_dot_range = m_dot_range[:-1]
-
-            # Generate and safe adiabatic flamelet data.
-            self.ComputeBurnerFlames(mix_status=mix_status, m_dot=m_dot_range, free_flame=prev_free_flame)
+            # Generate burner-stabilized flamelet data.
+            # When __mdot_dH_target > 0 pass m_dot=None to enable adaptive ΔH stepping;
+            # otherwise ComputeBurnerFlames generates a uniform linspace internally.
+            self.ComputeBurnerFlames(mix_status=mix_status, m_dot=None, free_flame=prev_free_flame)
 
         # Generate chemical equilibrium data
         if self.__run_equilibrium:
@@ -877,17 +953,35 @@ class DataGenerator_Cantera(DataGenerator_Base):
             eq_data = np.loadtxt(eq_filepath, delimiter=',', skiprows=1, ndmin=2)
             eq_row = eq_data[0].tolist()
 
-            # Linearly interpolate N_int synthetic flames from the lowest-mdot burner flame to the equilibrium endpoint.
+            # Identify source-term column indices: Y_dot_net/pos/neg and heat release rate
+            # decay faster than linear because Arrhenius kinetics make rates negligible
+            # well before the cold equilibrium end is reached.
+            _src_prefixes = ("Y_dot_net-", "Y_dot_pos-", "Y_dot_neg-")
+            _src_cols = frozenset(
+                j for j, h in enumerate(headerline)
+                if h.startswith(_src_prefixes) or h == FGMVars.Heat_Release.name
+            )
+
+            # Interpolate N_int synthetic flames from the lowest-mdot burner flame to the
+            # equilibrium endpoint.  State variables (T, Y, h, …) use linear weights;
+            # source-term columns use a power-law weight so they reach zero sooner.
             N_int = self.__n_mdot_extra_flamelets
+            exp = self.__src_interp_exponent
             for i in range(N_int):
                 ratio = float(i + 1) / float(N_int)
+                w_a_lin = 1.0 - ratio                   # linear weight toward burner flame
+                w_a_src = (1.0 - ratio) ** exp          # power-law weight for source terms
+                w_b_src = 1.0 - w_a_src
                 int_filename = burnerfolder + "/" + "burnerflamelet_%s%.6f_int%04d.csv" % (folder_header, mix_status, i)
                 with open(int_filename, 'w', newline='') as f:
                     writer = csv.writer(f)
                     writer.writerow(headerline)
                     for burner_row in burner_rows:
-                        row_mix = [(1.0 - ratio) * a + ratio * b
-                                   for a, b in zip(burner_row, eq_row)]
+                        row_mix = [
+                            w_a_src * a + w_b_src * b if j in _src_cols
+                            else w_a_lin * a + ratio * b
+                            for j, (a, b) in enumerate(zip(burner_row, eq_row))
+                        ]
                         writer.writerow(row_mix)
 
         return
@@ -972,7 +1066,7 @@ class DataGenerator_Cantera(DataGenerator_Base):
 
         Y_dot_net = net_reaction_rate * molar_weights
         Y_dot_pos = pos_reaction_rate * molar_weights
-        Y_dot_neg = neg_reaction_rate * molar_weights / (Y.T+1e-11)
+        Y_dot_neg = -neg_reaction_rate * molar_weights / (Y.T+1e-11)  # negated: SU2 uses source_prod + source_cons*Y directly
 
         Le_i = ComputeLewisNumber(flame)
         if self.__transport_model == "unity-Lewis-number":
@@ -1149,7 +1243,8 @@ class DataGenerator_Cantera(DataGenerator_Base):
             csvWriter = csv.writer(fid)
             csvWriter.writerows(total_data)
 
-def ComputeFlameletData(Config:Config_FGM, run_parallel:bool=False, N_processors:int=2, loglevel:int=0):
+def ComputeFlameletData(Config:Config_FGM, run_parallel:bool=False, N_processors:int=2, loglevel:int=0,
+                        free_flame_refine:dict=None, burner_flame_refine:dict=None):
     """Generate flamelet data according to Config_FGM settings either in serial or parallel.
 
     :param Config: Config_FGM class containing manifold and flamelet generation settings.
@@ -1160,6 +1255,12 @@ def ComputeFlameletData(Config:Config_FGM, run_parallel:bool=False, N_processors
     :type N_processors: int, optional
     :param loglevel: Cantera solver verbosity level (0=silent), defaults to 0
     :type loglevel: int, optional
+    :param free_flame_refine: Cantera free-flame refinement criteria dict with keys ratio, slope, curve, prune.
+        If None, the DataGenerator_Cantera defaults are used.
+    :type free_flame_refine: dict, optional
+    :param burner_flame_refine: Cantera burner-flame refinement criteria dict with keys ratio, slope, curve, prune.
+        If None, the DataGenerator_Cantera defaults are used.
+    :type burner_flame_refine: dict, optional
     :raises Exception: If number of processors is set to zero when running in parallel.
     """
 
@@ -1182,20 +1283,26 @@ def ComputeFlameletData(Config:Config_FGM, run_parallel:bool=False, N_processors
         # Equivalence ratios to calculate flamelets for are system inputs
         mixture_range = np.linspace(mix_bounds[0], mix_bounds[1], Np_unb_mix)
 
-    # Set up Cantera flamelet generator object
-
-    def ComputeFlameletData(mix_input):
-
+    def _make_generator():
         F = DataGenerator_Cantera(Config)
         F.SetLoglevel(loglevel)
+        if free_flame_refine is not None:
+            F.SetFreeFlameRefineCriteria(**free_flame_refine)
+        if burner_flame_refine is not None:
+            F.SetBurnerFlameRefineCriteria(**burner_flame_refine)
+        return F
+
+    # Set up Cantera flamelet generator object
+
+    def _ComputeFlameletData(mix_input):
+        F = _make_generator()
         F.ComputeFlameletsOnMixStatus(mix_input)
 
     if run_parallel:
         with threadpool_limits(limits=1):
-            Parallel(n_jobs=N_processors)(delayed(ComputeFlameletData)(mix_status) for mix_status in mixture_range)
+            Parallel(n_jobs=N_processors)(delayed(_ComputeFlameletData)(mix_status) for mix_status in mixture_range)
     else:
-        F = DataGenerator_Cantera(Config)
-        F.SetLoglevel(loglevel)
+        F = _make_generator()
         F.SetMixtureValues(mixture_range)
         F.ComputeFlamelets()
 
