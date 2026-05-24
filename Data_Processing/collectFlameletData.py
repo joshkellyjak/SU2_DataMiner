@@ -732,10 +732,7 @@ class FlameletConcatenator:
                     for iVar_LookUp, LookUp_var in enumerate(self.__LookUp_vars):
                         idx_var_flamelet = variables.index(LookUp_var)
                         LookUp_data[:, iVar_LookUp] = D[:, idx_var_flamelet]
-                        if LookUp_var == FGMVars.Heat_Release.name:
-                            LookUp_data[sourceterm_zero_line_numbers, iVar_LookUp] = 0.0
-                            # Enforce non-negativity of heat release rate.
-                            LookUp_data[:, iVar_LookUp] = np.maximum(LookUp_data[:, iVar_LookUp], 0.0)
+
 
                 # Load species sources data
                 species_mass_fraction = np.zeros([len(D), len(self.__Species_in_FGM)])

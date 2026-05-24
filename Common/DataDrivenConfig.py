@@ -1818,10 +1818,8 @@ class Config_FGM(Config):
                 raise Exception("Number of variables does not match data array.")
             ppv = np.zeros(np.shape(flamelet_data)[0])
             for iPv, pvSp in enumerate(self.__pv_definition):
-                prodrate_pos = flamelet_data[:, variables.index('Y_dot_pos-'+pvSp)]
-                prodrate_neg = flamelet_data[:, variables.index('Y_dot_neg-'+pvSp)]
-                mass_fraction = flamelet_data[:, variables.index('Y-'+pvSp)]
-                ppv += self.__pv_weights[iPv] * (prodrate_pos + prodrate_neg * mass_fraction)
+                prodrate_net = flamelet_data[:, variables.index('Y_dot_net-'+pvSp)]
+                ppv += self.__pv_weights[iPv] * prodrate_net
             return ppv
 
     def GetSparkSources(self, val_phi:float, val_T:float, iGroup:int=0):

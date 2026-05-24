@@ -68,7 +68,7 @@ class DataGenerator_Cantera(DataGenerator_Base):
 
     __initial_grid_length:float = 0.2  # Flamelet grid width
     __loglevel:int = 0  # Cantera solver verbosity level (0=silent)
-    __initial_grid_Np:int = 30          # Number of initial grid nodes.
+    __initial_grid_Np:int = 50          # Number of initial grid nodes.
 
     __define_equivalence_ratio:bool = not DefaultSettings_FGM.run_mixture_fraction # Define unburnt mixture via the equivalence ratio
     __unb_mixture_status:list[float] = []
@@ -161,35 +161,35 @@ class DataGenerator_Cantera(DataGenerator_Base):
         :param prune: Threshold for grid point removal, defaults to 0.01.
         :raises Exception: if any value is not strictly positive.
         """
-        if any(v <= 0 for v in (ratio, slope, curve, prune)):
+        if (any(v <= 0 for v in (ratio, slope, curve)) or (prune < 0)):
             raise Exception("All refine criteria values must be strictly positive.")
         self.__free_flame_refine = {"ratio": ratio, "slope": slope, "curve": curve, "prune": prune}
         return
 
-    def SetBurnerFlameRefineCriteria(self, ratio:float=3, slope:float=0.15, curve:float=0.15, prune:float=0.05):
+    def SetBurnerFlameRefineCriteria(self, ratio:float=3, slope:float=0.15, curve:float=0.15, prune:float=0.01):
         """Set the grid refinement criteria for the burner-stabilized flame solver.
 
         :param ratio: Maximum ratio of adjacent grid spacings, defaults to 3.
         :param slope: Maximum relative slope of the solution, defaults to 0.15.
         :param curve: Maximum relative curvature of the solution, defaults to 0.15.
-        :param prune: Threshold for grid point removal, defaults to 0.05.
+        :param prune: Threshold for grid point removal, defaults to 0.01.
         :raises Exception: if any value is not strictly positive.
         """
-        if any(v <= 0 for v in (ratio, slope, curve, prune)):
+        if (any(v <= 0 for v in (ratio, slope, curve)) or (prune < 0)):
             raise Exception("All refine criteria values must be strictly positive.")
         self.__burner_flame_refine = {"ratio": ratio, "slope": slope, "curve": curve, "prune": prune}
         return
 
-    def SetCounterFlameRefineCriteria(self, ratio:float=3, slope:float=0.04, curve:float=0.06, prune:float=0.02):
+    def SetCounterFlameRefineCriteria(self, ratio:float=3, slope:float=0.04, curve:float=0.06, prune:float=0.01):
         """Set the grid refinement criteria for the counter-flow diffusion flame solver.
 
         :param ratio: Maximum ratio of adjacent grid spacings, defaults to 3.
         :param slope: Maximum relative slope of the solution, defaults to 0.04.
         :param curve: Maximum relative curvature of the solution, defaults to 0.06.
-        :param prune: Threshold for grid point removal, defaults to 0.02.
+        :param prune: Threshold for grid point removal, defaults to 0.01.
         :raises Exception: if any value is not strictly positive.
         """
-        if any(v <= 0 for v in (ratio, slope, curve, prune)):
+        if (any(v <= 0 for v in (ratio, slope, curve)) or (prune < 0)):
             raise Exception("All refine criteria values must be strictly positive.")
         self.__counter_flame_refine = {"ratio": ratio, "slope": slope, "curve": curve, "prune": prune}
         return
@@ -464,6 +464,7 @@ class DataGenerator_Cantera(DataGenerator_Base):
             initialgrid = np.linspace(0, self.__initial_grid_length, self.__initial_grid_Np)
             freeflame = ct.FreeFlame(self.gas, grid=initialgrid)
             freeflame.set_refine_criteria(**self.__free_flame_refine)
+            freeflame.max_grid_points = 2000
             freeflame.transport_model = self.__transport_model
             freeflame.set_initial_guess(locs=[0.0, 0.3, 0.5, 1.0])
         else:
@@ -1042,7 +1043,7 @@ class DataGenerator_Cantera(DataGenerator_Base):
             X = flame.X
             net_reaction_rate = flame.net_production_rates
             neg_reaction_rate =flame.destruction_rates
-            pos_reaction_rate = flame.net_production_rates - neg_reaction_rate
+            pos_reaction_rate = flame.net_production_rates + neg_reaction_rate
             cp_i = (flame.partial_molar_cp.T/gas.molecular_weights)
             enth_i = (flame.partial_molar_enthalpies.T/gas.molecular_weights)
             grid= flame.grid
