@@ -25,8 +25,8 @@
 #=============================================================================================#
 
 # Import SU2 DataMiner modules
-from Common.DataDrivenConfig import EntropicAIConfig 
-from Data_Generation.DataGenerator_NICFD import DataGenerator_CoolProp 
+from Common.DataDrivenConfig import EntropicAIConfig
+from Data_Generation.DataGenerator_NICFD import DataGenerator_CoolProp
 
 # Load configuration.
 Config = EntropicAIConfig("MM_config_SU2_2024.cfg")

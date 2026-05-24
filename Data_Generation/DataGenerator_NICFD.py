@@ -188,7 +188,7 @@ class DataGenerator_CoolProp(DataGenerator_Base):
     def VisualizeDataGrid(self):
         """Visualize query points at which fluid data are evaluated.
         """
-        fig = plt.figure(figsize=[10,10])
+        plt.figure(figsize=[10,10])
         ax = plt.axes()
         ax.plot(self.__X_grid.flatten(), self.__Y_grid.flatten(), 'k.')
         if self. __use_PT:
@@ -830,7 +830,7 @@ class DataGenerator_CoolProp(DataGenerator_Base):
                 'k_l': k_l, 'k_g': k_g,
                 'rho_l': rho_l, 'rho_g': rho_g
             }
-        except Exception as ex:
+        except Exception:
             return None
 
     def __compute_void_fraction(self, quality:float, rho_l:float, rho_g:float):
@@ -949,18 +949,10 @@ class DataGenerator_CoolProp(DataGenerator_Base):
         self.UpdateFluid(rho, e)
         state_vector,_ = self.GetStateVector()
         self.UpdateFluid(rho, e)
-        dPde_rho_ref = self.fluid.first_partial_deriv(CP.iP, CP.iUmass, CP.iDmass)
-        dPdrho_e_ref = self.fluid.first_partial_deriv(CP.iP, CP.iDmass, CP.iUmass)
-        dTde_rho_ref = self.fluid.first_partial_deriv(CP.iT, CP.iUmass, CP.iDmass)
-        dTdrho_e_ref = self.fluid.first_partial_deriv(CP.iT, CP.iDmass, CP.iUmass)
         P_ref = self.fluid.p()
         T_ref = self.fluid.T()
         ref_data = np.array([P_ref, T_ref])
 
-        dPde_rho_test = state_vector[EntropicVars.dpde_rho.value]
-        dPdrho_e_test = state_vector[EntropicVars.dpdrho_e.value]
-        dTde_rho_test = state_vector[EntropicVars.dTde_rho.value]
-        dTdrho_e_test = state_vector[EntropicVars.dTdrho_e.value]
         P_test = state_vector[EntropicVars.p.value]
         T_test = state_vector[EntropicVars.T.value]
         test_data = np.array([P_test, T_test])

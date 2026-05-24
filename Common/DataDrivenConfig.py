@@ -190,7 +190,6 @@ class Config_NICFD(Config):
             #     raise Exception("Only two fluids can be used for mixtures")
 
             self.__fluid_names = []
-            fluid_mixing = []
             for f in fluid_name:
                 if type(f) is not str:
                     raise Exception("Fluid name should be provided in string format.")
@@ -1829,8 +1828,6 @@ class Config_FGM(Config):
         flame = ct.FreeFlame(self.gas)
         flame.transport_model = self.__transport_model
         flame.solve(auto=True,refine_grid=True,loglevel=0)
-        dx = flame.grid[1:] - flame.grid[:-1]
-        t_res = np.sum(dx / flame.velocity[:-1])
         qdot = flame.heat_release_rate
         ix_max = np.argmax(qdot)
         ydot = flame.net_production_rates

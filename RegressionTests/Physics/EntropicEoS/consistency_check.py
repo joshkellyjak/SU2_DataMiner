@@ -28,7 +28,6 @@
 import numpy as np
 import CoolProp.CoolProp as CP
 import CoolProp as CoolP
-import matplotlib.pyplot as plt
 from CoolProp.CoolProp import get_global_param_string
 
 # Entropic equation of stat is only valid for the gas and supercritical phases.

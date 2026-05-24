@@ -32,7 +32,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 from scipy.optimize import differential_evolution, Bounds, LinearConstraint, minimize
 from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler, RobustScaler, MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler
 
 from Common.Properties import FGMVars, DefaultSettings_FGM
 from Common.DataDrivenConfig import Config_FGM
@@ -290,7 +290,7 @@ class PVOptimizer:
 
 
     def penalty_function(self, x:np.array):
-        """Optimization penalty function computing the derivative of the 
+        """Optimization penalty function computing the derivative of the
         progress vector w.r.t. that of the progress variable increment.
 
         :param x: progress variable weights vector.
@@ -397,10 +397,10 @@ class PVOptimizer:
         self.__CurveStepTolerance = val_tol
 
     def SetSpeciesRangeTolerance(self, val_tol:float=1e-5):
-        """Specify the minimum change in species mass fraction for species to be 
+        """Specify the minimum change in species mass fraction for species to be
         considered in progress variable optimization.
 
-        :param val_tol: species mass fraction range threshold. 
+        :param val_tol: species mass fraction range threshold.
         :type val_tol: float
         :raises Exception: if threshold value is negative.
         """
@@ -897,7 +897,6 @@ class PVOptimizer_Niu(PVOptimizer):
         else:
             update_strategy = "immediate"
 
-        A_constr = np.hstack((-self._progress_vector, self._delta_Y_flamelets))
         #self._monotonicity_full = LinearConstraint(A_constr, lb=-1e-4,keep_feasible=True)
         # Initiate evolutionary algorithm.
         print("Generation,Penalty," + ",".join(s for s in self._pv_definition_optim))
