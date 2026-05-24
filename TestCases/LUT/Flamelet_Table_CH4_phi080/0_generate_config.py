@@ -24,10 +24,10 @@ Config.SetInitialGridLength(0.2)  # Initial flamelet domain length in metres
 Config.RunFreeFlames(True)
 Config.RunBurnerFlames(True)
 Config.RunExtraInterpolatedBurnerFlames(True)
-Config.SetSrcInterpExponent(2.0)   # Decay of interpolated flamelets 
+Config.SetSrcInterpExponent(2.0)   # Decay of interpolated flamelets
 Config.RunEquilibrium(True)
 
-# unity Lewis number assumption 
+# unity Lewis number assumption
 # results in constant enthalpy and constant mixture fraction flames
 # Use this if Constant Lewis is a reasonable assumption
 Config.SetTransportModel('unity-Lewis-number')

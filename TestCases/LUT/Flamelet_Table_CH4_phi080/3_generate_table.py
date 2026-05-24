@@ -22,7 +22,7 @@ Tgen.SetRefinementFields(["ProdRateTot_PV", "Y_dot_net-CO", "Y_dot_pos-CO","Y_do
 #Tgen.SetMaxRefinementSeeds(500)
 #Tgen.SetHullCellSize(1.0e-2)
 
-# medium 
+# medium
 Tgen.SetBaseCellSize(5e-3)
 Tgen.SetRefinedCellSize(5e-3)
 Tgen.SetRefinementRadius(5e-3)

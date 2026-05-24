@@ -37,4 +37,3 @@ for iGroup in range(Config.GetNMLPOutputGroups()):
     Config.UpdateMLPHyperParams(Eval)
     Config.SaveConfig()
 
-    
