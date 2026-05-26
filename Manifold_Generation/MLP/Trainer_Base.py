@@ -378,7 +378,7 @@ class MLPTrainer:
         return
 
     def SetDecaySteps(self):
-        """Set the number of steps in the exponential decay algorithm. The number of steps scale are proportioned based on the number of epochs, 
+        """Set the number of steps in the exponential decay algorithm. The number of steps scale are proportioned based on the number of epochs,
         and training data size and mini batch size.
         """
         self._decay_steps = int(1e-3 * self._n_epochs * self._Np_train / self._Np_batch)
@@ -429,7 +429,7 @@ class MLPTrainer:
         return self._activation_function_name
 
     def PlotR2Data(self):
-        """Plot the MLP prediction in the form of R2-plots w.r.t. the reference data, and along each of the 
+        """Plot the MLP prediction in the form of R2-plots w.r.t. the reference data, and along each of the
         normalized controlling variables.
         """
 

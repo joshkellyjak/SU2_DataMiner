@@ -26,7 +26,7 @@
 
 # Import SU2 DataMiner modules
 from Manifold_Generation.MLP.Trainers_NICFD.Trainers import EvaluateArchitecture_NICFD
-from Common.DataDrivenConfig import EntropicAIConfig 
+from Common.DataDrivenConfig import EntropicAIConfig
 
 # Load test case configuration.
 Config = EntropicAIConfig("MM_config_SU2_2024.cfg")

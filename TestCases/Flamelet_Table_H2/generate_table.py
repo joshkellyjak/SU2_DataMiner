@@ -1,5 +1,5 @@
 from Manifold_Generation.LUT.FlameletTableGeneration import SU2TableGenerator
-from Common.DataDrivenConfig import FlameletAIConfig 
+from Common.DataDrivenConfig import FlameletAIConfig
 
 # Loading configuration.
 Config = FlameletAIConfig("TableGeneration.cfg")

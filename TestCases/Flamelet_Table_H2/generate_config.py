@@ -1,6 +1,6 @@
 
-from Common.DataDrivenConfig import FlameletAIConfig 
-import os 
+from Common.DataDrivenConfig import FlameletAIConfig
+import os
 
 Config = FlameletAIConfig()
 Config.SetConfigName("TableGeneration")
@@ -26,7 +26,7 @@ Config.SetProgressVariableDefinition(pv_species=['H2', 'H', 'O2', 'O', 'H2O', 'O
 flamelet_data_dir = os.getcwd() + "/flamelet_data/"
 if not os.path.isdir(flamelet_data_dir):
     os.mkdir(flamelet_data_dir)
-Config.SetOutputDir(flamelet_data_dir) 
- 
+Config.SetOutputDir(flamelet_data_dir)
+
 Config.PrintBanner()
 Config.SaveConfig()

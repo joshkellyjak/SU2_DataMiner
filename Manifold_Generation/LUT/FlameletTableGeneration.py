@@ -31,12 +31,10 @@ import sys,os
 from Common.DataDrivenConfig import Config_FGM, Config
 from Common.CommonMethods import GetReferenceData
 from Common.Properties import DefaultSettings_FGM
-import cantera as ct
 import gmsh
 import pickle
 from multiprocessing import Pool
 from Common.Interpolators import Invdisttree
-from random import sample
 
 class SU2TableGenerator_Base:
     _Config = None
@@ -176,7 +174,6 @@ class SU2TableGenerator_Base:
         return data_interp
 
     def Compute2DTable(self, CV_1:str, CV_2:str):
-        Np_grid = 300
 
         return
 
@@ -1204,6 +1201,75 @@ class SU2TableGenerator:
         self._Config.gas.set_equivalence_ratio(1.0, fuel_string, ox_string)
         mixfrac_stoch = self._Config.gas.mixture_fraction(fuel_string, ox_string)
         return mixfrac_stoch
+
+    def ClampSourceTerms(self, species_list:list[str], pv_frac:float=0.99, abs_tol:float=1e-3):
+        """Clamp source terms of selected species to zero near the burnt (high-PV) boundary.
+
+        For each table level the per-level PV maximum is computed.  At every node
+        where PV >= ``pv_frac * PV_max`` the net, positive, and negative source
+        terms (``Y_dot_net-<sp>``, ``Y_dot_pos-<sp>``, ``Y_dot_neg-<sp>``) for each
+        species in ``species_list`` are forced to zero when their absolute value is
+        below ``abs_tol``.
+
+        This method must be called after :meth:`GenerateTableNodes` and before
+        :meth:`WriteTableFile`.
+
+        :param species_list: species names to clamp (e.g. ``['CO', 'H2']``).
+        :type species_list: list[str]
+        :param pv_frac: fraction of per-level PV_max above which clamping is applied; default 0.99.
+        :type pv_frac: float
+        :param abs_tol: source terms with absolute value below this are set to zero; default 1e-3.
+        :type abs_tol: float
+        """
+        if not species_list:
+            return
+        pv_col    = self._plane_cv_idxs[0]   # column of ProgressVariable in _table_nodes
+
+        # Build per-species index lists for each source-term role.
+        idx_net, idx_pos, idx_neg = [], [], []
+        for sp in species_list:
+            for fmt, bucket in [("Y_dot_net-%s", idx_net),
+                                 ("Y_dot_pos-%s", idx_pos),
+                                 ("Y_dot_neg-%s", idx_neg)]:
+                vname = fmt % sp
+                if vname in self.table_vars:
+                    bucket.append(self.table_vars.index(vname))
+                else:
+                    print("ClampSourceTerms: variable '%s' not found in table_vars, skipping." % vname)
+
+        clamp_indices = idx_net + idx_pos + idx_neg
+        if not clamp_indices:
+            return
+
+        n_clamped_total = 0
+        for iLevel in range(self._N_table_levels):
+            pv_nodes = self._table_nodes[iLevel][:, pv_col]
+            pv_max   = np.max(pv_nodes)
+            mask     = pv_nodes >= pv_frac * pv_max
+            n_clamped_total += int(np.sum(mask))
+
+            # Near the burnt boundary: zero small-magnitude net/pos/neg source terms.
+            for iVar in clamp_indices:
+                src = self.table_data[iLevel][iVar]
+                src[mask & (np.abs(src) < abs_tol)] = 0.0
+                self.table_data[iLevel][iVar] = src
+
+            # Sign constraints (all nodes):
+            #   source_prod (Y_dot_pos) >= 0  — production is never negative.
+            #   source_cons (Y_dot_neg) <= 0  — consumption coefficient is never positive
+            #   (SU2 uses:  source = source_prod + source_cons * y_aux).
+            for iVar in idx_pos:
+                src = self.table_data[iLevel][iVar]
+                np.clip(src, 0.0, None, out=src)
+                self.table_data[iLevel][iVar] = src
+            for iVar in idx_neg:
+                src = self.table_data[iLevel][iVar]
+                np.clip(src, None, 0.0, out=src)
+                self.table_data[iLevel][iVar] = src
+
+        print("ClampSourceTerms: clamped %i nodes across %i levels (pv_frac=%.3f, abs_tol=%.2e)." %
+              (n_clamped_total, self._N_table_levels, pv_frac, abs_tol))
+        return
 
     def SaveTableGenerator(self, file_name:str):
         """Save the current TableGenerator object settings such that subsequent tables can be

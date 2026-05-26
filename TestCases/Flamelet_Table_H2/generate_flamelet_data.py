@@ -1,6 +1,6 @@
-# Generate flamelet data for pre-mixed hydrogen-air problems 
+# Generate flamelet data for pre-mixed hydrogen-air problems
 
-from Common.DataDrivenConfig import FlameletAIConfig 
+from Common.DataDrivenConfig import FlameletAIConfig
 from Data_Generation.DataGenerator_FGM import ComputeFlameletData
 
 # Load FlameletAI configuration

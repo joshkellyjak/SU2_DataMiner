@@ -1,0 +1,2 @@
+[tool.ruff.lint]
+select=["W291", "F401", "F841", "PIE794"]

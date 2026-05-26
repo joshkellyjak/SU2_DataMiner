@@ -2,7 +2,6 @@ import os,sys
 import subprocess
 import datetime
 import time
-import difflib
 
 def is_float(test_string):
     try:
