@@ -330,3 +330,7 @@ class EquilibriumSolver(FlameletSolver_Cantera):
         return
     def _commonPreprocessing(self):
         return 
+    
+FlameletSolverDict:dict = {"FREEFLAME" : FreeFlameSolver,\
+                           "BURNERFLAME" : BurnerFlameSolver,\
+                            "EQUILIBRIUM" : EquilibriumSolver}

@@ -41,7 +41,7 @@ supported_fluid_names = get_global_param_string("FluidsList").split(',')
 from Common.Properties import DefaultSettings_NICFD, DefaultSettings_FGM
 from Common.Config_base import Config
 from Common.CommonMethods import *
-
+from Data_Generation.FlameletSolvers import FlameletSolverDict
 #---------------------------------------------------------------------------------------------#
 # NI-CFD DataMiner configuration class
 #---------------------------------------------------------------------------------------------#
