@@ -38,10 +38,10 @@ supported_fluid_names = get_global_param_string("FluidsList").split(',')
 #---------------------------------------------------------------------------------------------#
 # Importing DataMiner classes and functions
 #---------------------------------------------------------------------------------------------#
-from Common.Properties import DefaultSettings_NICFD, DefaultSettings_FGM
+from Common.Properties import DefaultSettings_NICFD, DefaultSettings_FGM, FlameletSolverOptions
 from Common.Config_base import Config
 from Common.CommonMethods import *
-from Data_Generation.FlameletSolvers import FlameletSolverDict
+
 #---------------------------------------------------------------------------------------------#
 # NI-CFD DataMiner configuration class
 #---------------------------------------------------------------------------------------------#
@@ -781,6 +781,8 @@ class Config_FGM(Config):
     __generate_equilibrium:bool = DefaultSettings_FGM.include_equilibrium     # Generate chemical equilibrium data
     __generate_counterflames:bool = DefaultSettings_FGM.include_counterflames   # Generate counter-flow diffusion flamelets.
 
+    __flamelet_types_in_manifold:list[str] = [FlameletSolverOptions[0]]
+
     __write_MATLAB_files:bool = False  # Write TableGenerator compatible flamelet files.
 
     gas:ct.Solution = None  # Cantera solution object.
@@ -1362,6 +1364,29 @@ class Config_FGM(Config):
         """
         return self.__run_mixture_fraction
 
+    def includeFlameletType(self, flamelet_type:str="FREEFLAME"):
+
+        if flamelet_type not in FlameletSolverOptions:
+            raise Exception("%s is not recognized as a viable flamelet type" % flamelet_type)
+        
+        if flamelet_type not in self.__flamelet_types_in_manifold:
+            self.__flamelet_types_in_manifold.append(flamelet_type)
+        return 
+
+    def excludeFlameletType(self, flamelet_type:str):
+        if flamelet_type not in FlameletSolverOptions:
+            raise Exception("%s is not recognized as a viable flamelet type" % flamelet_type)
+        
+        if flamelet_type in self.__flamelet_types_in_manifold:
+            self.__flamelet_types_in_manifold.remove(flamelet_type)
+        
+        if len(self.__flamelet_types_in_manifold) == 0:
+            raise Exception("At least one flamelet type should be included in the manifold")
+        return 
+
+    def getFlameletTypes(self):
+        return self.__flamelet_types_in_manifold 
+
     def RunFreeFlames(self, input:bool=DefaultSettings_FGM.include_freeflames):
         """
         Include adiabatic free flame data in the manifold.
@@ -1372,7 +1397,7 @@ class Config_FGM(Config):
         """
         self.__generate_freeflames = input
         return
-
+    
     def RunBurnerFlames(self, input:bool=DefaultSettings_FGM.include_burnerflames):
         """
         Include burner-stabilized flame data in the manifold.
@@ -1741,7 +1766,7 @@ class Config_FGM(Config):
         :type reactant_temperature: float, optional
         :raises Exception: if negative mixture status value or temperature is provided.
         """
-        if mixture_status != None:
+        if mixture_status:
             if mixture_status < 0:
                 raise Exception("Mixture status value should be positive.")
             if self.__run_mixture_fraction and mixture_status > 1:
