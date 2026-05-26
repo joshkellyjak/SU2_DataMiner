@@ -61,8 +61,8 @@ def main():
     FGM_training.config_file = ""
     FGM_training.timeout=300
     FGM_training.exec_command="./ML_FGM_manifold.py"
-    FGM_training.reference_files=["TrainingHistory_ref.csv"]
-    FGM_training.test_files=["architectures_Group1/Worker_0/Model_0/TrainingHistory.csv"]
+    FGM_training.reference_files=["testdata_ref.csv", "TrainingHistory_ref.csv"]
+    FGM_training.test_files=["fluid_data_test.csv","architectures_Group1/Worker_0/Model_0/TrainingHistory.csv"]
     test_list_FGM.append(FGM_training)
 
 
