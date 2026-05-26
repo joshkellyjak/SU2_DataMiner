@@ -8,6 +8,6 @@ config = Config_FGM(sys.argv[-1])
 config.SetOutputDir(os.getcwd())
 
 DG = DataGenerator_Cantera(config)
-DG.ComputeFreeFlames(mix_status=1.0, T_ub=300.0)
+DG.computeSingleFreeFlame(mix_status=1.0, T_ub=300.0, i_freeflame=0)
 
 
