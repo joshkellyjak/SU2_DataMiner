@@ -228,3 +228,4 @@ ActivationFunctionOptions = {"linear" : tf.keras.activations.linear,\
                              "sigmoid" : tf.keras.activations.sigmoid,\
                              "swish" : tf.keras.activations.swish}
 
+FlameletSolverOptions:list[str] = ["FREEFLAME", "BURNERFLAME", "EQUILIBRIUM"]
