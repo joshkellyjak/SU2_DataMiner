@@ -499,9 +499,6 @@ class DataGenerator_CoolProp(DataGenerator_Base):
                         self.fluid.update(CP.PT_INPUTS, self.__X_grid[i,j], self.__Y_grid[i,j])
                     else:
                         self.fluid.update(CP.DmassUmass_INPUTS, self.__X_grid[j,i], self.__Y_grid[j,i])
-                        p = self.fluid.p()
-                        T = self.fluid.T()
-                        self.fluid.update(CP.PT_INPUTS, p, T)
                     # Check if fluid phase is not vapor or liquid
                     self.__StateVars_fluid[i,j,:], self.__success_locations[i,j] = self.GetStateVector()
                 except:
@@ -523,32 +520,32 @@ class DataGenerator_CoolProp(DataGenerator_Base):
         phase = self.fluid.phase()
         is_twophase = (phase == CoolP.iphase_twophase)
         if is_twophase:
-                vapor_q = q
-                sat_props = self.__get_saturated_transport_properties(p)
+            vapor_q = q
+            sat_props = self.__get_saturated_transport_properties(p)
 
-                if sat_props is not None:
-                    # Compute void fraction for volume-weighted models
-                    alpha = self.__compute_void_fraction(
-                        q, sat_props['rho_l'], sat_props['rho_g'])
-                    # Mixture viscosity
-                    viscosity = self.__compute_twophase_viscosity(
-                        q, sat_props['mu_l'], sat_props['mu_g'],
-                        sat_props['rho_l'], sat_props['rho_g'], alpha)
+            if sat_props is not None:
+                # Compute void fraction for volume-weighted models
+                alpha = self.__compute_void_fraction(
+                    q, sat_props['rho_l'], sat_props['rho_g'])
+                # Mixture viscosity
+                viscosity = self.__compute_twophase_viscosity(
+                    q, sat_props['mu_l'], sat_props['mu_g'],
+                    sat_props['rho_l'], sat_props['rho_g'], alpha)
 
-                    # Mixture thermal conductivity
-                    conductivity = self.__compute_twophase_conductivity(
-                        q, sat_props['k_l'], sat_props['k_g'],
-                        sat_props['rho_l'], sat_props['rho_g'], alpha)
-                else:
-                    # Fallback: try to get properties at current state (might fail)
-                    try:
-                        self.fluid.update(CP.DmassUmass_INPUTS, rho, e)
-                        viscosity = self.fluid.viscosity()
-                        conductivity = self.fluid.conductivity()
-                    except:
-                        # Last resort: interpolate based on quality
-                        viscosity = 1e-5  # Reasonable default
-                        conductivity = 0.1  # Reasonable default
+                # Mixture thermal conductivity
+                conductivity = self.__compute_twophase_conductivity(
+                    q, sat_props['k_l'], sat_props['k_g'],
+                    sat_props['rho_l'], sat_props['rho_g'], alpha)
+            else:
+                # Fallback: try to get properties at current state (might fail)
+                try:
+                    self.fluid.update(CP.DmassUmass_INPUTS, rho, e)
+                    viscosity = self.fluid.viscosity()
+                    conductivity = self.fluid.conductivity()
+                except:
+                    # Last resort: interpolate based on quality
+                    viscosity = 1e-5  # Reasonable default
+                    conductivity = 0.1  # Reasonable default
         else:
             vapor_q = -1.0
             viscosity = self.fluid.viscosity()
@@ -776,7 +773,7 @@ class DataGenerator_CoolProp(DataGenerator_Base):
         self.__fd_step_size_e = fd_step_e
         return
 
-    def ComputeSaturationCurve(self):
+    def ComputeSaturationCurve(self, N_samples:int=4000):
         """Compute the density and static energy along the fluid saturation curve
 
         :return: density and static energy array of saturation curve
@@ -785,7 +782,7 @@ class DataGenerator_CoolProp(DataGenerator_Base):
         eos_fluid = "%s::%s" % (self._Config.GetEquationOfState(), self._Config.GetFluid())
         ptriple = CP.PropsSI("PTRIPLE", eos_fluid)
         pcrit = CP.PropsSI("PCRIT", eos_fluid)
-        Psat = np.linspace(ptriple, pcrit, 4000)
+        Psat = np.linspace(ptriple, pcrit, N_samples)
 
         rhoLiq=CP.PropsSI("D","P",Psat,"Q",0,eos_fluid)
         rhoVap=CP.PropsSI("D","P",Psat,"Q",1,eos_fluid)
