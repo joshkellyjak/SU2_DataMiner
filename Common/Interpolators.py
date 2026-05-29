@@ -27,7 +27,6 @@ from scipy.spatial import cKDTree as KDTree
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-import matplotlib.pyplot as plt 
 from sklearn.preprocessing import MinMaxScaler
 class Invdisttree:
     """ inverse-distance-weighted interpolation using KDTree:
@@ -80,13 +79,13 @@ is exceedingly sensitive to distance and to h.
     """
 # anykernel( dj / av dj ) is also scale-free
 # error analysis, |f(x) - idw(x)| ? todo: regular grid, nnear ndim+1, 2*ndim
-    __state_space_data:np.ndarray[float]=None 
+    __state_space_data:np.ndarray[float]=None
     __nDim_input:int=None
     __number_of_states:int=None
-    __KD_tree:KDTree = None 
-    __single_query_sample:bool=False 
-    __number_of_nearest_neighbors:int=None 
-    __inverse_distance_exponent:float=None 
+    __KD_tree:KDTree = None
+    __single_query_sample:bool=False
+    __number_of_nearest_neighbors:int=None
+    __inverse_distance_exponent:float=None
     
     def __init__( self, samples_state_space:np.ndarray[float], state_data:np.ndarray[float], leafsize:int=10):
         assert len(samples_state_space) == len(state_data), "len(X) %d != len(z) %d" % (len(samples_state_space), len(state_data))
@@ -132,7 +131,7 @@ is exceedingly sensitive to distance and to h.
     def __check_correct_input_dimensions(self, query_samples:np.ndarray[float]):
         if query_samples.shape[1] != self.__nDim_input:
             raise Exception("Incorrect input dimensionality")
-        return 
+        return
     
     def __interpolate_from_inverse_distance(self, query_input_samples:np.ndarray[float]):
         distances, nearest_neighbor_indices = self.__evaluate_KD_tree(query_input_samples, self.__number_of_nearest_neighbors)
@@ -159,7 +158,7 @@ is exceedingly sensitive to distance and to h.
                 nearest_neighbor_coefficients /= np.sum(nearest_neighbor_coefficients)
                 interpolated_state_data[j] = np.dot( nearest_neighbor_coefficients, self.__state_space_data[ix])
 
-        return interpolated_state_data 
+        return interpolated_state_data
     
     def __single_nearest_neighbor(self):
         return self.__number_of_nearest_neighbors==1
@@ -205,10 +204,10 @@ is exceedingly sensitive to distance and to h.
     
 class fluidDataInterpolator:
 
-    __controlling_variable_nodes:np.ndarray[float] = None 
-    __lookup_data:np.ndarray[float] = None 
-    __lookup_tree:Invdisttree = None 
-    __n_near_single:int = 6 
+    __controlling_variable_nodes:np.ndarray[float] = None
+    __lookup_data:np.ndarray[float] = None
+    __lookup_tree:Invdisttree = None
+    __n_near_single:int = 6
     __p_fac_single:int = 2
     __state_vars:list[str] = None
 
@@ -223,7 +222,7 @@ class fluidDataInterpolator:
 
         if not self.__n_near_single or not self.__p_fac_single:
             self.tuneTreeParameters()
-        return 
+        return
 
     def tuneTreeParameters(self):
 
@@ -262,7 +261,7 @@ class fluidDataInterpolator:
         # ax.plot3D(cv_data_test[:,0], cv_data_test[:,1], lookup_data_test[:, 2], 'k.')
         # ax.plot3D(cv_data_test[:,0], cv_data_test[:,1], self.__lookup_data[:, 2], 'r.')
         # plt.show()
-        return 
+        return
 
     def __call__(self, cv_data_query:np.ndarray[float],varnames:list[str]=[]):
         ndim_input = cv_data_query.ndim

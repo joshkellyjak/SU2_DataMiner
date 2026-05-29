@@ -32,9 +32,9 @@ from Manifold_Generation.LUT.LUTGenerator_Base import SU2TableGenerator_Base
 from Manifold_Generation.LUT.MeshTools import MeshThermodynamicPlane
 
 class TableGenerator_NICFD(SU2TableGenerator_Base):
-    _Config:Config_NICFD = None 
-    __datagenerator:DataGenerator_CoolProp = None 
-    __thermodynamic_data:pd.DataFrame = None 
+    _Config:Config_NICFD = None
+    __datagenerator:DataGenerator_CoolProp = None
+    __thermodynamic_data:pd.DataFrame = None
 
     def __init__(self, config_in:Config_NICFD):
         self._state_quantities = [q.name for q in EntropicVars]
@@ -42,7 +42,7 @@ class TableGenerator_NICFD(SU2TableGenerator_Base):
         self.__datagenerator = DataGenerator_CoolProp(self._Config)
         self.__datagenerator.SetFDStepSizes(3e-3,3e-3)
         self.__defaultTableVariables()
-        return 
+        return
     
     def __defaultTableVariables(self):
         vars_to_exclude = [EntropicVars.N_STATE_VARS.name]
@@ -55,7 +55,7 @@ class TableGenerator_NICFD(SU2TableGenerator_Base):
         for var in EntropicVars:
             if var.name not in vars_to_exclude:
                 self._table_vars.append(var.name)
-        return 
+        return
     
     def setTableVars(self, table_vars_in:list[str]):
         if self._Config.TwoPhase() and EntropicVars.VaporQuality.name in table_vars_in:
@@ -86,7 +86,7 @@ class TableGenerator_NICFD(SU2TableGenerator_Base):
     
     def _checkIfVariableIsValid(self, var_to_check:str):
         if var_to_check in self._state_quantities:
-            return True 
+            return True
         else:
             return False
     
@@ -112,7 +112,7 @@ class TableGenerator_NICFD(SU2TableGenerator_Base):
 
         self.__thermodynamic_data = state_dataFrame
 
-        return state_dataFrame 
+        return state_dataFrame
     
     def _createPointCloud(self, levelValue:float):
 
@@ -132,7 +132,7 @@ class TableGenerator_NICFD(SU2TableGenerator_Base):
                 if correct_phase:
                     state_data_out[i] = state_data
             except:
-                pass 
+                pass
 
         return state_data_out
 
@@ -145,10 +145,10 @@ class TableGenerator_NICFD(SU2TableGenerator_Base):
             fid.write("Table contains two-phase data\n\n")
         else:
             fid.write("Table constains single-phase data\n\n")
-        return 
+        return
     
 class TableGenerator_FGM(SU2TableGenerator_Base):
-    _Config:Config_FGM = None 
+    _Config:Config_FGM = None
 
     def __init__(self, config_in:Config_FGM):
         super().__init__(config_in)
@@ -199,7 +199,7 @@ class TableGenerator_FGM(SU2TableGenerator_Base):
 
         cv_pointcloud = CV_grid_init[idx_keep, :]
         cv_pointcloud_scaled = self._scaler_controlling_variables.transform(cv_pointcloud)
-        return cv_pointcloud_scaled 
+        return cv_pointcloud_scaled
     
     def _writeAdditionalInfoToTable(self, fid):
         fid.write("Fuel:\n")
@@ -209,4 +209,4 @@ class TableGenerator_FGM(SU2TableGenerator_Base):
         fid.write("\nProgress variable:\n")
         fid.write("+".join(["(%+.3e*%s)" % (w, sp) for w, sp in zip(self._Config.GetProgressVariableWeights(), self._Config.GetProgressVariableSpecies())]))
         fid.write("\n\n")
-        return 
+        return

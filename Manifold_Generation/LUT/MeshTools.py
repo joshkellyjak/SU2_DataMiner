@@ -1,38 +1,38 @@
-import numpy as np 
-import gmsh 
+import numpy as np
+import gmsh
 from concave_hull import concave_hull, concave_hull_indexes
-from Common.CommonMethods import shoelace, FiniteDifferenceDerivative 
+from Common.CommonMethods import shoelace, FiniteDifferenceDerivative
 
 def default_refinement_function(this, x:float, y:float, z:float):
     return 1.0
 
 class Mesh2DPlane:
 
-    __pointCloud:np.ndarray[float] = None 
-    _pointCloud_hullNodes:np.ndarray[float] = None 
+    __pointCloud:np.ndarray[float] = None
+    _pointCloud_hullNodes:np.ndarray[float] = None
     __mesh_along_coords:list[int] = [0, 1]
 
-    _gmsh_geo:gmsh.model.geo = None 
-    _gmsh_mesher:gmsh.model.mesh = None 
-    _gmsh_verbosity:int = 0 
+    _gmsh_geo:gmsh.model.geo = None
+    _gmsh_mesher:gmsh.model.mesh = None
+    _gmsh_verbosity:int = 0
     _mesher_verbosity:int = 1
 
     _base_cell_size:float = 2e-2
 
     refinement_function = default_refinement_function
 
-    __plane_area:float = None 
+    __plane_area:float = None
     __perimiter_tag:int=None
     __use_target_node_count:bool = False
     __target_node_count:int=3000
 
-    __meshNodes:np.ndarray[float] = None 
-    __connectivity:np.ndarray[int] = None 
-    __hullNodeIDs:np.ndarray[int] = None 
+    __meshNodes:np.ndarray[float] = None
+    __connectivity:np.ndarray[int] = None
+    __hullNodeIDs:np.ndarray[int] = None
 
 
     def __init__(self):
-        return 
+        return
     
     def generateMesh(self):
         self.__checkPlanarCoords()
@@ -45,7 +45,7 @@ class Mesh2DPlane:
             
         self.__meshNodes, self.__connectivity, self.__hullNodeIDs = self.__mesh2D()
         self._gmsh_geo.synchronize()
-        return 
+        return
     
     def __optimizeMeshResolution(self):
         self.__printMessage("Refining table based on target node count")
@@ -74,7 +74,7 @@ class Mesh2DPlane:
         
         if iter == niter_max:
             self.__printMessage("Target node count was not reached within %i iterations" % niter_max)
-        return 
+        return
     
     def __createGeometry(self):
         
@@ -82,7 +82,7 @@ class Mesh2DPlane:
         curvloop_table_outline, perimiter_tags = self.__createHullPerimiter()
         self._gmsh_geo.synchronize()
         self._createInternalGeometry(curvloop_table_outline, perimiter_tags)
-        return 
+        return
     
     def __mesh2D(self):
         
@@ -106,7 +106,7 @@ class Mesh2DPlane:
         equal_Z_coords = np.all(self.__pointCloud[:, const_dim]==self.__pointCloud[0, const_dim])
         if not equal_Z_coords:
             raise Exception("Point cloud does not contain planar coordinates")
-        return 
+        return
     
     def __createHullPerimiter(self):
         self._pointCloud_hullNodes = self.__findHullNodes()
@@ -140,7 +140,7 @@ class Mesh2DPlane:
         hull_pts = []
         for i in range(int(len(coords_hull_pts))):
             hull_pts.append(self._gmsh_geo.addPoint(coords_hull_pts[i, 0], coords_hull_pts[i, 1], coords_hull_pts[i, 2]))
-        return hull_pts 
+        return hull_pts
     
     def __connectHullPoints(self, pointIDs:list[int]):
         hull_lines = []
@@ -152,7 +152,7 @@ class Mesh2DPlane:
     def setInitialPointCloud(self, point_could_3D:np.ndarray[float]):
         self.__pointCloud = self.__filterNansFromPointCloud(point_could_3D)
 
-        return 
+        return
     
     def __filterNansFromPointCloud(self, point_cloud_3D:np.ndarray[float]):
         unique_pts_init = np.unique(point_cloud_3D, axis=0)
@@ -165,7 +165,7 @@ class Mesh2DPlane:
 
         planeID = self._gmsh_geo.addPlaneSurface([curvloop_perimiter])
         self._gmsh_geo.addPhysicalGroup(2, [planeID])
-        return 
+        return
     
     def __extractNodesTriangles(self):
         nodeTags, coords, _ = self._gmsh_mesher.getNodes()
@@ -222,7 +222,7 @@ class Mesh2DPlane:
         if cell_size_input <= 0:
             raise Exception("Cell size should be strictly positive")
         self._base_cell_size = cell_size_input
-        return 
+        return
     
     def _initializeGmesh(self):
         gmsh.initialize()
@@ -231,9 +231,9 @@ class Mesh2DPlane:
         gmsh.option.setNumber("Mesh.MeshSizeFromPoints",0)
         gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary",0)
 
-        self._gmsh_geo = gmsh.model.geo 
-        self._gmsh_mesher = gmsh.model.mesh 
-        return 
+        self._gmsh_geo = gmsh.model.geo
+        self._gmsh_mesher = gmsh.model.mesh
+        return
     
     def __prepareMesher(self):
         self._gmsh_geo.synchronize()
@@ -245,14 +245,14 @@ class Mesh2DPlane:
             return self._base_cell_size * refinement_factor
         
         self._gmsh_mesher.setSizeCallback(meshSizeCallback)
-        return 
+        return
     
     def setRefinementFunction(self, function_input):
         self.refinement_function = function_input
-        return 
+        return
     
     def getGmshFactory(self):
-        return self._gmsh_geo 
+        return self._gmsh_geo
     
     def getGmshMesher(self):
         return self._gmsh_mesher
@@ -261,11 +261,11 @@ class Mesh2DPlane:
         if Np_target <= 0:
             raise Exception("Target number of nodes should be positive")
         self.__target_node_count = Np_target
-        self.__use_target_node_count = True 
-        return 
+        self.__use_target_node_count = True
+        return
     
     def getMeshNodes(self):
-        return self.__meshNodes 
+        return self.__meshNodes
     
     def getConnectivity(self):
         return self.__connectivity
@@ -276,24 +276,24 @@ class Mesh2DPlane:
     def __printMessage(self, msg:str):
         if self._mesher_verbosity > 0:
             print(msg)
-        return 
+        return
     
     def setVerbosity(self, verbosity_level:int=1):
-        self._mesher_verbosity = verbosity_level 
+        self._mesher_verbosity = verbosity_level
         if self._mesher_verbosity > 1:
             self._gmsh_verbosity = 4
 
-        return 
+        return
 
 
 class MeshThermodynamicPlane(Mesh2DPlane):
 
     __includeSaturationCurve:bool=False
-    __saturation_curve_points:np.ndarray[float] = None 
+    __saturation_curve_points:np.ndarray[float] = None
 
     def __init__(self):
         super().__init__()
-        return 
+        return
     
     def _createInternalGeometry(self, perimiter_curvloop:int, perimiter_tags:list[int]):
         if self.__includeSaturationCurve:
@@ -304,7 +304,7 @@ class MeshThermodynamicPlane(Mesh2DPlane):
             self._gmsh_geo.addPhysicalGroup(2, [fluid_surf] + sat_surfs)
         else:
             super()._createInternalGeometry(perimiter_curvloop, perimiter_tags)
-        return 
+        return
     
     def __createSaturationCurveGeom(self):
         
@@ -404,7 +404,7 @@ class MeshThermodynamicPlane(Mesh2DPlane):
     
     def setSaturationCurvePoints(self, saturation_curve_rhoe:np.ndarray[float]):
         self.__saturation_curve_points = saturation_curve_rhoe
-        self.__includeSaturationCurve = True 
-        return 
+        self.__includeSaturationCurve = True
+        return
     
     

@@ -23,13 +23,13 @@
 #                                                                                             |
 #=============================================================================================#
 import numpy as np
-import pandas as pd 
-import meshio 
+import pandas as pd
+import meshio
 import pandas
 from os import sep
 from sklearn.preprocessing import MinMaxScaler
 from multiprocessing import Pool
-from scipy.interpolate import RBFInterpolator 
+from scipy.interpolate import RBFInterpolator
 
 from Common.Interpolators import fluidDataInterpolator
 from Common.DataDrivenConfig import Config
@@ -38,9 +38,9 @@ from Manifold_Generation.LUT.MeshTools import Mesh2DPlane
 
 class SU2TableGenerator_Base:
     
-    _Config:Config = None 
+    _Config:Config = None
     _nDim_table:int=2
-    _base_cell_size:float = 2e-2 
+    _base_cell_size:float = 2e-2
     _target_number_of_nodes:int = None
 
     _table_vars:list[str] = []
@@ -56,13 +56,13 @@ class SU2TableGenerator_Base:
     _conditional_refinement_factor:list[float] = [] # Refinement factors to apply within the bounds
 
     _scaler_controlling_variables:MinMaxScaler = MinMaxScaler()
-    _fluid_data_interpolator:fluidDataInterpolator = None 
+    _fluid_data_interpolator:fluidDataInterpolator = None
 
-    __smoothTableData:bool = False 
-    __smoothingLevel:float = 0.1 
+    __smoothTableData:bool = False
+    __smoothingLevel:float = 0.1
 
-    __N_nearest_neighbors:int = None 
-    __inverse_distance_exponent:float = None 
+    __N_nearest_neighbors:int = None
+    __inverse_distance_exponent:float = None
 
     _N_table_levels:int = None
     _table_levels:np.ndarray[float] = []
@@ -70,7 +70,7 @@ class SU2TableGenerator_Base:
     _tableLowerLevel:float = None
     _table_level_inserts:list[float] = []
 
-    __run_parallel:bool = False 
+    __run_parallel:bool = False
     __N_cores:int = 1
 
     _state_quantities:list[str] = []
@@ -80,19 +80,19 @@ class SU2TableGenerator_Base:
     _verbosity:int=1
 
     def __init__(self, config_in:Config):
-        self._Config = config_in 
+        self._Config = config_in
         self._nDim_table = len(self._Config.GetControllingVariables())
-        return 
+        return
     
     def defineInterpolator(self):
         stateDataFrame = self._getFluidDataPointCloud()
         cv_data = np.column_stack(tuple(stateDataFrame[cv] for cv in self._Config.GetControllingVariables()))
         cv_data_scaled = self._scaler_controlling_variables.fit_transform(cv_data)
         self._fluid_data_interpolator = fluidDataInterpolator(cv_data_scaled, stateDataFrame, self.__N_nearest_neighbors, self.__inverse_distance_exponent)
-        return 
+        return
     
     def _getFluidDataPointCloud(self):
-        return 
+        return
      
     def setMaximumCellSize(self, cell_size_coarse:float=1e-2):
         """Specify the coarse level cell size of the table
@@ -106,7 +106,7 @@ class SU2TableGenerator_Base:
     
     def setTargetNodeCount(self, target_node_count:int=3000):
         self._target_number_of_nodes = target_node_count
-        return 
+        return
     
     def addRefinementCriterion(self, varname:str, lowerbound:float=-np.inf, upperbound:float=np.inf, coef:float=0.5):
         """Specify conditional refinement based on interpolated thermochemical state data. Cell sizes are reduced by a factor "coef" where the table data lies between the specified lower bound and upper bound (inclusive)
@@ -168,11 +168,11 @@ class SU2TableGenerator_Base:
 
         if self.__smoothTableData:
             self.smoothTableLevelData()
-        return 
+        return
     
     def __preprocessTableSettings(self):
         self.__processTableLevels()
-        return 
+        return
     
     def meshTableLevel(self, level_index:int):
         pointCloud = self._createPointCloud(self._table_levels[level_index])
@@ -224,7 +224,7 @@ class SU2TableGenerator_Base:
     
 
     def _createPointCloud(self, levelValue:float):
-        return 
+        return
     
     def _initiateMesher(self):
         return Mesh2DPlane()
@@ -234,7 +234,7 @@ class SU2TableGenerator_Base:
         if self._target_number_of_nodes:
             mesher.setTargetNodeCount(self._target_number_of_nodes)
         mesher.setRefinementFunction(self._refinelocation)
-        return 
+        return
     
     def _calculateTableStateData(self, cv_table_nodes:np.ndarray[float]):
         return self._fluid_data_interpolator(cv_table_nodes)
@@ -267,10 +267,10 @@ class SU2TableGenerator_Base:
                 self._table_vars.append(user_var)
             else:
                 raise Exception("%s is not supported for table output variables")
-        return 
+        return
     
     def _checkIfVariableIsValid(self, var_to_check:str):
-        return True 
+        return True
     
     
     def writeParaviewTable(self, filepath_out:str=None):
@@ -286,7 +286,7 @@ class SU2TableGenerator_Base:
             
             self.__writeParaViewVTK(cv_nodes_scaled, self._data_in_table[iLevel], self._table_connectivity[iLevel], table_level_filename)
         self.__printmsg("Done")
-        return 
+        return
     
     def __writeParaViewVTK(self, cv_coordinates:np.ndarray[float], table_data:pandas.DataFrame, connectivity:np.ndarray[int], file_name_out:str):
         
@@ -322,7 +322,7 @@ class SU2TableGenerator_Base:
                 if var not in self._Config.GetControllingVariables():
                     self._data_in_table[iLevel][var] = smoothened_table_data[:, ivar]
         self.__printmsg("Done")
-        return 
+        return
     
     def writeSU2Table(self, filepath_out:str=None):
         
@@ -416,59 +416,59 @@ class SU2TableGenerator_Base:
     def setTableLevels(self, level_values:np.ndarray[float]):
         if self.__optionAppliesFor3D():
             self._table_levels = level_values
-        return 
+        return
     
     def setTableLimits(self, lower_limit:float, upper_limit:float):
         if self.__optionAppliesFor3D():
             if lower_limit >= upper_limit:
                 raise Exception("Table upper level value should exceed lower level value")
             self._tableLowerLevel = lower_limit
-            self._tableUpperLevel = upper_limit 
-        return 
+            self._tableUpperLevel = upper_limit
+        return
     
     def setNTableLevels(self, N_levels:int=10):
         if self.__optionAppliesFor3D():
             if N_levels <= 0:
                 raise Exception("Number of table levels should be positive")
             self._N_table_levels = N_levels
-        return 
+        return
     
     def insertTableLevel(self, level_value:float):
         if self.__optionAppliesFor3D():
             self._table_level_inserts.append(level_value)
-        return 
+        return
     
     def setNProcessors(self, N_cores:int=2):
         if self.__optionAppliesFor3D():
             if N_cores <= 1:
                 raise Exception("At least two cores should be used")
-            self.__run_parallel = True 
-            self.__N_cores = N_cores 
-        return 
+            self.__run_parallel = True
+            self.__N_cores = N_cores
+        return
     
     def setNNearestNeighbors(self, N_input:int=6):
         if N_input < 1:
             raise Exception("Number of nearest neighbors should be strictly positive")
         self.__N_nearest_neighbors = N_input
-        return 
+        return
     
     def setInverseDistanceExponent(self, p_factor:float=2):
         if p_factor <= 0:
             raise Exception("Inverse distance parameter value should be positive")
         self.__inverse_distance_exponent = p_factor
-        return 
+        return
     
     def setSmoothingParameter(self, smoothing_factor:float=0):
-        self.__smoothTableData = True 
-        self.__smoothingLevel = smoothing_factor 
-        return 
+        self.__smoothTableData = True
+        self.__smoothingLevel = smoothing_factor
+        return
     
     def __optionAppliesFor3D(self):
         if self.__is2D():
             print("Option does not apply for two-dimensional table, ignoring")
             return False
         else:
-            return True 
+            return True
 
     def __is2D(self):
         return self._nDim_table==2
@@ -496,16 +496,16 @@ class SU2TableGenerator_Base:
         else:
             self._table_levels = [0]
             self._N_table_levels = 1
-        return 
+        return
     
     def __printmsg(self, msg:str):
         if self._verbosity > 0:
             print(msg)
-        return 
+        return
     
     def setVerbosity(self, verbosity_level:int=1):
         if verbosity_level < 0 or verbosity_level > 4:
             raise Exception("Verbosity level should be between 0 and 4")
-        self._verbosity = verbosity_level 
-        return 
+        self._verbosity = verbosity_level
+        return
     
