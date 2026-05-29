@@ -59,4 +59,3 @@ Config.PrintBanner()
 Config.SetConfigName("MM_config_SU2_2024")
 
 Config.SaveConfig()
- 
