@@ -787,7 +787,7 @@ class Config_FGM(Config):
     __generate_equilibrium:bool = DefaultSettings_FGM.include_equilibrium     # Generate chemical equilibrium data
     __generate_counterflames:bool = DefaultSettings_FGM.include_counterflames   # Generate counter-flow diffusion flamelets.
 
-    __flamelet_types_in_manifold:list[str] = [FlameletSolverOptions[0]]
+    __flamelet_types:list[str] = [FlameletSolverOptions[0]]
 
     __write_MATLAB_files:bool = False  # Write TableGenerator compatible flamelet files.
 
@@ -1496,23 +1496,27 @@ class Config_FGM(Config):
         if flamelet_type not in FlameletSolverOptions:
             raise Exception("%s is not recognized as a viable flamelet type" % flamelet_type)
         
-        if flamelet_type not in self.__flamelet_types_in_manifold:
-            self.__flamelet_types_in_manifold.append(flamelet_type)
+        if flamelet_type not in self.__flamelet_types:
+            self.__flamelet_types.append(flamelet_type)
         return 
 
+    def setFlameletTypes(self, flamelet_types:list[str]):
+        self.__flamelet_types = flamelet_types.copy()
+        return 
+    
     def excludeFlameletType(self, flamelet_type:str):
         if flamelet_type not in FlameletSolverOptions:
             raise Exception("%s is not recognized as a viable flamelet type" % flamelet_type)
         
-        if flamelet_type in self.__flamelet_types_in_manifold:
-            self.__flamelet_types_in_manifold.remove(flamelet_type)
+        if flamelet_type in self.__flamelet_types:
+            self.__flamelet_types.remove(flamelet_type)
         
-        if len(self.__flamelet_types_in_manifold) == 0:
+        if len(self.__flamelet_types) == 0:
             raise Exception("At least one flamelet type should be included in the manifold")
         return 
 
     def getFlameletTypes(self):
-        return self.__flamelet_types_in_manifold 
+        return self.__flamelet_types 
 
     def RunFreeFlames(self, input:bool=DefaultSettings_FGM.include_freeflames):
         """
@@ -2444,7 +2448,6 @@ class Config_FGM(Config):
         :type file_name: str
         """
         self.__SynchronizeSettings()
-
         file = open(self._config_name+'.cfg','wb')
         pickle.dump(self, file)
         file.close()
