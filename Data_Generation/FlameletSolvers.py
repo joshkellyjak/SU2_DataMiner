@@ -12,7 +12,7 @@ class FlameletSolver_Cantera:
     _flamelet_type:str = "None"
 
     _flameletTypeOutputFolder:str = ""
-    _output_filepath:str 
+    _output_filepath:str = "./"
     _flamelet_filename:str 
 
     _canteraSolution:ct.Solution = None 
@@ -53,7 +53,7 @@ class FlameletSolver_Cantera:
 
         self._prepareStorageFolder()
 
-        self._startSolver()
+        self.startSolver()
 
         if self.__printToTerminal():
             self._printStatusToTerminal()
@@ -105,7 +105,7 @@ class FlameletSolver_Cantera:
         mixture_subfolder = "%s_%.1f" % (tag_for_mixture_status, self._reactant_mixture_status)
         return mixture_subfolder 
     
-    def _startSolver(self):
+    def startSolver(self):
         self._prepareFlameletSimulation()
         self._computeFlameletSolution()
         self._postProcessResults()
@@ -223,7 +223,7 @@ class FlameletSolver_Cantera:
         return 
     
     def _commonPreprocessing(self):
-        self._flameletSolution.set_gridRefinementCriteria(**self._gridRefinementCriteria)
+        self._flameletSolution.set_refine_criteria(**self._gridRefinementCriteria)
         self._flameletSolution.transport_model = self._Config.GetTransportModel()
         return 
     
@@ -426,7 +426,7 @@ class FreeFlameSolver(FlameletSolver_Cantera):
                                                                             tag_for_mixture_status,\
                                                                             self._reactant_mixture_status,\
                                                                             self._T_reactants,\
-                                                                            solution_index,\
+                                                                            self._iteration,\
                                                                             self._Config.GetNpTemp()))
         return 
     
@@ -467,7 +467,7 @@ class BurnerFlameSolver(FlameletSolver_Cantera):
             freeflame_solver:FreeFlameSolver = FreeFlameSolver(self._Config)
             freeflame_solver.setMixtureStatus(self._reactant_mixture_status)
             freeflame_solver.setReactantTemperature(self._Config.GetUnbTempBounds()[0])
-            freeflame_solver._startSolver()
+            freeflame_solver.startSolver()
             if freeflame_solver.isBurning() and freeflame_solver.isConverged():
                 self.__adiabatic_massflow = freeflame_solver.getMassFlowRate()
             else:
@@ -542,6 +542,8 @@ class EquilibriumSolver(FlameletSolver_Cantera):
     __is_reaction_products:bool = False
     __is_lean:bool = False 
     __accumulated_solution:pd.DataFrame = pd.DataFrame()
+    __solution_reactants:pd.DataFrame = pd.DataFrame()
+    __solution_products:pd.DataFrame = pd.DataFrame()
 
     def __init__(self, config_input:Config_FGM):
         FlameletSolver_Cantera.__init__(self, config_input)
@@ -553,9 +555,13 @@ class EquilibriumSolver(FlameletSolver_Cantera):
         self.__is_reaction_products = False 
         self.__accumulated_solution = pd.DataFrame()
         super().solveForMixtureStatus(val_mixture_status)
+        self.__solution_reactants = self.__accumulated_solution
+
         self.__is_reaction_products = True
         self.__accumulated_solution = pd.DataFrame()
         super().solveForMixtureStatus(val_mixture_status)
+        self.__solution_products = self.__accumulated_solution
+
         return 
     
     def _solverSpecificPreprocessing(self):
@@ -691,7 +697,86 @@ class EquilibriumSolver(FlameletSolver_Cantera):
             if val_mixture_status <= 1.0:
                 self.__is_lean = True 
         return 
+
+    def getThermoChemicalData(self, is_reactants=True):
+        if is_reactants:
+            return self.__solution_reactants
+        else:
+            return self.__solution_products
     
+class CooledFlameInterpolator(FlameletSolver_Cantera):
+    __burnerFlameSolution:pd.DataFrame = None 
+    __equilibriumSolution:pd.DataFrame = None 
+    __N_iteration:int = 20
+    __src_interp_exponent:float = 2.0
+
+    def __init__(self, config:Config_FGM):
+        super().__init__(config)
+        self._flameletTypeOutputFolder = "interpolated_burnerflame_data"
+        self._flamelet_type = "BurnerflameInt"
+        return 
+    
+    def setEquilibriumData(self, eq_data:pd.DataFrame):
+        self.__equilibriumSolution = eq_data
+        return 
+    
+    def setBurnerFlameData(self, burner_data:pd.DataFrame):
+        self.__burnerFlameSolution = burner_data 
+        return 
+    
+    def _prepareSettingRange(self):
+        iter_values = [i for i in range(self.__N_iteration)]
+        return iter_values
+    
+    def setInputVariable(self, val_input:float):
+        self._iteration = val_input
+        return 
+    
+    def _computeFlameletSolution(self):
+        ratio = float(self._iteration + 1) / float(self.__N_iteration)
+        w_a_lin = 1.0 - ratio                   # linear weight toward burner flame
+        w_a_src = (1.0 - ratio) ** self.__src_interp_exponent          # power-law weight for source terms
+        w_b_src = 1.0 - w_a_src
+
+        T_eq = self.__equilibriumSolution[FGMVars.Temperature.name]
+        iMin = np.argmin(T_eq)
+
+        exponential_interpolation = w_a_src * self.__burnerFlameSolution.values + w_b_src * self.__equilibriumSolution.values[iMin]
+
+        linear_interpolation = w_a_lin * self.__burnerFlameSolution.values + ratio * self.__equilibriumSolution.values[iMin]
+
+        self._thermochemical_solution = pd.DataFrame()
+        for iVar, var in enumerate(self.__burnerFlameSolution.keys()):
+            if (var==FGMVars.Heat_Release.name) or "Y_dot" in var:
+                self._thermochemical_solution[var] = exponential_interpolation[:, iVar]
+            else:
+                self._thermochemical_solution[var] = linear_interpolation[:, iVar]
+        return 
+    
+    def _extractThermoChemicalData(self):
+        return 
+    
+    def _setFlameletFileName(self):
+        if self._Config.GetMixtureStatus():
+            tag_for_mixture_status="mixfrac"
+        else:
+            tag_for_mixture_status="phi"
+        flamelet_filename = "%s_%s%.1f_iter%i.csv" % (self._flamelet_type, \
+                                                        tag_for_mixture_status, \
+                                                        self._reactant_mixture_status, \
+                                                        self._iteration)
+        return flamelet_filename
+    
+    def retrieveSolverSettings(self, solvers):
+        burnerflameSolver = solvers["BURNERFLAME"]
+        equilibriumSolver = solvers["EQUILIBRIUM"]
+        self.setBurnerFlameData(burnerflameSolver.getThermoChemicalData())
+        self.setEquilibriumData(equilibriumSolver.getThermoChemicalData(), False)
+        return 
+    
+    def _commonPreprocessing(self):
+        return 
 FlameletSolverDict:dict = {"FREEFLAME" : FreeFlameSolver,\
                            "BURNERFLAME" : BurnerFlameSolver,\
-                            "EQUILIBRIUM" : EquilibriumSolver}
+                           "EQUILIBRIUM" : EquilibriumSolver,\
+                            "INT_BURNERFLAME" : CooledFlameInterpolator}
