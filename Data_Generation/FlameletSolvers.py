@@ -1,7 +1,8 @@
 import cantera as ct 
-from os import sep, path, mkdir
+from os import sep, path, mkdir, getcwd
 from typing import Dict
 import numpy as np
+import matplotlib.pyplot as plt
 import pandas as pd 
 from Common.DataDrivenConfig import Config_FGM
 from Common.Properties import DefaultSettings_FGM, FGMVars
@@ -12,14 +13,17 @@ class FlameletSolver_Cantera:
     _flamelet_type:str = "None"
 
     _flameletTypeOutputFolder:str = ""
-    _output_filepath:str = "./"
+    _output_filepath:str = getcwd()
     _flamelet_filename:str 
 
     _canteraSolution:ct.Solution = None 
 
     _flameletSolution:ct.FlameBase = None 
     _iteration:int = 0
-    __from_restart:bool=False
+    _n_1D_iterations:int = 10
+    _print_iteration:bool =False
+
+    _from_restart:bool=False
     _flameletSolutionForRestart:ct.FlameBase = None 
 
     
@@ -27,14 +31,14 @@ class FlameletSolver_Cantera:
     _reactant_mixture_status:float = 0.0
     _pressure:float = ct.one_atm
 
-    __initial_grid_length:float = 1e-2 
+    _initial_grid_length:float = 0.2
     __initial_grid_number_of_points:int = 30
     _initial_grid:np.ndarray[float] = None 
     _gridRefinementCriteria:dict={"ratio":2,\
                                   "slope":0.025,\
                                   "curve":0.025,\
                                   "prune":0.01}
-    
+    _max_grid_points:int=2000
     __cantera_loglevel:int=0 
     __flameletSolverLogLevel:int=1
 
@@ -47,35 +51,39 @@ class FlameletSolver_Cantera:
         self._canteraSolution = ct.Solution(self._Config.GetReactionMechanism())
         return 
     
-    def solveAndSaveFor(self, flamelet_solution_settings:Dict[str,float]):
-
+    def solveFor(self, **flamelet_solution_settings):
         self._parseInputSettings(flamelet_solution_settings)
-
-        self._prepareStorageFolder()
-
         self.startSolver()
-
-        if self.__printToTerminal():
-            self._printStatusToTerminal()
-
         return 
     
-    def solveForMixtureStatus(self, val_mixture_status:float):
+    def solveAndSaveFor(self, **flamelet_solution_settings):
+        self._parseInputSettings(flamelet_solution_settings)
+        self.startSolver()
+        self._prepareStorageFolder()
+        self._writeOutput()
+        return 
+    
+    def solveForMixtureStatus(self, val_mixture_status:float, save:bool=True):
 
         self.setMixtureStatus(val_mixture_status)
 
         vals_input_settings = self._prepareSettingRange()
         for i, q in enumerate(vals_input_settings):
             solver_specific_settings = self._writeSolverSettings(i, q)
-            self.solveAndSaveFor(solver_specific_settings)
+            self._parseInputSettings(solver_specific_settings)
+            self.startSolver()
+            if save:
+                self.saveSolution()
+        
+        self.resetRestart()
         return 
     
-
+    def saveSolution(self):
+        self._prepareStorageFolder()
+        self._writeOutput()
+        return 
+    
     def _parseInputSettings(self, flamelet_solution_settings):
-        if "iteration" in flamelet_solution_settings.keys():
-            self._iteration = flamelet_solution_settings["iteration"]
-        else:
-            self._iteration = 0
         return 
     
     def _prepareStorageFolder(self):
@@ -102,13 +110,15 @@ class FlameletSolver_Cantera:
         else:
             tag_for_mixture_status="phi"
 
-        mixture_subfolder = "%s_%.1f" % (tag_for_mixture_status, self._reactant_mixture_status)
+        mixture_subfolder = "%s_%.4f" % (tag_for_mixture_status, self._reactant_mixture_status)
         return mixture_subfolder 
     
     def startSolver(self):
         self._prepareFlameletSimulation()
         self._computeFlameletSolution()
         self._postProcessResults()
+        if self.__printToTerminal():
+            self._printStatusToTerminal()
         return 
     
     def _prepareFlameletSimulation(self):
@@ -151,7 +161,7 @@ class FlameletSolver_Cantera:
         return self._flamelet_type
     
     def setInitialGrid(self, initial_grid_length_in_meters:float=1.8e-2, number_of_nodes:int=100):
-        self.__initial_grid_length = initial_grid_length_in_meters
+        self._initial_grid_length = initial_grid_length_in_meters
         self.__initial_grid_number_of_points = number_of_nodes 
         return 
     
@@ -170,9 +180,8 @@ class FlameletSolver_Cantera:
         self.__flameletSolverLogLevel = verbose_level 
         return 
     
-    
-    
     def _prepareSettingRange(self):
+        self._print_iteration=True
         return 
     
     def setInputVariable(self, val_input:float):
@@ -185,8 +194,8 @@ class FlameletSolver_Cantera:
         return 
     
     
-    
     def _writeSolverSettings(self, solution_index:int, setting_1D:float):
+        self._iteration = solution_index
         return 
     
     
@@ -212,14 +221,15 @@ class FlameletSolver_Cantera:
     def _fromRestart(self):
         if self._flameletSolutionForRestart:
             self._flameletSolution = self._flameletSolutionForRestart
-            self.__from_restart = True 
+            self._from_restart = True 
             self._flameletSolution.gas = self._canteraSolution
+            
         else:
-            self.__from_restart = False 
+            self._from_restart = False 
         return 
     
     def _solverSpecificPreprocessing(self):
-        self._initial_grid = np.linspace(0, self.__initial_grid_length, self.__initial_grid_number_of_points)
+        self._initial_grid = np.linspace(0, self._initial_grid_length, self.__initial_grid_number_of_points)
         return 
     
     def _commonPreprocessing(self):
@@ -229,7 +239,7 @@ class FlameletSolver_Cantera:
     
     def _computeFlameletSolution(self):
         try:
-            automatic_grid_refinement = not self.__from_restart
+            automatic_grid_refinement = not self._from_restart
             self._flameletSolution.solve(loglevel=self.__cantera_loglevel, refine_grid=True, auto=automatic_grid_refinement)
             self._converged_solution = True 
 
@@ -246,7 +256,8 @@ class FlameletSolver_Cantera:
     
     def _postProcessResults(self):
         self._extractThermoChemicalData()
-        self._writeOutput()
+        if self.isConverged():
+            self._flameletSolutionForRestart = self._flameletSolution
         return 
     
     def getFlameletSolution(self):
@@ -287,14 +298,13 @@ class FlameletSolver_Cantera:
         pos_reaction_rate = net_reaction_rate - neg_reaction_rate
         Y_dot_net = net_reaction_rate * molecular_weights
         Y_dot_pos = pos_reaction_rate * molecular_weights
-        Y_dot_neg = neg_reaction_rate * molecular_weights / (mass_fractions+1e-11)
+        Y_dot_neg = -neg_reaction_rate * molecular_weights / (mass_fractions+1e-11)
         for species_index, species_name in enumerate(self._canteraSolution.species_names):
             self._thermochemical_solution["Y_dot_net-%s" % species_name] = Y_dot_net[species_index]
         for species_index, species_name in enumerate(self._canteraSolution.species_names):
             self._thermochemical_solution["Y_dot_pos-%s" % species_name] = Y_dot_pos[species_index]
         for species_index, species_name in enumerate(self._canteraSolution.species_names):
             self._thermochemical_solution["Y_dot_neg-%s" % species_name] = Y_dot_neg[species_index]
-
         species_specific_heat = self._flameletSolution.partial_molar_cp / molecular_weights
         species_specific_enthalpy = self._flameletSolution.partial_molar_enthalpies / molecular_weights
 
@@ -355,25 +365,37 @@ class FlameletSolver_Cantera:
         self._thermochemical_solution.to_csv(filePathName,index=False)
         return 
     
+    def resetRestart(self):
+        self._flameletSolutionForRestart = None 
+        self._from_restart = False 
+        return 
+    
 class FreeFlameSolver(FlameletSolver_Cantera):
-    __mass_flow_rate:float = 0.0;
+    __mass_flow_rate:float = 0.0
 
     def __init__(self, config_input:Config_FGM):
         FlameletSolver_Cantera.__init__(self, config_input)
         self._flameletTypeOutputFolder = "freeflame_data"
         self._flamelet_type = "Freeflame"
+        self._n_1D_iterations = self._Config.GetNpTemp()
+        #self.setGridRefinementCriteria(ratio=3, slope=0.03, curve=0.03, prune=0.01)
         return 
     
     
     def _solverSpecificPreprocessing(self):
         super()._solverSpecificPreprocessing()
-        self._flameletSolution = ct.FreeFlame(self._canteraSolution, self._initial_grid)
+        if not self._from_restart:
+            self._flameletSolution = ct.FreeFlame(self._canteraSolution, self._initial_grid)
+            self._flameletSolution.set_initial_guess(locs=[0.0, 0.3, 0.5, 1.0])
+            self._flameletSolution.max_grid_points = self._max_grid_points
+        self._flameletSolution.inlet.T = self._T_reactants
+        
         return 
     
     def _prepareSettingRange(self):
+        super()._prepareSettingRange()
         Tu_bounds = self._Config.GetUnbTempBounds()
-        Np_temp = self._Config.GetNpTemp()
-        Tu_range = np.linspace(Tu_bounds[0], Tu_bounds[1], Np_temp)
+        Tu_range = np.linspace(Tu_bounds[1], Tu_bounds[0], self._n_1D_iterations)
         return Tu_range 
     
     def _parseInputSettings(self, flamelet_solution_settings):
@@ -384,6 +406,7 @@ class FreeFlameSolver(FlameletSolver_Cantera):
         return super()._parseInputSettings(flamelet_solution_settings)
     
     def _writeSolverSettings(self, solution_index:int, setting_1D:float):
+        super()._writeSolverSettings(solution_index, setting_1D)
         freeflame_settings = {"reactant_temperature":setting_1D, "solution_index":solution_index}
         return freeflame_settings
     
@@ -396,7 +419,7 @@ class FreeFlameSolver(FlameletSolver_Cantera):
             tag_for_mixture_status="mixfrac"
         else:
             tag_for_mixture_status="phi"
-        flamelet_filename = "%s_%s%.1f_Tu%.1f.csv" % (self._flamelet_type, \
+        flamelet_filename = "%s_%s%.4f_Tu%.1f.csv" % (self._flamelet_type, \
                                                         tag_for_mixture_status, \
                                                         self._reactant_mixture_status, \
                                                         self._T_reactants)
@@ -408,26 +431,24 @@ class FreeFlameSolver(FlameletSolver_Cantera):
         else:
             tag_for_mixture_status="phi"
         if not self.isConverged():
-            print("%s simulation at %s=%.2f, Tu=%.2f did not converge (%i/%i)" % (self._flamelet_type,\
+            outp_message = "%s simulation at %s=%.3f, Tu=%.2f did not converge " % (self._flamelet_type,\
                                                                                   tag_for_mixture_status,\
                                                                                   self._reactant_mixture_status,\
-                                                                                  self._T_reactants,\
-                                                                                  self._iteration,\
-                                                                                  self._Config.GetNpTemp()))
+                                                                                  self._T_reactants)
         elif not self.isBurning():
-            print("%s at %s=%.2f, Tu=%.2f did not ignite (%i/%i)" % (self._flamelet_type,\
+            outp_message = "%s at %s=%.3f, Tu=%.2f did not ignite " % (self._flamelet_type,\
                                                                     tag_for_mixture_status,\
                                                                     self._reactant_mixture_status,\
-                                                                    self._T_reactants,\
-                                                                    self._iteration,\
-                                                                    self._Config.GetNpTemp()))
+                                                                    self._T_reactants)
         else:
-            print("Successful %s simulation at %s=%.2f, Tu=%.2f (%i/%i)" % (self._flamelet_type,\
+            outp_message = "Successful %s simulation at %s=%.3f, Tu=%.2f " % (self._flamelet_type,\
                                                                             tag_for_mixture_status,\
                                                                             self._reactant_mixture_status,\
-                                                                            self._T_reactants,\
-                                                                            self._iteration,\
-                                                                            self._Config.GetNpTemp()))
+                                                                            self._T_reactants)
+        
+        if self._print_iteration:
+            outp_message += "(%i/%i)" % (self._iteration+1, self._n_1D_iterations)
+        print(outp_message)
         return 
     
     def _writeOutput(self):
@@ -445,7 +466,9 @@ class BurnerFlameSolver(FlameletSolver_Cantera):
         FlameletSolver_Cantera.__init__(self, config_input)
         self._flameletTypeOutputFolder = "burnerflame_data"
         self._flamelet_type = "Burnerflame"
-
+        #self.setGridRefinementCriteria(ratio=3, slope=0.15, curve=0.15, prune=0.05)
+        return 
+    
     def setReactantMassFlow(self, val_massflow_inlet:float):
         self.__val_massflow = val_massflow_inlet
         return 
@@ -455,7 +478,8 @@ class BurnerFlameSolver(FlameletSolver_Cantera):
     
     def _solverSpecificPreprocessing(self):
         super()._solverSpecificPreprocessing()
-        self._flameletSolution = ct.BurnerFlame(self._canteraSolution, self._initial_grid)
+        if not self._from_restart:
+            self._flameletSolution = ct.BurnerFlame(self._canteraSolution, self._initial_grid)
         self._flameletSolution.burner.mdot = self.__val_massflow
         return 
     
@@ -475,10 +499,10 @@ class BurnerFlameSolver(FlameletSolver_Cantera):
         return 
     
     def _prepareSettingRange(self):
-        mdot_max = self.__adiabatic_massflow
-        mdot_min = 0.001*mdot_max
-        Np = self._Config.GetNpTemp()
-        m_dot_range = np.linspace(mdot_max, mdot_min, Np+1)[:-1]
+        super()._prepareSettingRange()
+        mdot_max = 0.98 * self.__adiabatic_massflow
+        mdot_min = 0.001 * mdot_max
+        m_dot_range = np.linspace(mdot_max, mdot_min, self._n_1D_iterations+1)[:-1]
         return m_dot_range
     
     def setInputVariable(self, val_input:float):
@@ -495,7 +519,8 @@ class BurnerFlameSolver(FlameletSolver_Cantera):
         return super()._parseInputSettings(flamelet_solution_settings)
     
     def _writeSolverSettings(self, solution_index:int, setting_1D:float):
-        freeflame_settings = {"mdot":setting_1D, "solution_index":solution_index}
+        super()._writeSolverSettings(solution_index, setting_1D)
+        freeflame_settings = {"mdot":setting_1D}
         return freeflame_settings
     
     def _setFlameletFileName(self):
@@ -503,7 +528,7 @@ class BurnerFlameSolver(FlameletSolver_Cantera):
             tag_for_mixture_status="mixfrac"
         else:
             tag_for_mixture_status="phi"
-        flamelet_filename = "%s_%s%.1f_mdot%.3f.csv" % (self._flamelet_type,\
+        flamelet_filename = "%s_%s%.4f_mdot%.3f.csv" % (self._flamelet_type,\
                                                         tag_for_mixture_status,\
                                                         self._reactant_mixture_status,\
                                                         self.__val_massflow)
@@ -515,26 +540,24 @@ class BurnerFlameSolver(FlameletSolver_Cantera):
         else:
             tag_for_mixture_status="phi"
         if not self.isConverged():
-            print("%s simulation at %s=%.2f, mdot=%.2f did not converge (%i/%i)" % (self._flamelet_type,\
+            output_message = "%s simulation at %s=%.3f, mdot=%.3f kg/m2/s did not converge " % (self._flamelet_type,\
                                                                                   tag_for_mixture_status,\
                                                                                   self._reactant_mixture_status,\
-                                                                                  self.__val_massflow,\
-                                                                                  self._iteration,\
-                                                                                  self._Config.GetNpTemp()))
+                                                                                  self.__val_massflow)
         elif not self.isBurning():
-            print("%s at %s=%.2f, mdot=%.2f did not ignite (%i/%i)" % (self._flamelet_type,\
+            output_message = "%s at %s=%.3f, mdot=%.3f kg/m2/s did not ignite " % (self._flamelet_type,\
                                                                     tag_for_mixture_status,\
                                                                     self._reactant_mixture_status,\
-                                                                    self.__val_massflow,\
-                                                                    self._iteration,\
-                                                                    self._Config.GetNpTemp()))
+                                                                    self.__val_massflow)
         else:
-            print("Successful %s simulation at %s=%.2f, mdot=%.2f (%i/%i)" % (self._flamelet_type,\
+            output_message = "Successful %s simulation at %s=%.3f, mdot=%.3f kg/m2/s " % (self._flamelet_type,\
                                                                             tag_for_mixture_status,\
                                                                             self._reactant_mixture_status,\
-                                                                            self.__val_massflow,\
-                                                                            self._iteration,\
-                                                                            self._Config.GetNpTemp()))
+                                                                            self.__val_massflow)
+        if self._print_iteration:
+            output_message += "(%i/%i)" % (self._iteration+1, self._n_1D_iterations)
+
+        print(output_message)
         return 
     
 
@@ -549,19 +572,21 @@ class EquilibriumSolver(FlameletSolver_Cantera):
         FlameletSolver_Cantera.__init__(self, config_input)
         self._flameletTypeOutputFolder = "equilibrium_data"
         self._flamelet_type = "Equilibrium"
+        self._n_1D_iterations = self._Config.GetNpTemp()
         return 
     
-    def solveForMixtureStatus(self, val_mixture_status:float):
+    def solveForMixtureStatus(self, val_mixture_status:float, save:bool=True):
         self.__is_reaction_products = False 
         self.__accumulated_solution = pd.DataFrame()
-        super().solveForMixtureStatus(val_mixture_status)
+        super().solveForMixtureStatus(val_mixture_status, save)
         self.__solution_reactants = self.__accumulated_solution
 
         self.__is_reaction_products = True
         self.__accumulated_solution = pd.DataFrame()
-        super().solveForMixtureStatus(val_mixture_status)
+        super().solveForMixtureStatus(val_mixture_status, save)
         self.__solution_products = self.__accumulated_solution
 
+        self.resetRestart()
         return 
     
     def _solverSpecificPreprocessing(self):
@@ -578,13 +603,14 @@ class EquilibriumSolver(FlameletSolver_Cantera):
    
     
     def _writeSolverSettings(self, solution_index:int, setting_1D:float):
-        freeflame_settings = {"reactant_temperature":setting_1D, "solution_index":solution_index}
+        super()._writeSolverSettings(solution_index, setting_1D)
+        freeflame_settings = {"reactant_temperature":setting_1D}
         return freeflame_settings
     
 
     def _prepareSettingRange(self):
+        super()._prepareSettingRange()
         Tu_bounds = self._Config.GetUnbTempBounds()
-        Np_temp = self._Config.GetNpTemp()
         if self.__is_reaction_products:
             T_min = Tu_bounds[0]
             self._canteraSolution.TP = Tu_bounds[1], ct.one_atm
@@ -601,8 +627,7 @@ class EquilibriumSolver(FlameletSolver_Cantera):
             T_min = Tu_bounds[0]
             T_max = Tu_bounds[1]
 
-        T_range = np.linspace(T_min, T_max, Np_temp)
-
+        T_range = np.linspace(T_max, T_min, self._n_1D_iterations)
         return T_range
     
     def setInputVariable(self, val_input:float):
@@ -614,10 +639,8 @@ class EquilibriumSolver(FlameletSolver_Cantera):
         try:
             self._canteraSolution.TP = self._T_reactants, ct.one_atm 
             self._converged_solution = True 
-            self._flamelet_is_burning = True 
         except:
             self._converged_solution = False 
-            self._flamelet_is_burning = False 
         return 
     
     def _extractFlameletDiscretization(self):
@@ -646,18 +669,22 @@ class EquilibriumSolver(FlameletSolver_Cantera):
             file_header = "Products"
         else:
             file_header = "Reactants"
-        flamelet_filename = "%s_%s%.1f.csv" % (file_header, \
-                                                        tag_for_mixture_status, \
-                                                        self._reactant_mixture_status)
+        flamelet_filename = "%s_%s%.4f.csv" % (file_header, \
+                                                tag_for_mixture_status, \
+                                                self._reactant_mixture_status)
         return flamelet_filename
     
-    def _writeOutput(self):
-        if self.isConverged() and self.isBurning():
+    def _postProcessResults(self):
+        super()._postProcessResults()
+        if self.isConverged():
             if self.__accumulated_solution.empty:
                 self.__accumulated_solution = self._thermochemical_solution
             else:
                 self.__accumulated_solution = pd.concat((self.__accumulated_solution, self._thermochemical_solution),axis=0)
-            
+        return
+    
+    def _writeOutput(self):
+        if self.isConverged():
             flamelet_filename = self._setFlameletFileName()
             filename_plus_folder = sep.join((self._output_filepath, flamelet_filename))
             self.writeToFile(filename_plus_folder)
@@ -707,13 +734,12 @@ class EquilibriumSolver(FlameletSolver_Cantera):
 class CooledFlameInterpolator(FlameletSolver_Cantera):
     __burnerFlameSolution:pd.DataFrame = None 
     __equilibriumSolution:pd.DataFrame = None 
-    __N_iteration:int = 20
-    __src_interp_exponent:float = 2.0
 
     def __init__(self, config:Config_FGM):
         super().__init__(config)
         self._flameletTypeOutputFolder = "interpolated_burnerflame_data"
         self._flamelet_type = "BurnerflameInt"
+        self._n_1D_iterations = self._Config.GetNpMdotExtra()
         return 
     
     def setEquilibriumData(self, eq_data:pd.DataFrame):
@@ -725,7 +751,8 @@ class CooledFlameInterpolator(FlameletSolver_Cantera):
         return 
     
     def _prepareSettingRange(self):
-        iter_values = [i for i in range(self.__N_iteration)]
+        super()._prepareSettingRange()
+        iter_values = [i for i in range(self._n_1D_iterations)]
         return iter_values
     
     def setInputVariable(self, val_input:float):
@@ -733,13 +760,13 @@ class CooledFlameInterpolator(FlameletSolver_Cantera):
         return 
     
     def _computeFlameletSolution(self):
-        ratio = float(self._iteration + 1) / float(self.__N_iteration)
-        w_a_lin = 1.0 - ratio                   # linear weight toward burner flame
-        w_a_src = (1.0 - ratio) ** self.__src_interp_exponent          # power-law weight for source terms
+        ratio = float(self._iteration + 1) / float(self._n_1D_iterations)
+        w_a_lin = 1.0 - ratio                   
+        w_a_src = (1.0 - ratio) ** self._Config.GetSrcInterpExponent()
         w_b_src = 1.0 - w_a_src
 
-        T_eq = self.__equilibriumSolution[FGMVars.Temperature.name]
-        iMin = np.argmin(T_eq)
+        h_eq = self.__equilibriumSolution[FGMVars.EnthalpyTot.name]
+        iMin = np.argmin(h_eq)
 
         exponential_interpolation = w_a_src * self.__burnerFlameSolution.values + w_b_src * self.__equilibriumSolution.values[iMin]
 
@@ -761,7 +788,7 @@ class CooledFlameInterpolator(FlameletSolver_Cantera):
             tag_for_mixture_status="mixfrac"
         else:
             tag_for_mixture_status="phi"
-        flamelet_filename = "%s_%s%.1f_iter%i.csv" % (self._flamelet_type, \
+        flamelet_filename = "%s_%s%.4f_iter%i.csv" % (self._flamelet_type, \
                                                         tag_for_mixture_status, \
                                                         self._reactant_mixture_status, \
                                                         self._iteration)
@@ -771,12 +798,94 @@ class CooledFlameInterpolator(FlameletSolver_Cantera):
         burnerflameSolver = solvers["BURNERFLAME"]
         equilibriumSolver = solvers["EQUILIBRIUM"]
         self.setBurnerFlameData(burnerflameSolver.getThermoChemicalData())
-        self.setEquilibriumData(equilibriumSolver.getThermoChemicalData(), False)
+        self.setEquilibriumData(equilibriumSolver.getThermoChemicalData(False))
+        return 
+    
+    def _printStatusToTerminal(self):
+        message_out = "Interpolated between burner-stabilized and equilibrium data "
+        if self._print_iteration:
+            message_out += "(%i/%i)" % (self._iteration+1, self._n_1D_iterations)
+        print(message_out)
         return 
     
     def _commonPreprocessing(self):
+        return
+
+    def _postProcessResults(self):
         return 
+    
+    def _writeSolverSettings(self, solution_index:int, setting_1D:float):
+        super()._writeSolverSettings(solution_index, setting_1D)
+        return {"iteration":setting_1D}
+
+class CounterFlowDiffusionFlameSolver(FlameletSolver_Cantera):
+
+    __strain_rate:float = 1.0
+    __fuel_density:float = None 
+    __fuel_velocity:float = None
+    __oxidizer_density:float = None  
+    __oxidizer_velocity:float = None 
+
+    def __init__(self, config_input):
+        super().__init__(config_input)
+        self._flameletTypeOutputFolder = "counterflame_data"
+        self._flamelet_type = "Counter-flow diffusion flame"
+        self.setGridRefinementCriteria(ratio=3, slope=0.04, curve=0.06, prune=0.02)
+        return 
+    
+    def _prepareFlameletSimulation(self):
+        return super()._prepareFlameletSimulation()
+    
+    def _prepareReactants(self):
+        super()._prepareReactants()
+        self._canteraSolution.set_mixture_fraction(0.0, self._Config.GetFuelString(), self._Config.GetOxidizerString())
+        self.__oxidizer_density = self._canteraSolution.density
+        self._canteraSolution.set_mixture_fraction(1.0, self._Config.GetFuelString(), self._Config.GetOxidizerString())
+        self.__fuel_density = self._canteraSolution.density
+        self.__fuel_velocity = self.__oxidizer_density * self.__strain_rate / (3*self.__fuel_density+self.__oxidizer_density)
+        self.__oxidizer_velocity = self.__strain_rate - self.__fuel_velocity
+        return 
+    
+    def _solverSpecificPreprocessing(self):
+        super()._solverSpecificPreprocessing()
+        if not self._from_restart:
+            self._flameletSolution = ct.CounterflowDiffusionFlame(self._canteraSolution, width=self._initial_grid_length)
+        
+        self._flameletSolution.P = ct.one_atm
+
+        self._flameletSolution.fuel_inlet.T = self._T_reactants
+        self._flameletSolution.fuel_inlet.mdot = self.__fuel_density * self.__fuel_velocity
+        self._flameletSolution.fuel_inlet.Y = self._Config.GetFuelString()
+
+        self._flameletSolution.oxidizer_inlet.T = self._T_reactants
+        self._flameletSolution.oxidizer_inlet.mdot = self.__oxidizer_density * self.__oxidizer_velocity
+        self._flameletSolution.oxidizer_inlet.Y = self._Config.GetOxidizerString()
+        return 
+    
+    def setStrainRate(self, val_strain_rate:float=1.0):
+        if val_strain_rate <= 0.0:
+            raise Exception("Strain rate should be strictly positive")
+        self.__strain_rate = val_strain_rate 
+        return 
+    
+    def _printStatusToTerminal(self):
+        if not self.isConverged():
+            output_message = "%s simulation at strain=%.2f s^-1 did not converge " % (self._flamelet_type,\
+                                                                                  self.__strain_rate)
+        elif not self.isBurning():
+            output_message = "%s simulation at strain=%.2f s^-1 did not ignite " % (self._flamelet_type,\
+                                                                                  self.__strain_rate)
+        else:
+            output_message = "Successful %s simulation at strain=%.2f s^-1" % (self._flamelet_type,\
+                                                                            self.__strain_rate)
+        if self._print_iteration:
+            output_message += "(%i/%i)" % (self._iteration, self._n_1D_iterations)
+
+        print(output_message)
+        return
+    
 FlameletSolverDict:dict = {"FREEFLAME" : FreeFlameSolver,\
                            "BURNERFLAME" : BurnerFlameSolver,\
                            "EQUILIBRIUM" : EquilibriumSolver,\
-                            "INT_BURNERFLAME" : CooledFlameInterpolator}
+                            "INT_BURNERFLAME" : CooledFlameInterpolator,\
+                            "COUNTERFLAME" : CounterFlowDiffusionFlameSolver}
