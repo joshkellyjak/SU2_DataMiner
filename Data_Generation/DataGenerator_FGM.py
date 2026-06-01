@@ -31,7 +31,6 @@ import numpy as np
 import csv
 from typing import Dict
 from os import path, mkdir, getcwd
-from os import listdir as _listdir
 
 from joblib import Parallel, delayed
 from threadpoolctl import threadpool_limits
@@ -41,8 +40,7 @@ from threadpoolctl import threadpool_limits
 #---------------------------------------------------------------------------------------------#
 from Common.DataDrivenConfig import Config_FGM
 from Data_Generation.DataGenerator_Base import DataGenerator_Base
-from Common.CommonMethods import ComputeLewisNumber
-from Common.Properties import DefaultSettings_FGM,FGMVars
+from Common.Properties import DefaultSettings_FGM
 
 from Data_Generation.FlameletSolvers import FlameletSolverDict, FlameletSolver_Cantera, FreeFlameSolver, BurnerFlameSolver, EquilibriumSolver
 
@@ -86,15 +84,15 @@ class DataGenerator_Cantera(DataGenerator_Base):
     __run_equilibrium:bool = DefaultSettings_FGM.include_equilibrium    # Run chemical equilibrium computations
     __run_counterflames:bool = DefaultSettings_FGM.include_counterflames   # Run counter-flow diffusion flamelet simulations.
 
-    __freeFlameSolver:FreeFlameSolver = None 
-    __burnerFlameSolver:BurnerFlameSolver = None 
-    __equilibriumSolver:EquilibriumSolver = None 
+    __freeFlameSolver:FreeFlameSolver = None
+    __burnerFlameSolver:BurnerFlameSolver = None
+    __equilibriumSolver:EquilibriumSolver = None
 
 
-    __freeflame_storage_folder:str = None 
-    __burnerflame_storage_folder:str = None 
-    __equilibrium_storage_folder:str = None 
-    __counterflame_storage_folder:str = None 
+    __freeflame_storage_folder:str = None
+    __burnerflame_storage_folder:str = None
+    __equilibrium_storage_folder:str = None
+    __counterflame_storage_folder:str = None
 
     __u_fuel:float = 1.0       # Fuel stream velocity in counter-flow diffusion flame.
     __u_oxidizer:float = None   # Oxidizer stream velocity in counter-flow diffusion flame.
@@ -150,7 +148,7 @@ class DataGenerator_Cantera(DataGenerator_Base):
         if flamelet_type not in self.__flameletSolverDict.keys():
             raise Exception("%s is included in the available flamelet types" % flamelet_type)
         self.__flameletSolverDict[flamelet_type].setGridRefinementCriteria(ratio, slope, curve, prune)
-        return 
+        return
     
     # def SetFreeFlameRefineCriteria(self, ratio:float=3, slope:float=0.03, curve:float=0.03, prune:float=0.01):
     #     """Set the grid refinement criteria for the free-flame (adiabatic) solver.
@@ -296,13 +294,13 @@ class DataGenerator_Cantera(DataGenerator_Base):
         self._Config.includeFlameletType(flamelet_type)
         self.__SynchronizeSettings()
 
-        return 
+        return
 
     def excludeFlameletType(self, flamelet_type:str):
         self._Config.excludeFlameletType(flamelet_type)
         self.__SynchronizeSettings()
 
-        return 
+        return
 
     def getFlameletTypes(self):
         return self._Config.getFlameletTypes()
@@ -437,7 +435,7 @@ class DataGenerator_Cantera(DataGenerator_Base):
     def computeSingleFlamelet(self, flamelet_type:str, **solver_settings):
         flameletSolver:FlameletSolver_Cantera = self.__flameletSolverDict[flamelet_type]
         flameletSolver.solveAndSaveFor(solver_settings)
-        return 
+        return
     
     def ComputeCounterFlowFlames(self, v_fuel:float, v_ox:float, T_ub:float):
         """Generate counter-flow diffusion flamelet data for a given temperature, and reactant velocities.
@@ -555,7 +553,7 @@ class DataGenerator_Cantera(DataGenerator_Base):
     def computeNonPremixedFlamelets(self):
         if "COUNTERFLAME" in self.__flameletSolverDict.values():
             self.__flameletSolverDict["COUNTERFLAME"].solveForMixtureStatus()
-        return 
+        return
     
     def ComputeFlamelets(self):
         """Generate and store all flamelet data for the current settings.
@@ -565,7 +563,7 @@ class DataGenerator_Cantera(DataGenerator_Base):
         # Generate all other flamelet types.
         for mix_status in self.__unb_mixture_status:
             self.computePremixedFlameletsFor(mix_status)
-        return 
+        return
     
     # def __SaveFlameletData(self,flame, gas:ct.Solution):
     #     """Save flamelet or chemical equilibrium data in csv file.

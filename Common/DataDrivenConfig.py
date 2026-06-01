@@ -1498,11 +1498,11 @@ class Config_FGM(Config):
         
         if flamelet_type not in self.__flamelet_types:
             self.__flamelet_types.append(flamelet_type)
-        return 
+        return
 
     def setFlameletTypes(self, flamelet_types:list[str]):
         self.__flamelet_types = flamelet_types.copy()
-        return 
+        return
     
     def excludeFlameletType(self, flamelet_type:str):
         if flamelet_type not in FlameletSolverOptions:
@@ -1513,10 +1513,10 @@ class Config_FGM(Config):
         
         if len(self.__flamelet_types) == 0:
             raise Exception("At least one flamelet type should be included in the manifold")
-        return 
+        return
 
     def getFlameletTypes(self):
-        return self.__flamelet_types 
+        return self.__flamelet_types
 
     def RunFreeFlames(self, input:bool=DefaultSettings_FGM.include_freeflames):
         """
