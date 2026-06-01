@@ -29,8 +29,12 @@
 import cantera as ct
 import numpy as np
 import csv
-from os import path, mkdir, sep, getcwd
+from typing import Dict
+from os import path, mkdir, getcwd
+from os import listdir as _listdir
+
 from joblib import Parallel, delayed
+from threadpoolctl import threadpool_limits
 
 #---------------------------------------------------------------------------------------------#
 # Importing DataMiner classes and functions
@@ -60,21 +64,24 @@ class DataGenerator_Cantera(DataGenerator_Base):
     __tag_for_mixture_status:str = "phi"
 
     __n_flamelets:int = DefaultSettings_FGM.Np_temp       # Number of adiabatic and burner flame computations per mixture fraction
+    __n_mdot_extra_flamelets:int = 20                       # Number of interpolation steps for extra interpolated burner-stabilized flamelets
     __T_unburnt_upper:float = DefaultSettings_FGM.T_max   # Highest unburnt reactant temperature
     __T_unburnt_lower:float = DefaultSettings_FGM.T_min   # Lowest unburnt reactant temperature
 
     __reaction_mechanism:str = DefaultSettings_FGM.reaction_mechanism   # Cantera reaction mechanism
     __transport_model:str = DefaultSettings_FGM.transport_model
 
-    __initial_grid_length:float = 1e-2  # Flamelet grid width
-    __initial_grid_Np:int = 30          # Number of initial grid nodes.
+    __initial_grid_length:float = 0.2  # Flamelet grid width
+    __loglevel:int = 0  # Cantera solver verbosity level (0=silent)
+    __initial_grid_Np:int = 50          # Number of initial grid nodes.
 
     __define_equivalence_ratio:bool = not DefaultSettings_FGM.run_mixture_fraction # Define unburnt mixture via the equivalence ratio
     __unb_mixture_status:list[float] = []
-
+    __flameletSolverDict:Dict[str, FlameletSolver_Cantera]
     __translate_to_matlab:bool = False # Save a copy of the flamelet data file in Matlab table generator format
 
     __run_freeflames:bool = DefaultSettings_FGM.include_freeflames      # Run adiabatic flame computations
+    __run_extra_interpolated_burnerflames:bool = True       # Run extra interpolated burner-stabilized flame computations
     __run_burnerflames:bool = DefaultSettings_FGM.include_burnerflames    # Run burner stabilized flame computations
     __run_equilibrium:bool = DefaultSettings_FGM.include_equilibrium    # Run chemical equilibrium computations
     __run_counterflames:bool = DefaultSettings_FGM.include_counterflames   # Run counter-flow diffusion flamelet simulations.
@@ -92,6 +99,12 @@ class DataGenerator_Cantera(DataGenerator_Base):
     __u_fuel:float = 1.0       # Fuel stream velocity in counter-flow diffusion flame.
     __u_oxidizer:float = None   # Oxidizer stream velocity in counter-flow diffusion flame.
 
+    __free_flame_refine:dict    = {"ratio": 3, "slope": 0.03, "curve": 0.03, "prune": 0.01}  # Refine criteria for free-flame solver.
+    __burner_flame_refine:dict  = {"ratio": 3, "slope": 0.15, "curve": 0.15, "prune": 0.05}  # Refine criteria for burner-stabilized flame solver.
+    __counter_flame_refine:dict = {"ratio": 3, "slope": 0.04, "curve": 0.06, "prune": 0.02}  # Refine criteria for counter-flow flame solver.
+    __mdot_dH_target:float = 0.0  # Target enthalpy step between successive burner flames (0 = linspace, >0 = adaptive).
+    __src_interp_exponent:float = 2.0  # Power-law exponent for source-term decay in extra interpolated burner flamelets.
+
     def __init__(self, Config:Config_FGM=None):
         """Constructur, load flamelet generation settings from Config_FGM.
 
@@ -106,7 +119,7 @@ class DataGenerator_Cantera(DataGenerator_Base):
             self._Config = Config_FGM()
         else:
             print("Initializing flamelet generator from Config_FGM with name " + self._Config.GetConfigName())
-            self.__SynchronizeSettings()
+        self.__SynchronizeSettings()
 
         return
 
@@ -117,7 +130,21 @@ class DataGenerator_Cantera(DataGenerator_Base):
         self.__oxidizer_string = self._Config.GetOxidizerString()
         self.gas = ct.Solution(self._Config.GetReactionMechanism())
 
+        self.__n_flamelets = self._Config.GetNpTemp()
+        self.__n_mdot_flamelets = self._Config.GetNpMdot()
+        self.__n_mdot_extra_flamelets = self._Config.GetNpMdotExtra()
+        self.__mdot_dH_target = self._Config.GetMdotDHTarget()
+        self.__src_interp_exponent = self._Config.GetSrcInterpExponent()
+        self.__initial_grid_length = self._Config.GetInitialGridLength()
+        [self.__T_unburnt_lower, self.__T_unburnt_upper] = self._Config.GetUnbTempBounds()
+
+        self.__define_equivalence_ratio = (not self._Config.GetMixtureStatus())
         self.__unb_mixture_status = np.linspace(self._Config.GetMixtureBounds()[0], self._Config.GetMixtureBounds()[1], self._Config.GetNpMix())
+        self.__run_freeflames = self._Config.GenerateFreeFlames()
+        self.__run_extra_interpolated_burnerflames = self._Config.GenerateExtraInterpolatedBurnerFlames()
+        self.__run_burnerflames = self._Config.GenerateBurnerFlames()
+        self.__run_equilibrium = self._Config.GenerateEquilibrium()
+        self.__run_counterflames = self._Config.GenerateCounterFlames()
 
         self._Config.ComputeMixFracConstants()
 
@@ -125,6 +152,90 @@ class DataGenerator_Cantera(DataGenerator_Base):
         for flamelet_type in self._Config.getFlameletTypes():
             self.__flameletSolverDict[flamelet_type] = FlameletSolverDict[flamelet_type](self._Config)
 
+        return
+
+    def SetLoglevel(self, loglevel:int=0):
+        """Set Cantera solver verbosity level (0=silent)."""
+        self.__loglevel = loglevel
+
+    def SetInitialGridLength(self, length:float):
+        """Set the initial domain length (in metres) for new flamelet grids."""
+        self.__initial_grid_length = length
+
+    def setRefinementCriteria(self, flamelet_type:str, ratio:float=3, slope:float=0.03, curve:float=0.03, prune:float=0.01):
+        if flamelet_type not in self.__flameletSolverDict.keys():
+            raise Exception("%s is included in the available flamelet types" % flamelet_type)
+        self.__flameletSolverDict[flamelet_type].setGridRefinementCriteria(ratio, slope, curve, prune)
+        return 
+    
+    # def SetFreeFlameRefineCriteria(self, ratio:float=3, slope:float=0.03, curve:float=0.03, prune:float=0.01):
+    #     """Set the grid refinement criteria for the free-flame (adiabatic) solver.
+
+    #     :param ratio: Maximum ratio of adjacent grid spacings, defaults to 3.
+    #     :param slope: Maximum relative slope of the solution, defaults to 0.03.
+    #     :param curve: Maximum relative curvature of the solution, defaults to 0.03.
+    #     :param prune: Threshold for grid point removal, defaults to 0.01.
+    #     :raises Exception: if any value is not strictly positive.
+    #     """
+    #     if (any(v <= 0 for v in (ratio, slope, curve)) or (prune < 0)):
+    #         raise Exception("All refine criteria values must be strictly positive.")
+    #     self.__free_flame_refine = {"ratio": ratio, "slope": slope, "curve": curve, "prune": prune}
+    #     return
+
+    # def SetBurnerFlameRefineCriteria(self, ratio:float=3, slope:float=0.15, curve:float=0.15, prune:float=0.01):
+    #     """Set the grid refinement criteria for the burner-stabilized flame solver.
+
+    #     :param ratio: Maximum ratio of adjacent grid spacings, defaults to 3.
+    #     :param slope: Maximum relative slope of the solution, defaults to 0.15.
+    #     :param curve: Maximum relative curvature of the solution, defaults to 0.15.
+    #     :param prune: Threshold for grid point removal, defaults to 0.01.
+    #     :raises Exception: if any value is not strictly positive.
+    #     """
+    #     if (any(v <= 0 for v in (ratio, slope, curve)) or (prune < 0)):
+    #         raise Exception("All refine criteria values must be strictly positive.")
+    #     self.__burner_flame_refine = {"ratio": ratio, "slope": slope, "curve": curve, "prune": prune}
+    #     return
+
+    # def SetCounterFlameRefineCriteria(self, ratio:float=3, slope:float=0.04, curve:float=0.06, prune:float=0.01):
+    #     """Set the grid refinement criteria for the counter-flow diffusion flame solver.
+
+    #     :param ratio: Maximum ratio of adjacent grid spacings, defaults to 3.
+    #     :param slope: Maximum relative slope of the solution, defaults to 0.04.
+    #     :param curve: Maximum relative curvature of the solution, defaults to 0.06.
+    #     :param prune: Threshold for grid point removal, defaults to 0.01.
+    #     :raises Exception: if any value is not strictly positive.
+    #     """
+    #     if (any(v <= 0 for v in (ratio, slope, curve)) or (prune < 0)):
+    #         raise Exception("All refine criteria values must be strictly positive.")
+    #     self.__counter_flame_refine = {"ratio": ratio, "slope": slope, "curve": curve, "prune": prune}
+    #     return
+
+    def SetMdotDHTarget(self, dH_target:float):
+        """Set the target enthalpy step between successive burner-stabilized flamelets.
+        When greater than zero, mdot stepping is adaptive: after each solved flame the next
+        Δmdot is rescaled so that |ΔH| matches this target.  When zero, the traditional
+        uniform linspace spacing is used.
+
+        :param dH_target: Target |ΔH| between successive burner flames in J/kg. 0 disables adaptive mode.
+        :type dH_target: float
+        :raises Exception: if the value is negative.
+        """
+        if dH_target < 0:
+            raise Exception("mdot ΔH target must be non-negative (0 = linspace mode).")
+        self.__mdot_dH_target = dH_target
+        return
+
+    def SetSrcInterpExponent(self, exponent:float=2.0):
+        """Set power-law exponent for source-term decay in extra interpolated burner flamelets.
+        1 = linear; > 1 = faster decay toward zero at the cold equilibrium end.
+
+        :param exponent: Power-law exponent (>= 1), defaults to 2.
+        :type exponent: float
+        :raises Exception: If exponent is less than 1.
+        """
+        if exponent < 1.0:
+            raise Exception("Source term interpolation exponent must be >= 1.")
+        self.__src_interp_exponent = exponent
         return
 
     def SetFuelDefinition(self, fuel_species:list[str], fuel_weights:list[float]):
@@ -251,6 +362,27 @@ class DataGenerator_Cantera(DataGenerator_Base):
     #     """
     #     self.__run_counterflames = input
     #     return
+
+    def RunExtraInterpolatedBurnerFlames(self, input:bool=True):
+        """Include extra interpolated burner-stabilized flame data in the manifold.
+
+        :param input: Generate extra interpolated burner-stabilized flamelet data.
+        :type input: bool
+        """
+        self.__run_extra_interpolated_burnerflames = input
+        return
+
+    def SetNpMdotExtra(self, n_extra:int):
+        """Set the number of interpolation steps for extra interpolated burner-stabilized flamelets.
+
+        :param n_extra: Number of interpolated steps between the lowest-mdot burner flame and equilibrium.
+        :type n_extra: int
+        :raises Exception: if the provided number is lower than one.
+        """
+        if n_extra < 1:
+            raise Exception("Number of extra interpolated mdot flamelets should be higher than one.")
+        self.__n_mdot_extra_flamelets = n_extra
+        return
 
     def SetMixtureValues(self, mixture_values:list[float]):
         """Set the reactant mixture status values manually.
@@ -519,7 +651,7 @@ class DataGenerator_Cantera(DataGenerator_Base):
             raise Exception("Reactant velocities should be higher than zero.")
         if T_ub < 200:
             raise Exception("Reactant temperature should be higher than 200K.")
-        flame = ct.CounterflowDiffusionFlame(self.gas, width=18e-3)
+        counterflame = ct.CounterflowDiffusionFlame(self.gas, width=18e-3)
 
         self.gas.set_mixture_fraction(1.0, self.__fuel_string, self.__oxidizer_string)
         self.gas.TP = T_ub, ct.one_atm
@@ -529,17 +661,17 @@ class DataGenerator_Cantera(DataGenerator_Base):
         self.gas.TP = T_ub, ct.one_atm
         rho_oxidizer = self.gas.density
 
-        flame.P = ct.one_atm
-        flame.fuel_inlet.Y = self.__fuel_string
-        flame.fuel_inlet.T = T_ub
-        flame.fuel_inlet.mdot = rho_fuel*v_fuel
-        flame.oxidizer_inlet.Y = self.__oxidizer_string
-        flame.oxidizer_inlet.T = T_ub
-        flame.oxidizer_inlet.mdot = rho_oxidizer*v_ox
-        flame.set_refine_criteria(ratio=3, slope=0.04, curve=0.06, prune=0.02)
+        counterflame.P = ct.one_atm
+        counterflame.fuel_inlet.Y = self.__fuel_string
+        counterflame.fuel_inlet.T = T_ub
+        counterflame.fuel_inlet.mdot = rho_fuel*v_fuel
+        counterflame.oxidizer_inlet.Y = self.__oxidizer_string
+        counterflame.oxidizer_inlet.T = T_ub
+        counterflame.oxidizer_inlet.mdot = rho_oxidizer*v_ox
+        counterflame.set_refine_criteria(**self.__counter_flame_refine)
 
-        flame.solve(loglevel=0, auto=True)
-        variables, data_calc = self.__SaveFlameletData(flame, self.gas)
+        counterflame.solve(loglevel=self.__loglevel, auto=True)
+        variables, data_calc = self.__SaveFlameletData(counterflame, self.gas)
 
         counterflame_filename = "counterflamelet_strain_0_Tu"+str(round(T_ub, 4))+".csv"
         if not path.isdir(self.GetOutputDir()+"/counterflame_data"):
@@ -566,24 +698,24 @@ class DataGenerator_Cantera(DataGenerator_Base):
         while not strain_overload:
             # Create an initial guess based on the previous solution
             # Update grid
-            flame.flame.grid *= strain_factor ** exp_d_a
-            normalized_grid = flame.grid / (flame.grid[-1] - flame.grid[0])
+            counterflame.flame.grid *= strain_factor ** exp_d_a
+            normalized_grid = counterflame.grid / (counterflame.grid[-1] - counterflame.grid[0])
             # Update mass fluxes
-            flame.fuel_inlet.mdot *= strain_factor ** exp_mdot_a
-            flame.oxidizer_inlet.mdot *= strain_factor ** exp_mdot_a
+            counterflame.fuel_inlet.mdot *= strain_factor ** exp_mdot_a
+            counterflame.oxidizer_inlet.mdot *= strain_factor ** exp_mdot_a
             # Update velocities
-            flame.set_profile('velocity', normalized_grid,
-                        flame.velocity * strain_factor ** exp_u_a)
-            flame.set_profile('spread_rate', normalized_grid,
-                        flame.spread_rate * strain_factor ** exp_V_a)
+            counterflame.set_profile('velocity', normalized_grid,
+                        counterflame.velocity * strain_factor ** exp_u_a)
+            counterflame.set_profile('spread_rate', normalized_grid,
+                        counterflame.spread_rate * strain_factor ** exp_V_a)
             # Update pressure curvature
-            flame.set_profile('lambda', normalized_grid, flame.L * strain_factor ** exp_lam_a)
+            counterflame.set_profile('lambda', normalized_grid, counterflame.L * strain_factor ** exp_lam_a)
 
             try:
                 # Try solving the flame
-                flame.solve(loglevel=0)
-                self.last_counterflame_massfraction = flame.Y
-                variables, data_calc = self.__SaveFlameletData(flame, self.gas)
+                counterflame.solve(loglevel=self.__loglevel)
+                self.last_counterflame_massfraction = counterflame.Y
+                variables, data_calc = self.__SaveFlameletData(counterflame, self.gas)
 
                 counterflame_filename = "counterflamelet_strain_"+str(n_iter)+"_Tu"+str(round(T_ub, 4))+".csv"
                 fid = open(self.GetOutputDir()+"/counterflame_data/"+counterflame_filename, 'w+')
@@ -979,7 +1111,8 @@ class DataGenerator_Cantera(DataGenerator_Base):
     #         csvWriter = csv.writer(fid)
     #         csvWriter.writerows(total_data)
 
-def ComputeFlameletData(Config:Config_FGM, run_parallel:bool=False, N_processors:int=2):
+def ComputeFlameletData(Config:Config_FGM, run_parallel:bool=False, N_processors:int=2, loglevel:int=0,
+                        free_flame_refine:dict=None, burner_flame_refine:dict=None):
     """Generate flamelet data according to Config_FGM settings either in serial or parallel.
 
     :param Config: Config_FGM class containing manifold and flamelet generation settings.
@@ -988,6 +1121,14 @@ def ComputeFlameletData(Config:Config_FGM, run_parallel:bool=False, N_processors
     :type run_parallel: bool, optional
     :param N_processors: Number of parallel jobs when generating flamelet data in parallel, defaults to 0
     :type N_processors: int, optional
+    :param loglevel: Cantera solver verbosity level (0=silent), defaults to 0
+    :type loglevel: int, optional
+    :param free_flame_refine: Cantera free-flame refinement criteria dict with keys ratio, slope, curve, prune.
+        If None, the DataGenerator_Cantera defaults are used.
+    :type free_flame_refine: dict, optional
+    :param burner_flame_refine: Cantera burner-flame refinement criteria dict with keys ratio, slope, curve, prune.
+        If None, the DataGenerator_Cantera defaults are used.
+    :type burner_flame_refine: dict, optional
     :raises Exception: If number of processors is set to zero when running in parallel.
     """
 
@@ -1008,17 +1149,26 @@ def ComputeFlameletData(Config:Config_FGM, run_parallel:bool=False, N_processors
         # Equivalence ratios to calculate flamelets for are system inputs
         mixture_range = np.linspace(mix_bounds[0], mix_bounds[1], Np_unb_mix)
 
+    def _make_generator():
+        F = DataGenerator_Cantera(Config)
+        F.SetLoglevel(loglevel)
+        if free_flame_refine is not None:
+            F.SetFreeFlameRefineCriteria(**free_flame_refine)
+        if burner_flame_refine is not None:
+            F.SetBurnerFlameRefineCriteria(**burner_flame_refine)
+        return F
+
     # Set up Cantera flamelet generator object
 
-    def ComputeFlameletData(mix_input):
-
-        F = DataGenerator_Cantera(Config)
+    def _ComputeFlameletData(mix_input):
+        F = _make_generator()
         F.ComputeFlameletsOnMixStatus(mix_input)
 
     if run_parallel:
-        Parallel(n_jobs=N_processors)(delayed(ComputeFlameletData)(mix_status) for mix_status in mixture_range)
+        with threadpool_limits(limits=1):
+            Parallel(n_jobs=N_processors)(delayed(_ComputeFlameletData)(mix_status) for mix_status in mixture_range)
     else:
-        F = DataGenerator_Cantera(Config)
+        F = _make_generator()
         F.SetMixtureValues(mixture_range)
         F.ComputeFlamelets()
 

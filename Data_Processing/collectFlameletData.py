@@ -46,6 +46,7 @@ class FlameletConcatenator:
     __Config:Config_FGM = None # FlameletAI configuration for current workflow.
 
     __Np_per_flamelet:int = 2**DefaultSettings_FGM.batch_size_exponent          # Number of data points to extract per flamelet.
+    __Np_equilibrium:int = 1            # Number of rows to read from each equilibrium file (1 = only the cold boundary point).
     __custom_resolution:bool = False    # Overwrite average number of data points per flamelet with a specified value.
 
     __mfrac_skip:int = 1        # Number of mixture status folder to skip while concatenating flamelet data.
@@ -179,6 +180,22 @@ class FlameletConcatenator:
 
     def GetNFlameletNodes(self):
         return self.__Np_per_flamelet
+
+    def SetNEquilibriumNodes(self, Np_equilibrium:int):
+        """Define the number of rows to sample from each equilibrium file.
+
+        A value of 1 (default) reads only the fully-cooled boundary point.
+        Higher values sample the full equilibrium curve from cold to adiabatic,
+        giving the table or MLP denser coverage of the equilibrium arm.
+
+        :param Np_equilibrium: number of points per equilibrium file (>= 1).
+        :type Np_equilibrium: int
+        :raises Exception: if the value is lower than one.
+        """
+        if Np_equilibrium < 1:
+            raise Exception("Number of equilibrium nodes must be at least 1.")
+        self.__Np_equilibrium = Np_equilibrium
+        return
 
     def SetMixStep(self, skip_mixtures:int):
         """Skip a number of mixture status values when reading flamelet data to reduce the concatenated file size.
@@ -570,18 +587,16 @@ class FlameletConcatenator:
             mixture_folders = np.sort(np.array(self.mfracs_equilibrium))
             for z in mixture_folders[::self.__mfrac_skip]:
                 if self.__ignore_mixture_bounds:
-                    n_eq += len(listdir(self.__flameletdata_dir + "/equilibrium_data/" + z))
-                    for f in listdir(self.__flameletdata_dir + "/equilibrium_data/" + z):
-                        with open(self.__flameletdata_dir + "/equilibrium_data/" + z + "/" + f, "r") as fid:
-                            Np_tot += len(fid.readlines())-1
+                    n_files = len(listdir(self.__flameletdata_dir + "/equilibrium_data/" + z))
+                    n_eq += n_files
+                    Np_tot += n_files * self.__Np_equilibrium
                 else:
                     if z[:len(folder_header)] == folder_header:
                         mixture_status = float(z[len(folder_header):])
                         if (mixture_status <= self.__mix_status_max) and (mixture_status >= self.__mix_status_min):
-                            n_eq += len(listdir(self.__flameletdata_dir + "/equilibrium_data/" + z))
-                            for f in listdir(self.__flameletdata_dir + "/equilibrium_data/" + z):
-                                with open(self.__flameletdata_dir + "/equilibrium_data/" + z + "/" + f, "r") as fid:
-                                    Np_tot += len(fid.readlines())-1
+                            n_files = len(listdir(self.__flameletdata_dir + "/equilibrium_data/" + z))
+                            n_eq += n_files
+                            Np_tot += n_files * self.__Np_equilibrium
 
         # Count the number of chemical equilibrium data files.
         if self.__include_fuzzy:
@@ -640,11 +655,13 @@ class FlameletConcatenator:
             variables = fid.readline().strip().split(',')
             fid.close()
 
-            # Load flamelet data
-            if is_equilibrium and self.__write_LUT_data:
-                D = np.loadtxt(flamelet_dir + "/" + eq_file + "/" + f, delimiter=',',skiprows=1,max_rows=1)[np.newaxis, :]
-            else:
-                D = np.loadtxt(flamelet_dir + "/" + eq_file + "/" + f, delimiter=',',skiprows=1)
+            # Load flamelet data.
+            # For equilibrium files only the first row is used: the fully cooled
+            # boundary point (T=T_unburnt).  The rest of the equilibrium curve is
+            # redundant with the interpolated burner flames.
+            D = np.loadtxt(flamelet_dir + "/" + eq_file + "/" + f, delimiter=',',
+                           skiprows=1, max_rows=self.__Np_equilibrium if is_equilibrium else None)
+            D = np.atleast_2d(D)
 
             # Set flamelet controlling variables
             CV_flamelet = np.zeros([len(D), self.__N_control_vars])
@@ -671,18 +688,29 @@ class FlameletConcatenator:
                 S_flamelet_norm = S_flamelet / (max(S_flamelet)+1e-32)
 
                 T_flamelet = D[:, variables.index(FGMVars.Temperature.name)]
-                if np.max(T_flamelet) < DefaultSettings_FGM.T_threshold:
+                # Interpolated cooling flames (_int####) and equilibrium flames always contain
+                # valid data even when T_max < T_threshold — they represent the cooled-product
+                # arm of the manifold and must not be discarded.
+                is_interpolated = "_int" in f
+                if np.max(T_flamelet) < DefaultSettings_FGM.T_threshold and not is_equilibrium and not is_interpolated:
                     BurningFlamelet = False
 
-                sourceterm_zero_line_numbers = [0, -1]
+                # Identify rows at which source terms must be zero: always at
+                # the first and last point (PV_min, PV_max endpoints), and with
+                # a small temperature margin when writing LUT data.
+                sourceterm_zero_line_numbers = np.zeros(len(T_flamelet), dtype=bool)
+                sourceterm_zero_line_numbers[0]  = True
+                sourceterm_zero_line_numbers[-1] = True
 
                 if self.__write_LUT_data:
-                    # Set source terms to zero near the start and end of the flamelet.
+                    # Extend zeroing to a 2 % temperature-margin band at both ends.
                     temp_margin = 2e-2
                     T_max, T_min = np.max(T_flamelet), np.min(T_flamelet)
-                    deltaT = temp_margin*(T_max - T_min)
-                    sourceterm_zero_line_numbers = np.logical_or((T_flamelet - T_min) < deltaT,\
-                                                                 ((T_max - T_flamelet) < deltaT))
+                    deltaT = temp_margin * (T_max - T_min)
+                    sourceterm_zero_line_numbers = np.logical_or(
+                        sourceterm_zero_line_numbers,
+                        np.logical_or((T_flamelet - T_min) < deltaT,
+                                      (T_max - T_flamelet) < deltaT))
 
                 # Load flamelet thermophysical property data
                 TD_data = np.zeros([len(D), len(self.__TD_train_vars)])
@@ -704,8 +732,7 @@ class FlameletConcatenator:
                     for iVar_LookUp, LookUp_var in enumerate(self.__LookUp_vars):
                         idx_var_flamelet = variables.index(LookUp_var)
                         LookUp_data[:, iVar_LookUp] = D[:, idx_var_flamelet]
-                        if LookUp_var == FGMVars.Heat_Release.name:
-                            LookUp_data[sourceterm_zero_line_numbers, iVar_LookUp] = 0.0
+
 
                 # Load species sources data
                 species_mass_fraction = np.zeros([len(D), len(self.__Species_in_FGM)])
@@ -723,7 +750,7 @@ class FlameletConcatenator:
                                 species_production_rate[:, iSp] += D[:, variables.index("Y_dot_pos-"+NOsp)]
                                 species_destruction_rate[:, iSp] += D[:, variables.index("Y_dot_neg-"+NOsp)]
                                 species_net_rate[:, iSp] += D[:, variables.index("Y_dot_net-"+NOsp)]
-                                species_mass_fraction[:, iSp] += D[:, variables.index("Y-"+Sp)]
+                                species_mass_fraction[:, iSp] += D[:, variables.index("Y-"+NOsp)]
                         else:
                             species_mass_fraction[:, iSp] = D[:, variables.index("Y-"+Sp)]
                             species_production_rate[:, iSp] = D[:, variables.index("Y_dot_pos-"+Sp)]
@@ -741,7 +768,13 @@ class FlameletConcatenator:
                         Sources_data[:, 1 + 4*iSp + 2] = species_net_rate[:, iSp]
                         Sources_data[:, 1 + 4*iSp + 3] = species_mass_fraction[:, iSp]
 
-                    Sources_data[sourceterm_zero_line_numbers, :] = 0.0
+                    # Only zero the PV source term at the flamelet boundaries.
+                    # Species production rates and mass fractions are NOT zeroed
+                    # because (a) Y-{species} is non-zero at PV_max and (b) species
+                    # rates at PV_max are governed by Cantera's equilibrium values.
+                    Sources_data[sourceterm_zero_line_numbers, 0] = 0.0
+                    # Enforce non-negativity of PV source term (column 0).
+                    Sources_data[:, 0] = np.maximum(Sources_data[:, 0], 0.0)
 
                 # Compute preferential diffusion scalars
                 if self.__Config.PreferentialDiffusion() and BurningFlamelet:
@@ -766,36 +799,28 @@ class FlameletConcatenator:
                         sources_sampled = Sources_data[samples, :]
                     else:
                         # Define query controlling variable range
-                        if is_equilibrium and self.__write_LUT_data:
-                            CV_sampled = CV_flamelet*np.ones([self.__Np_per_flamelet, np.shape(CV_flamelet)[1]])
-                            TD_sampled = TD_data*np.ones([self.__Np_per_flamelet, np.shape(CV_flamelet)[1]])
-                            if self.__Config.PreferentialDiffusion():
-                                PD_sampled = PD_data*np.ones([self.__Np_per_flamelet, np.shape(CV_flamelet)[1]])
-                            lookup_sampled = LookUp_data*np.ones([self.__Np_per_flamelet, np.shape(CV_flamelet)[1]])
-                            sources_sampled = np.zeros([self.__Np_per_flamelet, 1 + 4*len(self.__Species_in_FGM)])
+                        if is_equilibrium:
+                            S_q = np.linspace(0, 1.0, self.__Np_per_flamelet)
                         else:
-                            if is_equilibrium:
-                                S_q = np.linspace(0, 1.0, self.__Np_per_flamelet)
-                            else:
-                                S_q = 0.5 - 0.5*np.cos(np.linspace(0, np.pi, self.__Np_per_flamelet))
-                            CV_sampled = np.zeros([self.__Np_per_flamelet, np.shape(CV_flamelet)[1]])
-                            TD_sampled = np.zeros([self.__Np_per_flamelet, np.shape(TD_data)[1]])
-                            if self.__Config.PreferentialDiffusion():
-                                PD_sampled = np.zeros([self.__Np_per_flamelet, np.shape(PD_data)[1]])
-                            lookup_sampled = np.zeros([self.__Np_per_flamelet, np.shape(LookUp_data)[1]])
-                            sources_sampled = np.zeros([self.__Np_per_flamelet, 1 + 4*len(self.__Species_in_FGM)])
-                            for i_CV in range(self.__N_control_vars):
-                                CV_sampled[:, i_CV] = np.interp(S_q, S_flamelet_norm, CV_flamelet[:, i_CV])
-                            for iVar_TD in range(len(self.__TD_train_vars)):
-                                TD_sampled[:, iVar_TD] = np.interp(S_q, S_flamelet_norm, TD_data[:, iVar_TD])
-                            if self.__Config.PreferentialDiffusion():
-                                for iVar_PD in range(len(self.__PD_train_vars)):
-                                    PD_sampled[:, iVar_PD] = np.interp(S_q, S_flamelet_norm, PD_data[:, iVar_PD])
+                            S_q = 0.5 - 0.5*np.cos(np.linspace(0, np.pi, self.__Np_per_flamelet))
+                        CV_sampled = np.zeros([self.__Np_per_flamelet, np.shape(CV_flamelet)[1]])
+                        TD_sampled = np.zeros([self.__Np_per_flamelet, np.shape(TD_data)[1]])
+                        if self.__Config.PreferentialDiffusion():
+                            PD_sampled = np.zeros([self.__Np_per_flamelet, np.shape(PD_data)[1]])
+                        lookup_sampled = np.zeros([self.__Np_per_flamelet, np.shape(LookUp_data)[1]])
+                        sources_sampled = np.zeros([self.__Np_per_flamelet, 1 + 4*len(self.__Species_in_FGM)])
+                        for i_CV in range(self.__N_control_vars):
+                            CV_sampled[:, i_CV] = np.interp(S_q, S_flamelet_norm, CV_flamelet[:, i_CV])
+                        for iVar_TD in range(len(self.__TD_train_vars)):
+                            TD_sampled[:, iVar_TD] = np.interp(S_q, S_flamelet_norm, TD_data[:, iVar_TD])
+                        if self.__Config.PreferentialDiffusion():
+                            for iVar_PD in range(len(self.__PD_train_vars)):
+                                PD_sampled[:, iVar_PD] = np.interp(S_q, S_flamelet_norm, PD_data[:, iVar_PD])
 
-                            for iVar_LU in range(len(self.__LookUp_vars)):
-                                lookup_sampled[:, iVar_LU] = np.interp(S_q, S_flamelet_norm, LookUp_data[:, iVar_LU])
-                            for iVar_Source in range(1 + 4*len(self.__Species_in_FGM)):
-                                sources_sampled[:, iVar_Source] = np.interp(S_q, S_flamelet_norm, Sources_data[:, iVar_Source])
+                        for iVar_LU in range(len(self.__LookUp_vars)):
+                            lookup_sampled[:, iVar_LU] = np.interp(S_q, S_flamelet_norm, LookUp_data[:, iVar_LU])
+                        for iVar_Source in range(1 + 4*len(self.__Species_in_FGM)):
+                            sources_sampled[:, iVar_Source] = np.interp(S_q, S_flamelet_norm, Sources_data[:, iVar_Source])
 
                     start = (i_start + i_flamelet + i_flamelet_total) * self.__Np_per_flamelet
                     end = (i_start + i_flamelet+1+ i_flamelet_total)*self.__Np_per_flamelet

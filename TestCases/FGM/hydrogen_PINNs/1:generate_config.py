@@ -63,7 +63,7 @@ flamelet_data_dir = os.getcwd() + "/flamelet_data/"
 if not os.path.isdir(flamelet_data_dir):
     os.mkdir(flamelet_data_dir)
 Config.SetOutputDir(flamelet_data_dir)
- 
+
 # Display configuration info in terminal.
 Config.PrintBanner()
 Config.SaveConfig()

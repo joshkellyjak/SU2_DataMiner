@@ -49,7 +49,7 @@ class Config_NICFD(Config):
     """
     Define Config_NICFD class or load existing configuration. If `load_file` is set, the settings from an existing
     is loaded. If no file name is provided, a new `Config_NICFD` class is created.
-    
+
     :param load_file: path to file of configuration to be loaded.
     :type load_file: str
     """
@@ -746,7 +746,7 @@ class Config_FGM(Config):
     """
     Define Config_FGM class or load existing configuration. If `load_file` is set, the settings from an existing
     is loaded. If no file name is provided, a new `Config_FGM` class is created.
-    
+
     :param load_file: path to file of configuration to be loaded.
     :type load_file: str
     """
@@ -771,6 +771,11 @@ class Config_FGM(Config):
     __T_unb_lower:float = DefaultSettings_FGM.T_min   # Lower bound of unburnt reactants temperature.
     __T_unb_upper:float = DefaultSettings_FGM.T_max   # Upper bound of unburnt reactants temperature.
     __Np_T_unb:int = DefaultSettings_FGM.Np_temp      # Number of unburnt temperature samples between bounds.
+    __Np_mdot:int = DefaultSettings_FGM.Np_mdot            # Number of mass flux divisions for burner-stabilized flamelets.
+    __Np_mdot_extra:int = 20                                # Number of interpolation steps for extra interpolated burner-stabilized flamelets.
+    __mdot_dH_target:float = 0.0                            # Target enthalpy step between successive burner flames (0 = linspace, >0 = adaptive).
+    __src_interp_exponent:float = 2.0                       # Power-law exponent for source-term decay in extra interpolated burner flamelets.
+    __initial_grid_length:float = DefaultSettings_FGM.initial_grid_length  # Initial flamelet domain length in metres.
 
     __mix_status_lower:float = DefaultSettings_FGM.eq_ratio_min  # Lower bound of premixed status
     __mix_status_upper:float = DefaultSettings_FGM.eq_ratio_max # Upper bound of premixed status
@@ -778,6 +783,7 @@ class Config_FGM(Config):
 
     __generate_freeflames:bool = DefaultSettings_FGM.include_freeflames      # Generate adiabatic flamelets
     __generate_burnerflames:bool = DefaultSettings_FGM.include_burnerflames   # Generate burner-stabilized flamelets
+    __generate_extra_interpolated_burnerflames:bool = True                    # Generate extra interpolated burner-stabilized flamelets
     __generate_equilibrium:bool = DefaultSettings_FGM.include_equilibrium     # Generate chemical equilibrium data
     __generate_counterflames:bool = DefaultSettings_FGM.include_counterflames   # Generate counter-flow diffusion flamelets.
 
@@ -1039,7 +1045,7 @@ class Config_FGM(Config):
     def GetMixtureFractionCoefficients(self):
         """
         Get the species mass fraction coefficients for computation of the mixture fraction according to Bilger's definition.
-        
+
         :return: array of coefficients for mixture fraction computation.
         :rtype: array[float]
 
@@ -1049,7 +1055,7 @@ class Config_FGM(Config):
     def GetMixtureFractionConstant(self):
         """
         Get the mixture fraction offset value according to Bilger's definition.
-        
+
         :return: mixture fraction offset value.
         :rtype: float
         """
@@ -1128,14 +1134,14 @@ class Config_FGM(Config):
     def SetFuelDefinition(self, fuel_species:list[str], fuel_weights:list[float]):
         """
         Define fuel species and weights. By default the fuel is set to pure methane.
-        
+
         :param fuel_species: List containing fuel species names.
         :type fuel_species: list[str]
         :param fuel_weights: List containing fuel molar fractions
         :type fuel_weights: list[float]
         :raise: Exception: If no reactants are provided.
         :raise: Exception: If the number of species and weights are unequal.
-        
+
         """
         if len(fuel_species) == 0:
             raise Exception("Fuel definition should contain at least one species name.")
@@ -1236,7 +1242,7 @@ class Config_FGM(Config):
 
         """
 
-        if (mix_lower >= mix_upper):
+        if (mix_lower > mix_upper):
             raise Exception("Lower mixture status should be lower than upper mixture status.")
         else:
             if mix_lower < 0.0:
@@ -1310,7 +1316,7 @@ class Config_FGM(Config):
     def GetUnbTempBounds(self):
         """
         Get the reactant temperature bounds for flamelet generation.
-        
+
         :return: lower and upper reactant temperature.
         :rtype: list[float]
 
@@ -1341,6 +1347,127 @@ class Config_FGM(Config):
 
         """
         return self.__Np_T_unb
+
+    def SetNpMdot(self, Np_mdot:int=DefaultSettings_FGM.Np_mdot):
+        """
+        Set number of mass flux divisions for burner-stabilized flamelets.
+
+        :param Np_mdot: Number of mass flux steps.
+        :type Np_mdot: int
+
+        """
+        if Np_mdot <= 0:
+            raise Exception("Number of mass flux samples should be higher than zero.")
+        self.__Np_mdot = Np_mdot
+        return
+
+    def GetNpMdot(self):
+        """
+        Get the number of mass flux divisions for burner-stabilized flamelets.
+
+        :return: Number of mass flux steps.
+        :rtype: int
+
+        """
+        return self.__Np_mdot
+
+    def SetNpMdotExtra(self, Np_Mdot_Extra:int=20):
+        """
+        Set number of interpolation steps for extra interpolated burner-stabilized flamelets.
+
+        :param Np_Mdot_Extra: Number of interpolated steps between the lowest-mdot burner flame and equilibrium.
+        :type Np_Mdot_Extra: int
+        :raises Exception: If the number of steps is lower than one.
+
+        """
+        if Np_Mdot_Extra <= 0:
+            raise Exception("Number of extra interpolated mdot flamelets should be higher than one.")
+        self.__Np_mdot_extra = Np_Mdot_Extra
+        return
+
+    def GetNpMdotExtra(self):
+        """
+        Get the number of interpolation steps for extra interpolated burner-stabilized flamelets.
+
+        :return: Number of interpolated steps.
+        :rtype: int
+
+        """
+        return self.__Np_mdot_extra
+
+    def SetMdotDHTarget(self, dH_target:float=0.0):
+        """
+        Set the target enthalpy step between successive burner-stabilized flamelets.
+        When greater than zero, the mass-flux stepping is adaptive: after each solved flame
+        the next mdot step is scaled so that the enthalpy drop matches this target.
+        When zero (default), the traditional uniform linspace spacing is used.
+
+        :param dH_target: Target |ΔH| between successive burner flames in J/kg. 0 disables adaptive mode.
+        :type dH_target: float
+        :raises Exception: If the value is negative.
+        """
+        if dH_target < 0:
+            raise Exception("mdot ΔH target must be non-negative (0 = linspace mode).")
+        self.__mdot_dH_target = dH_target
+        return
+
+    def GetMdotDHTarget(self):
+        """
+        Get the target enthalpy step between successive burner-stabilized flamelets.
+
+        :return: Target |ΔH| in J/kg (0 = linspace mode).
+        :rtype: float
+        """
+        return self.__mdot_dH_target
+
+    def SetSrcInterpExponent(self, exponent:float=2.0):
+        """
+        Set the power-law exponent used to scale source terms (Y_dot_net, Y_dot_pos, Y_dot_neg,
+        and heat release rate) in the extra interpolated burner-stabilized flamelets.
+        A value of 1 gives linear interpolation; values greater than 1 make the source terms
+        decay faster toward the cold equilibrium endpoint, which is more physically realistic
+        given Arrhenius kinetics.
+
+        :param exponent: Power-law exponent (>= 1). Default is 2.
+        :type exponent: float
+        :raises Exception: If the exponent is less than 1.
+        """
+        if exponent < 1.0:
+            raise Exception("Source term interpolation exponent must be >= 1.")
+        self.__src_interp_exponent = exponent
+        return
+
+    def GetSrcInterpExponent(self):
+        """
+        Get the power-law exponent for source-term decay in interpolated burner flamelets.
+
+        :return: Power-law exponent.
+        :rtype: float
+        """
+        return self.__src_interp_exponent
+
+    def SetInitialGridLength(self, length:float=DefaultSettings_FGM.initial_grid_length):
+        """
+        Set the initial flamelet domain length.
+
+        :param length: Domain length in metres.
+        :type length: float
+
+        """
+        if length <= 0:
+            raise Exception("Initial grid length must be greater than zero.")
+        self.__initial_grid_length = length
+        return
+
+    def GetInitialGridLength(self):
+        """
+        Get the initial flamelet domain length.
+
+        :return: Domain length in metres.
+        :rtype: float
+
+        """
+        return self.__initial_grid_length
 
     def DefineMixtureStatus(self, run_as_mixture_fraction:bool=DefaultSettings_FGM.run_mixture_fraction):
         """
@@ -1431,6 +1558,17 @@ class Config_FGM(Config):
         self.__generate_counterflames = input
         return
 
+    def RunExtraInterpolatedBurnerFlames(self, input:bool=True):
+        """
+        Include extra interpolated burner-stabilized flame data in the manifold.
+
+        :param input: enable generation of extra interpolated burner-stabilized flamelet data.
+        :type input: bool
+
+        """
+        self.__generate_extra_interpolated_burnerflames = input
+        return
+
     def GenerateFreeFlames(self):
         """
         Whether the manifold data contains adiabatic free-flame data.
@@ -1466,6 +1604,15 @@ class Config_FGM(Config):
         :rtype: bool
         """
         return self.__generate_counterflames
+
+    def GenerateExtraInterpolatedBurnerFlames(self):
+        """
+        Whether the manifold data contains extra interpolated burner-stabilized flame data.
+
+        :return: extra interpolated burner-stabilized flamelets are generated.
+        :rtype: bool
+        """
+        return self.__generate_extra_interpolated_burnerflames
 
     def TranslateToMatlab(self, input:bool):
         """
@@ -1695,10 +1842,8 @@ class Config_FGM(Config):
                 raise Exception("Number of variables does not match data array.")
             ppv = np.zeros(np.shape(flamelet_data)[0])
             for iPv, pvSp in enumerate(self.__pv_definition):
-                prodrate_pos = flamelet_data[:, variables.index('Y_dot_pos-'+pvSp)]
-                prodrate_neg = flamelet_data[:, variables.index('Y_dot_neg-'+pvSp)]
-                mass_fraction = flamelet_data[:, variables.index('Y-'+pvSp)]
-                ppv += self.__pv_weights[iPv] * (prodrate_pos + prodrate_neg * mass_fraction)
+                prodrate_net = flamelet_data[:, variables.index('Y_dot_net-'+pvSp)]
+                ppv += self.__pv_weights[iPv] * prodrate_net
             return ppv
 
     def GetSparkSources(self, val_phi:float, val_T:float, iGroup:int=0):
@@ -1811,7 +1956,7 @@ class Config_FGM(Config):
         """
         Compute the differential diffusion scalars for a flamelet.
 
-        
+
         :param variables: list of variable names in the flamelet data.
         :type variables: list[str]
         :param flamelet_data: flamelet data array.
