@@ -30,6 +30,7 @@ import cantera as ct
 import numpy as np
 import csv
 from typing import Dict
+import copy
 from os import path, mkdir, getcwd
 
 from joblib import Parallel, delayed
@@ -150,47 +151,6 @@ class DataGenerator_Cantera(DataGenerator_Base):
         self.__flameletSolverDict[flamelet_type].setGridRefinementCriteria(ratio, slope, curve, prune)
         return
     
-    # def SetFreeFlameRefineCriteria(self, ratio:float=3, slope:float=0.03, curve:float=0.03, prune:float=0.01):
-    #     """Set the grid refinement criteria for the free-flame (adiabatic) solver.
-
-    #     :param ratio: Maximum ratio of adjacent grid spacings, defaults to 3.
-    #     :param slope: Maximum relative slope of the solution, defaults to 0.03.
-    #     :param curve: Maximum relative curvature of the solution, defaults to 0.03.
-    #     :param prune: Threshold for grid point removal, defaults to 0.01.
-    #     :raises Exception: if any value is not strictly positive.
-    #     """
-    #     if (any(v <= 0 for v in (ratio, slope, curve)) or (prune < 0)):
-    #         raise Exception("All refine criteria values must be strictly positive.")
-    #     self.__free_flame_refine = {"ratio": ratio, "slope": slope, "curve": curve, "prune": prune}
-    #     return
-
-    # def SetBurnerFlameRefineCriteria(self, ratio:float=3, slope:float=0.15, curve:float=0.15, prune:float=0.01):
-    #     """Set the grid refinement criteria for the burner-stabilized flame solver.
-
-    #     :param ratio: Maximum ratio of adjacent grid spacings, defaults to 3.
-    #     :param slope: Maximum relative slope of the solution, defaults to 0.15.
-    #     :param curve: Maximum relative curvature of the solution, defaults to 0.15.
-    #     :param prune: Threshold for grid point removal, defaults to 0.01.
-    #     :raises Exception: if any value is not strictly positive.
-    #     """
-    #     if (any(v <= 0 for v in (ratio, slope, curve)) or (prune < 0)):
-    #         raise Exception("All refine criteria values must be strictly positive.")
-    #     self.__burner_flame_refine = {"ratio": ratio, "slope": slope, "curve": curve, "prune": prune}
-    #     return
-
-    # def SetCounterFlameRefineCriteria(self, ratio:float=3, slope:float=0.04, curve:float=0.06, prune:float=0.01):
-    #     """Set the grid refinement criteria for the counter-flow diffusion flame solver.
-
-    #     :param ratio: Maximum ratio of adjacent grid spacings, defaults to 3.
-    #     :param slope: Maximum relative slope of the solution, defaults to 0.04.
-    #     :param curve: Maximum relative curvature of the solution, defaults to 0.06.
-    #     :param prune: Threshold for grid point removal, defaults to 0.01.
-    #     :raises Exception: if any value is not strictly positive.
-    #     """
-    #     if (any(v <= 0 for v in (ratio, slope, curve)) or (prune < 0)):
-    #         raise Exception("All refine criteria values must be strictly positive.")
-    #     self.__counter_flame_refine = {"ratio": ratio, "slope": slope, "curve": curve, "prune": prune}
-    #     return
 
     def SetMdotDHTarget(self, dH_target:float):
         """Set the target enthalpy step between successive burner-stabilized flamelets.
@@ -434,7 +394,7 @@ class DataGenerator_Cantera(DataGenerator_Base):
 
     def computeSingleFlamelet(self, flamelet_type:str, **solver_settings):
         flameletSolver:FlameletSolver_Cantera = self.__flameletSolverDict[flamelet_type]
-        flameletSolver.solveAndSaveFor(solver_settings)
+        flameletSolver.solveAndSaveFor(**solver_settings)
         return
     
     def ComputeCounterFlowFlames(self, v_fuel:float, v_ox:float, T_ub:float):
@@ -565,238 +525,6 @@ class DataGenerator_Cantera(DataGenerator_Base):
             self.computePremixedFlameletsFor(mix_status)
         return
     
-    # def __SaveFlameletData(self,flame, gas:ct.Solution):
-    #     """Save flamelet or chemical equilibrium data in csv file.
-
-    #     :param flame: Converged Cantera flamelet class.
-    #     :type flame: cantera.FreeFlame, cantera.BurnerFlame, or cantera.CounterFlowDiffusionFlame
-    #     :param gas: Cantera Solution object containing molecular properties of the respective mixture.
-    #     :type gas: cantera.Solution
-    #     :return: Flamelet variables string and data array
-    #     :rtype: str, np.ndarray
-    #     """
-
-    #     # Check if chemical equilibrium or flamelet data are supplied.
-    #     flame_is_gas = (np.shape(flame.Y) == np.shape(gas.Y))
-    #     molar_weights = np.reshape(gas.molecular_weights, [gas.n_species, 1])
-
-    #     # Extract species mass and molar fractions, reaction rates, and species specific heat values.
-    #     if flame_is_gas:
-    #         Y = np.reshape(flame.Y, [gas.n_species, 1])
-    #         X = np.reshape(flame.X, [gas.n_species, 1])
-    #         net_reaction_rate = np.zeros(np.shape(Y))#flame.net_production_rates[:,np.newaxis]
-    #         neg_reaction_rate =np.zeros(np.shape(Y))#flame.destruction_rates[:,np.newaxis]
-    #         pos_reaction_rate = np.zeros(np.shape(Y))#net_reaction_rate- neg_reaction_rate
-    #         cp_i = np.reshape(flame.partial_molar_cp/gas.molecular_weights, [gas.n_species, 1])
-    #         enth_i = np.reshape(flame.partial_molar_enthalpies/gas.molecular_weights, [gas.n_species, 1])
-    #         grid = np.zeros([1,1])
-    #         velocity = np.zeros([1,1])
-    #     else:
-    #         Y = flame.Y
-    #         X = flame.X
-    #         net_reaction_rate = flame.net_production_rates
-    #         neg_reaction_rate =flame.destruction_rates
-    #         pos_reaction_rate = flame.net_production_rates - neg_reaction_rate
-    #         cp_i = (flame.partial_molar_cp.T/gas.molecular_weights)
-    #         enth_i = (flame.partial_molar_enthalpies.T/gas.molecular_weights)
-    #         grid= flame.grid
-    #         velocity = flame.velocity[:,np.newaxis]
-    #     Y = Y.T
-    #     try:
-    #         mixture_fraction = flame.mixture_fraction("Bilger")
-    #     except:
-    #         mixture_fraction = np.sum(Y.T * np.reshape(self.z_i, [self.gas.n_species, 1]), axis=0) + self.c
-
-    #     mean_molar_weights = np.dot(molar_weights.T, X)
-    #     enthalpy = flame.enthalpy_mass
-
-    #     density = flame.density
-    #     cp = flame.cp_mass
-    #     k = flame.thermal_conductivity
-
-    #     T = flame.T
-
-    #     viscosity = flame.viscosity
-
-    #     Y_dot_net = net_reaction_rate * molar_weights
-    #     Y_dot_pos = pos_reaction_rate * molar_weights
-    #     Y_dot_neg = neg_reaction_rate * molar_weights / (Y.T+1e-11)
-
-    #     Le_i = ComputeLewisNumber(flame)
-    #     if self.__transport_model == "unity-Lewis-number":
-    #         Le_i = Le_i / Le_i
-
-    #     cp_i = np.reshape(cp_i, np.shape(Y))
-    #     enth_i = np.reshape(enth_i, np.shape(Y))
-
-    #     Le_i = Le_i.T
-
-    #     if flame_is_gas:
-    #         Le_i = np.reshape(Le_i, [1, gas.n_species])
-
-    #     if flame_is_gas:
-    #         heat_rel = 0.0
-    #     else:
-    #         heat_rel = flame.heat_release_rate
-
-    #     # Define variables and output data array.
-    #     variables = 'Distance,'
-    #     data_matrix = np.reshape(grid, [len(grid), 1])
-    #     variables += 'Velocity,'
-    #     data_matrix = np.append(data_matrix, velocity,axis=1)
-    #     variables += ','.join("Y-"+s for s in gas.species_names)
-    #     data_matrix = np.append(data_matrix, Y,axis=1)
-    #     variables += ',' + ','.join("Y_dot_net-"+s for s in gas.species_names)
-    #     data_matrix = np.append(data_matrix, Y_dot_net.T, axis=1)
-    #     variables += ',' + ','.join("Y_dot_pos-"+s for s in gas.species_names)
-    #     data_matrix = np.append(data_matrix, Y_dot_pos.T, axis=1)
-    #     variables += ',' + ','.join("Y_dot_neg-"+s for s in gas.species_names)
-    #     data_matrix = np.append(data_matrix, Y_dot_neg.T, axis=1)
-    #     variables += ',' + ','.join("Cp-"+s for s in gas.species_names)
-    #     data_matrix = np.append(data_matrix, cp_i, axis=1)
-    #     variables += ',' + ','.join("h-"+s for s in gas.species_names)
-    #     data_matrix = np.append(data_matrix, enth_i, axis=1)
-    #     variables += ',' + ','.join("Le-"+s for s in gas.species_names)
-    #     data_matrix = np.append(data_matrix, Le_i, axis=1)
-
-
-    #     if flame_is_gas:
-    #         variables += ','+DefaultSettings_FGM.name_enth+','
-    #         data_matrix = np.append(data_matrix, np.array([[enthalpy]]), axis=1)
-    #         variables += DefaultSettings_FGM.name_mixfrac+','
-    #         data_matrix = np.append(data_matrix, np.array([mixture_fraction]), axis=1)
-    #         variables += '%s,' % FGMVars.Temperature.name
-    #         data_matrix = np.append(data_matrix, np.array([[T]]), axis=1)
-    #         variables += '%s,' % FGMVars.Density.name
-    #         data_matrix = np.append(data_matrix, np.array([[density]]), axis=1)
-    #         variables += '%s,' % FGMVars.MolarWeightMix.name
-    #         data_matrix = np.append(data_matrix, mean_molar_weights.T, axis=1)
-    #         variables += '%s,' % FGMVars.Cp.name
-    #         data_matrix = np.append(data_matrix, np.array([[cp]]), axis=1)
-    #         variables += '%s,' % FGMVars.Conductivity.name
-    #         data_matrix = np.append(data_matrix, np.array([[k]]), axis=1)
-    #         variables += '%s,' % FGMVars.ViscosityDyn.name
-    #         data_matrix = np.append(data_matrix, np.array([[viscosity]]), axis=1)
-    #         variables += '%s' % FGMVars.Heat_Release.name
-    #         data_matrix = np.append(data_matrix, np.array([[heat_rel]]), axis=1)
-    #     else:
-    #         variables += ','+DefaultSettings_FGM.name_enth+','
-    #         data_matrix = np.append(data_matrix, np.reshape(enthalpy, [len(enthalpy),1]), axis=1)
-    #         variables += DefaultSettings_FGM.name_mixfrac+','
-    #         data_matrix = np.append(data_matrix, np.reshape(mixture_fraction, [len(mixture_fraction),1]), axis=1)
-    #         variables += '%s,' % FGMVars.Temperature.name
-    #         data_matrix = np.append(data_matrix, np.reshape(T, [len(T), 1]), axis=1)
-    #         variables += '%s,' % FGMVars.Density.name
-    #         data_matrix = np.append(data_matrix, np.reshape(density, [len(density), 1]), axis=1)
-    #         variables += '%s,' % FGMVars.MolarWeightMix.name
-    #         data_matrix = np.append(data_matrix, mean_molar_weights.T, axis=1)
-    #         variables += '%s,' % FGMVars.Cp.name
-    #         data_matrix = np.append(data_matrix, np.reshape(cp, [len(cp), 1]), axis=1)
-    #         variables += '%s,' % FGMVars.Conductivity.name
-    #         data_matrix = np.append(data_matrix, np.reshape(k, [len(k), 1]), axis=1)
-    #         variables += '%s,' % FGMVars.ViscosityDyn.name
-    #         data_matrix = np.append(data_matrix, np.reshape(viscosity, [len(viscosity), 1]), axis=1)
-    #         variables += '%s' % FGMVars.Heat_Release.name
-    #         data_matrix = np.append(data_matrix, np.reshape(heat_rel, [len(heat_rel), 1]), axis=1)
-
-    #     return variables, data_matrix
-
-    # def __TranslateToMatlabFile(self, filename:str, filename_out:str, output_dir:str):
-    #     """Translate default FlameletAI output file to TableMaster compatible file.
-
-    #     :param filename: default FlameletAI output file name.
-    #     :type filename: str
-    #     :param filename_out: output file name.
-    #     :type filename_out: str
-    #     :param output_dir: folder where to store the translated file.
-    #     :type output_dir: str
-    #     """
-    #     fid = open(filename, "r")
-    #     variables = fid.readline().strip().split(',')
-    #     fid.close()
-
-    #     data_flamelet = np.loadtxt(filename,delimiter=',',skiprows=1)
-
-    #     species_in_flamelet = []
-    #     species_molecular_weights = []
-    #     for v in variables:
-    #         if v[:2] == 'Y-':
-    #             species_in_flamelet.append(v[2:])
-    #             species_molecular_weights.append(self.gas.molecular_weights[self.gas.species_index(v[2:])])
-
-    #     variables_1 = ['Distance',\
-    #         'Temperature',\
-    #         'Density',\
-    #         'Conductivity',\
-    #         'Dynamic_Viscosity',\
-    #         'Cp',\
-    #         'Total_Enthalpy',\
-    #         'Heat_Release',\
-    #         'Mixture_Fraction']
-
-    #     variables_translated = ['Distance',\
-    #                             'T',\
-    #                             'rho',\
-    #                             'Conductivity',\
-    #                             'ViscosityDyn',\
-    #                             'cp',\
-    #                             'Enthalpy total',\
-    #                             'Heat release rate',\
-    #                             'Mixture Fraction']
-
-    #     units = ['m',\
-    #             'K', \
-    #             'kg m^-3',\
-    #             'W/m/K',\
-    #             'kg/m/s',\
-    #             'J/kg/K',\
-    #             'J/kg',\
-    #             'W/m^3',\
-    #             '-']
-
-    #     fid = open(output_dir + "/" + filename_out, 'w+')
-    #     fid.write("Cantera (Bosch edit) flamelet\n\n")
-    #     fid.write("Molecular weights:\n")
-    #     fid.write(",".join(species_in_flamelet) + "\n")
-    #     fid.write(",".join([str(m) for m in species_molecular_weights]) + "\n\n")
-    #     fid.write(",".join([variables_translated[i] + " ("+units[i]+")" for i in range(len(variables_translated))]) + ",")
-    #     fid.write(",".join(["Y-"+s for s in species_in_flamelet]) + ",")
-    #     fid.write(",".join(["ReacRatePos-"+s for s in species_in_flamelet]) + ",")
-    #     fid.write(",".join(["ReacRateNeg-"+s for s in species_in_flamelet]) + ",")
-    #     fid.write(",".join(["cp-"+s for s in species_in_flamelet]) + ",")
-    #     fid.write(",".join(["Enthalpy-"+s for s in species_in_flamelet]) + ",")
-    #     fid.write(",".join(["Le-"+s for s in species_in_flamelet]))
-
-    #     fid.write('\n\n')
-    #     fid.close()
-
-    #     idx_vars = [variables.index(v) for v in variables_1]
-    #     idx_massfrac = [variables.index("Y-"+s) for s in species_in_flamelet]
-    #     idx_pos_reacrate = [variables.index("Y_dot_pos-"+s) for s in species_in_flamelet]
-    #     idx_neg_reacrate = [variables.index("Y_dot_neg-"+s) for s in species_in_flamelet]
-    #     idx_cp_sp = [variables.index("Cp-"+s) for s in species_in_flamelet]
-    #     idx_h_sp = [variables.index("h-"+s) for s in species_in_flamelet]
-    #     idx_le_sp = [variables.index("Le-"+s) for s in species_in_flamelet]
-
-    #     thermophysical_props = data_flamelet[:, [i for i in idx_vars]]
-    #     massfracs = data_flamelet[:, [i for i in idx_massfrac]]
-    #     pos_reacrate = data_flamelet[:, [i for i in idx_pos_reacrate]] / np.array([species_molecular_weights])
-    #     neg_reacrate = data_flamelet[:, [i for i in idx_neg_reacrate]] / np.array([species_molecular_weights])
-    #     cp_sp = data_flamelet[:, [i for i in idx_cp_sp]]
-    #     h_sp = data_flamelet[:, [i for i in idx_h_sp]]
-    #     le_sp = data_flamelet[:, [i for i in idx_le_sp]]
-
-    #     total_data = np.hstack([thermophysical_props,\
-    #                         massfracs,\
-    #                         pos_reacrate,\
-    #                         neg_reacrate,\
-    #                         cp_sp,\
-    #                         h_sp,le_sp])
-
-    #     with open(output_dir + "/" + filename_out, "a+") as fid:
-    #         csvWriter = csv.writer(fid)
-    #         csvWriter.writerows(total_data)
-
 def ComputeFlameletData(Config:Config_FGM, run_parallel:bool=False, N_processors:int=2, loglevel:int=0,
                         free_flame_refine:dict=None, burner_flame_refine:dict=None):
     """Generate flamelet data according to Config_FGM settings either in serial or parallel.
@@ -863,8 +591,10 @@ def ComputeFlameletData(Config:Config_FGM, run_parallel:bool=False, N_processors
 
 def ComputeBoundaryData(Config:Config_FGM, run_parallel:bool=False, N_processors:int=2):
 
+    Config_local:Config_FGM = copy.copy(Config)
+
     def ComputeEquilibriumData(mix_input):
-        F = DataGenerator_Cantera(Config)
+        F = DataGenerator_Cantera(Config_local)
         F.RunMixtureFraction()
         F.includeFlameletType("EQUILIBRIUM")
         for flamelet_type in FlameletSolverDict.keys():
@@ -874,8 +604,8 @@ def ComputeBoundaryData(Config:Config_FGM, run_parallel:bool=False, N_processors
         F.computePremixedFlameletsFor(mix_input)
 
 
-    Np_unb_mix = Config.GetNpMix()
-    mix_status_stoch = Config.GetMixtureFractionConstant()
+    Np_unb_mix = Config_local.GetNpMix()
+    mix_status_stoch = Config_local.GetMixtureFractionConstant()
     mixture_range_lean = np.linspace(0, mix_status_stoch, int(Np_unb_mix/2))
     mixture_range_rich = np.linspace(mix_status_stoch, 1, int(Np_unb_mix/2)+1)
     mixture_range = np.append(mixture_range_lean, mixture_range_rich[1:])
