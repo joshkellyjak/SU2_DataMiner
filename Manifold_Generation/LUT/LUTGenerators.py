@@ -30,7 +30,6 @@ from su2dataminer.generate_data import DataGenerator_CoolProp
 from Common.DataDrivenConfig import Config_NICFD,Config_FGM
 from Manifold_Generation.LUT.LUTGenerator_Base import SU2TableGenerator_Base
 from Manifold_Generation.LUT.MeshTools import MeshThermodynamicPlane
-
 class TableGenerator_NICFD(SU2TableGenerator_Base):
     _Config:Config_NICFD = None
     __datagenerator:DataGenerator_CoolProp = None
@@ -100,7 +99,7 @@ class TableGenerator_NICFD(SU2TableGenerator_Base):
     def _initiateMesher(self):
         return MeshThermodynamicPlane()
     
-    def _getFluidDataPointCloud(self):
+    def _getFluidDataForInterpolator(self):
         self.__datagenerator.PreprocessData()
         self.__datagenerator.ComputeData()
         state_data_pointcloud, valid_mask = self.__datagenerator.GetStateData()
@@ -114,7 +113,7 @@ class TableGenerator_NICFD(SU2TableGenerator_Base):
 
         return state_dataFrame
     
-    def _createPointCloud(self, levelValue:float):
+    def _createPointCloudForTableLevel(self, levelValue:float):
 
         rhoe_pointcloud = np.column_stack((self.__thermodynamic_data[EntropicVars.Density.name], self.__thermodynamic_data[EntropicVars.Energy.name]))
         const_z = np.zeros(len(rhoe_pointcloud))
@@ -149,21 +148,73 @@ class TableGenerator_NICFD(SU2TableGenerator_Base):
     
 class TableGenerator_FGM(SU2TableGenerator_Base):
     _Config:Config_FGM = None
+    __refineGradients:bool = False
+    _refine_for_gradients_of:list[str] = []
+    _gradient_refinement_factors:list[float] = []
+    _gradient_norm_factors:list[float] = []
+
+    __refine_equilibrium:bool = False
+    __equilibrium_refinement_factor:float = 0.5
+    __margin_equilibrium:float = 2e-2
 
     def __init__(self, config_in:Config_FGM):
         super().__init__(config_in)
-        self._getFluidDataPointCloud()
+        self._getFluidDataForInterpolator()
         return
     
-    def _getFluidDataPointCloud(self):
+    def applyRefinementForGradientOf(self, varname:str, coef:float=0.5):
+        """Scale table refinement based on the gradients of thermochemical properties.
+
+        :param varname: quantity for which to evaluate gradients.
+        :type varname: str
+        :param coef: refinement coefficient, defaults to 0.5
+        :type coef: float, optional
+        :raises Exception: if quantity is not found in table variables.
+        :raises Exception: if refinement coefficient value is negative.
+        """
+        if varname not in self._state_quantities:
+            raise Exception("%s is not in the list of available thermophysical state variables" % varname)
+        if coef <= 0:
+            raise Exception("Refinement coeffcient should be positive")
+        self._refine_for_gradients_of.append(varname)
+        self._gradient_refinement_factors.append(coef)
+        self.__refineGradients = True
+        return
+    
+    def refineEquilibrium(self, coef:float=0.5, margin:float=2e-2):
+        """Apply refinement to equilibrium areas of each table level.
+
+        :param coef: refinement coefficient, defaults to 0.5
+        :type coef: float, optional
+        :raises Exception: if refinement coefficient value is negative.
+        """
+        if coef <= 0:
+            raise Exception("Refinement coefficient should be positive")
+        self.__refine_equilibrium = True
+        self.__equilibrium_refinement_factor = coef
+        self.__margin_equilibrium = margin
+        return
+    
+    def _getFluidDataForInterpolator(self):
         flamelet_data_filename = os.sep.join((self._Config.GetOutputDir(), self._Config.GetConcatenationFileHeader()+"_full.csv"))
         flameletDataPointCloud = pd.read_csv(flamelet_data_filename)
         self._state_quantities = list(flameletDataPointCloud.keys())
         self._table_vars = self._state_quantities.copy()
         return flameletDataPointCloud
     
-    def _createPointCloud(self, levelValue:float):
-
+    def _processTableLevels(self):
+        super()._processTableLevels()
+        if self._is2D():
+            mixture_status = self._Config.GetMixtureBounds()[0]
+            if self._Config.DefineMixtureStatus():
+                mixture_fraction = mixture_status
+            else:
+                self._Config.gas.set_equivalence_ratio(mixture_status, self._Config.GetFuelString(),self._Config.GetOxidizerString())
+                mixture_fraction = self._Config.gas.mixture_fraction(self._Config.GetFuelString(),self._Config.GetOxidizerString())
+            self._table_levels[0] = mixture_fraction
+        return
+    
+    def _createPointCloudForTableLevel(self, levelValue:float):
         self._Config.gas.set_mixture_fraction(levelValue, self._Config.GetFuelString(),self._Config.GetOxidizerString())
         self._Config.gas.TP=self._Config.GetUnbTempBounds()[0],DefaultSettings_FGM.pressure
         h_min_unb = self._Config.gas.enthalpy_mass
@@ -197,9 +248,55 @@ class TableGenerator_FGM(SU2TableGenerator_Base):
         h_limit = ((h_min_unb - h_min) * pv_grid + (h_min*pv_unb - h_min_unb*pv_b))/(pv_unb - pv_b)
         idx_keep = h_grid >= h_limit
 
-        cv_pointcloud = CV_grid_init[idx_keep, :]
-        cv_pointcloud_scaled = self._scaler_controlling_variables.transform(cv_pointcloud)
-        return cv_pointcloud_scaled
+        cv_pointcloud = CV_grid_init[idx_keep]
+        if self._is2D():
+            cv_pointcloud_scaled = self._scaler_controlling_variables.transform(cv_pointcloud[:,:2])
+            zcoords = np.zeros([len(cv_pointcloud), 1])
+            pointCloudNodes = np.column_stack((cv_pointcloud_scaled, zcoords))
+        else:
+            cv_pointcloud_scaled = self._scaler_controlling_variables.transform(cv_pointcloud)
+            pointCloudNodes = cv_pointcloud_scaled
+        
+        if self.__refineGradients:
+            self.__computeGradientNormFactors(cv_pointcloud_scaled)
+
+        return pointCloudNodes
+    
+    def __computeGradientNormFactors(self, cv_vals:np.ndarray[float]):
+        gradients = self._fluid_data_interpolator.Jacobian(cv_vals, varnames=self._refine_for_gradients_of)
+        grads_mag = np.linalg.norm(gradients,axis=0)
+        self._gradient_norm_factors = np.max(grads_mag,axis=0)
+        return
+    
+    def _refinelocation(self, x:float,y:float,z:float):
+        ref_factor = super()._refinelocation(x,y,z)
+        
+        if self.__refineGradients:
+            ref_factor_grads = self.__applyGradientRefinement(x,y,z)
+            ref_factor = min(ref_factor, ref_factor_grads)
+        
+        if self.__refine_equilibrium:
+            ref_factor_equilibrium = self.__applyEquilibriumRefinement(x,y,z)
+            ref_factor = min(ref_factor, ref_factor_equilibrium)
+
+        return ref_factor
+    
+    def __applyGradientRefinement(self, x:float, y:float, z:float):
+        cv_input = np.array([x,y,z])
+        jac = self._fluid_data_interpolator.Jacobian(cv_input[:self._nDim_table], varnames=self._refine_for_gradients_of)
+        jac_mag = np.linalg.norm(jac,axis=0)
+        jac_mag_norm = jac_mag / self._gradient_norm_factors
+        ref_factor = 1.0
+        for i, f in enumerate(self._gradient_refinement_factors):
+            ref_factor = min(ref_factor, max(f, 1.0 - (1 - f)*jac_mag_norm[i]))
+        return ref_factor
+    
+    def __applyEquilibriumRefinement(self, x:float, y:float, z:float):
+        ref_factor = 1.0
+        if self._is2D():
+            if x <= self.__margin_equilibrium or x >= (1-self.__margin_equilibrium):
+                ref_factor = self.__equilibrium_refinement_factor
+        return ref_factor
     
     def _writeAdditionalInfoToTable(self, fid):
         fid.write("Fuel:\n")

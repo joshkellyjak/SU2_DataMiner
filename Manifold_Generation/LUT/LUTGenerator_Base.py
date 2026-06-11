@@ -27,6 +27,7 @@ import pandas as pd
 import meshio
 import pandas
 from os import sep
+from copy import copy
 from sklearn.preprocessing import MinMaxScaler
 from multiprocessing import Pool
 from scipy.interpolate import RBFInterpolator
@@ -80,18 +81,18 @@ class SU2TableGenerator_Base:
     _verbosity:int=1
 
     def __init__(self, config_in:Config):
-        self._Config = config_in
+        self._Config = copy(config_in)
         self._nDim_table = len(self._Config.GetControllingVariables())
         return
     
     def defineInterpolator(self):
-        stateDataFrame = self._getFluidDataPointCloud()
+        stateDataFrame = self._getFluidDataForInterpolator()
         cv_data = np.column_stack(tuple(stateDataFrame[cv] for cv in self._Config.GetControllingVariables()))
         cv_data_scaled = self._scaler_controlling_variables.fit_transform(cv_data)
         self._fluid_data_interpolator = fluidDataInterpolator(cv_data_scaled, stateDataFrame, self.__N_nearest_neighbors, self.__inverse_distance_exponent)
         return
     
-    def _getFluidDataPointCloud(self):
+    def _getFluidDataForInterpolator(self):
         return
      
     def setMaximumCellSize(self, cell_size_coarse:float=1e-2):
@@ -108,7 +109,7 @@ class SU2TableGenerator_Base:
         self._target_number_of_nodes = target_node_count
         return
     
-    def addRefinementCriterion(self, varname:str, lowerbound:float=-np.inf, upperbound:float=np.inf, coef:float=0.5):
+    def applyRefinementWithin(self, varname:str, lowerbound:float=-np.inf, upperbound:float=np.inf, coef:float=0.5):
         """Specify conditional refinement based on interpolated thermochemical state data. Cell sizes are reduced by a factor "coef" where the table data lies between the specified lower bound and upper bound (inclusive)
 
         :param varname: thermochemical state variable name.
@@ -171,11 +172,11 @@ class SU2TableGenerator_Base:
         return
     
     def __preprocessTableSettings(self):
-        self.__processTableLevels()
+        self._processTableLevels()
         return
     
     def meshTableLevel(self, level_index:int):
-        pointCloud = self._createPointCloud(self._table_levels[level_index])
+        pointCloud = self._createPointCloudForTableLevel(self._table_levels[level_index])
         mesher = self._initiateMesher()
         if self.__run_parallel:
             mesher.setVerbosity(0)
@@ -193,7 +194,7 @@ class SU2TableGenerator_Base:
 
         cvTable, triangles, hullIDs, tableDataFrame = self.__extractTableLevelData(mesher)
         
-        if self.__is3D():
+        if self._is3D():
             self.__printmsg("Finished meshing table level %i at %s=%.2e with %i nodes" % (level_index, \
                                                                                     self._Config.GetControllingVariables()[2], \
                                                                                     self._table_levels[level_index], \
@@ -223,7 +224,7 @@ class SU2TableGenerator_Base:
         return cvTable, triangles, hullIDs, tableDataFrame
     
 
-    def _createPointCloud(self, levelValue:float):
+    def _createPointCloudForTableLevel(self, levelValue:float):
         return
     
     def _initiateMesher(self):
@@ -337,14 +338,14 @@ class SU2TableGenerator_Base:
         fid = open(file_out, "w+")
         fid.write("Dragon library\n\n")
         fid.write("<Header>\n\n")
-        if self.__is2D():
+        if self._is2D():
             fid.write("[Version]\n1.0.1\n\n")
         else:
             fid.write("[Version]\n1.1.0\n\n")
         
         self._writeAdditionalInfoToTable(fid)
 
-        if self.__is3D():
+        if self._is3D():
             fid.write("[Number of table levels]\n%i\n\n" % self._N_table_levels)
             fid.write("[Table levels]\n")
             for z in self._table_levels:
@@ -379,34 +380,34 @@ class SU2TableGenerator_Base:
 
         fid.write("<Data>\n")
         for iLevel in range(len(self._table_nodes)):
-            if self.__is3D():
+            if self._is3D():
                 fid.write("<Level>\n")
             Np = np.shape(self._table_nodes[iLevel])[0]
             for iNode in range(Np):
                 line_table_data = "\t".join(["%.14e" % self._data_in_table[iLevel][var][iNode] for var in self._table_vars])
                 
                 fid.write(line_table_data + "\n")
-            if self.__is3D():
+            if self._is3D():
                 fid.write("</Level>\n")
         fid.write("</Data>\n\n")
 
         fid.write("<Connectivity>\n")
         for iLevel in range(len(self._table_connectivity)):
-            if self.__is3D():
+            if self._is3D():
                 fid.write("<Level>\n")
             for iCell in range(len(self._table_connectivity[iLevel])):
                 fid.write("\t".join("%i" % c for c in self._table_connectivity[iLevel][iCell, :]+1) + "\n")
-            if self.__is3D():
+            if self._is3D():
                 fid.write("</Level>\n")
         fid.write("</Connectivity>\n\n")
 
         fid.write("<Hull>\n")
         for iLevel in range(len(self._table_hullnodes)):
-            if self.__is3D():
+            if self._is3D():
                 fid.write("<Level>\n")
             for iCell in range(len(self._table_hullnodes[iLevel])):
                 fid.write(("%i" % (self._table_hullnodes[iLevel][iCell]+1)) + "\n")
-            if self.__is3D():
+            if self._is3D():
                 fid.write("</Level>\n")
         fid.write("</Hull>\n\n")
         self.__printmsg("Done")
@@ -459,25 +460,30 @@ class SU2TableGenerator_Base:
         return
     
     def setSmoothingParameter(self, smoothing_factor:float=0):
+        """Apply smoothing to table data. High value = more smoothing, low value = no smoothing
+
+        :param smoothing_factor: _description_, defaults to 0
+        :type smoothing_factor: float, optional
+        """
         self.__smoothTableData = True
         self.__smoothingLevel = smoothing_factor
         return
     
     def __optionAppliesFor3D(self):
-        if self.__is2D():
+        if self._is2D():
             print("Option does not apply for two-dimensional table, ignoring")
             return False
         else:
             return True
 
-    def __is2D(self):
+    def _is2D(self):
         return self._nDim_table==2
 
-    def __is3D(self):
+    def _is3D(self):
         return self._nDim_table==3
     
-    def __processTableLevels(self):
-        if self.__is3D():
+    def _processTableLevels(self):
+        if self._is3D():
             if not any(self._table_levels):
                 if self._tableUpperLevel and self._tableLowerLevel and self._N_table_levels:
                     self._table_levels = np.linspace(self._tableLowerLevel, self._tableUpperLevel, self._N_table_levels)
