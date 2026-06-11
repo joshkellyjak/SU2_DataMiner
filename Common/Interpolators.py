@@ -140,7 +140,27 @@ is exceedingly sensitive to distance and to h.
             return interpolated_data[0]
         else:
             return interpolated_data
+    
+    def queryJacobian(self, query_input_samples:np.ndarray[float], nearest_neighbors:int=3, inverse_distance_exponent:float=2):
         
+        dx = 1e-2
+        grads = np.zeros([self.__nDim_input, query_input_samples.shape[0], self.__state_space_data.shape[1]])
+        for i in range(self.__nDim_input):
+            q_copy = query_input_samples.copy()
+            if query_input_samples.ndim==1:
+                q_copy[i] += dx
+            else:
+                q_copy[:, i] += dx
+            interp_data_plus = self.query(q_copy, nearest_neighbors, inverse_distance_exponent)
+            if query_input_samples.ndim==1:
+                q_copy[i] -= 2*dx
+            else:
+                q_copy[:, i] -= 2*dx
+            interp_data_minus = self.query(q_copy, nearest_neighbors, inverse_distance_exponent)
+            
+            grads[i] = (interp_data_plus - interp_data_minus) / (2*dx)
+        return grads
+    
     def __evaluate_KD_tree(self, query_input_samples:np.ndarray[float], number_of_nearest_neighbors:int):
         distances_to_nearest_neighbors, nearest_neighbor_indices = self.__KD_tree.query(query_input_samples, k=number_of_nearest_neighbors,eps=0)
         return distances_to_nearest_neighbors, nearest_neighbor_indices
@@ -256,11 +276,6 @@ class fluidDataInterpolator:
 
         print("Number of nearest neighbors: %i" % self.__n_near_single)
         print("Inverse distance exponent: %.2f" % self.__p_fac_single)
-        # plt.figure()
-        # ax = plt.axes(projection='3d')
-        # ax.plot3D(cv_data_test[:,0], cv_data_test[:,1], lookup_data_test[:, 2], 'k.')
-        # ax.plot3D(cv_data_test[:,0], cv_data_test[:,1], self.__lookup_data[:, 2], 'r.')
-        # plt.show()
         return
 
     def __call__(self, cv_data_query:np.ndarray[float],varnames:list[str]=[]):
@@ -282,3 +297,23 @@ class fluidDataInterpolator:
                 return fluid_data_interp[0]
             else:
                 return fluid_data_interp
+
+    def Jacobian(self, cv_data_query:np.ndarray[float],varnames:list[str]=[]):
+        ndim_input = cv_data_query.ndim
+        if ndim_input < 2:
+            cv_data_query = cv_data_query[np.newaxis]
+        
+        grads = self.__lookup_tree.queryJacobian(cv_data_query, nearest_neighbors=self.__n_near_single, inverse_distance_exponent=self.__p_fac_single)
+        nvars =len(varnames)
+        if nvars > 0:
+            var_indices = [self.__state_vars.index(var) for var in varnames]
+
+            if grads.shape[1] == 1:
+                return grads[:,0,var_indices]
+            else:
+                return grads[:,:,var_indices]
+        else:
+            if grads.shape[1] == 1:
+                return grads[:,0,:]
+            else:
+                return grads
