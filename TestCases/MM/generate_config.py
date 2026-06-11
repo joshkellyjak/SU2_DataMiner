@@ -68,4 +68,3 @@ Config.PrintBanner()
 
 # Save current configuration.
 Config.SaveConfig("MM_test")
- 

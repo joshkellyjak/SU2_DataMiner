@@ -175,11 +175,15 @@ class DefaultSettings_FGM(DefaultProperties):
     T_max:float = 800.0
     Np_temp:int = 30
 
+    # discard flamelets (not interpolated, not equilibrium) with max T below this threshold.
     T_threshold:float = 600.0
 
     eq_ratio_min:float = 0.2
     eq_ratio_max:float = 20.0
     Np_eq:int = 30
+    Np_mdot:int = 25
+
+    initial_grid_length:float = 0.2
 
     reaction_mechanism:str = 'gri30.yaml'
     transport_model:str = 'multicomponent'

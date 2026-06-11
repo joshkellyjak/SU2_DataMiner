@@ -60,6 +60,7 @@ def main():
     FGM_training.config_dir="FGM_MLP/"
     FGM_training.config_file = ""
     FGM_training.timeout=300
+    FGM_training.tolerance= 0.01
     FGM_training.exec_command="./ML_FGM_manifold.py"
     FGM_training.reference_files=["TrainingHistory_ref.csv"]
     FGM_training.test_files=["architectures_Group1/Worker_0/Model_0/TrainingHistory.csv"]
