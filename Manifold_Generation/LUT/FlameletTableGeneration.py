@@ -396,7 +396,7 @@ class SU2TableGenerator:
         PPV_test = D_test[:, self._Flamelet_Variables.index(var_to_test_for)]
         print("Done!")
         print("Setting up KD-tree...")
-        self._lookup_tree = Invdisttree(X=CV_train_scaled,z=D_train)
+        self._lookup_tree = Invdisttree(samples_state_space=CV_train_scaled,state_data=D_train)
         print("Done!")
 
         if not self._custom_KDtreeparams:
@@ -407,7 +407,7 @@ class SU2TableGenerator:
             RMS_ppv = np.zeros([len(n_near_range), len(p_range)])
             for i in tqdm(range(len(n_near_range))):
                 for j in range(len(p_range)):
-                    PPV_predicted = self._lookup_tree(q=CV_test_scaled, nnear=n_near_range[i], p=p_range[j])[:, self._Flamelet_Variables.index(var_to_test_for)]
+                    PPV_predicted = self._lookup_tree.query(query_samples=CV_test_scaled, nearest_neighbors=n_near_range[i], inverse_distance_exponent=p_range[j])[:, self._Flamelet_Variables.index(var_to_test_for)]
                     rms_local = np.average(np.power(PPV_predicted - PPV_test, 2))
                     RMS_ppv[i,j] = rms_local
             [imin,jmin] = divmod(RMS_ppv.argmin(), RMS_ppv.shape[1])
@@ -418,7 +418,7 @@ class SU2TableGenerator:
         print("Best found distance power: "+str(self._p_fac))
         print("Setting up KD-tree...")
         self._D_full = D_full
-        self._lookup_tree = Invdisttree(X=CV_full_scaled,z=D_full)
+        self._lookup_tree = Invdisttree(samples_state_space=CV_full_scaled,state_data=D_full)
         print("Done!")
         return
 
@@ -437,7 +437,7 @@ class SU2TableGenerator:
         CV_full_2d = self._D_full[:, self._plane_cv_idxs]
         self._scaler_2d = MinMaxScaler()
         CV_full_2d_scaled = self._scaler_2d.fit_transform(CV_full_2d)
-        self._lookup_tree = Invdisttree(X=CV_full_2d_scaled, z=self._D_full)
+        self._lookup_tree = Invdisttree(samples_state_space=CV_full_2d_scaled, state_data=self._D_full)
         print("Done!")
         return
 
@@ -446,7 +446,7 @@ class SU2TableGenerator:
             CV_scaled = self._scaler_2d.transform(CV_unscaled[:, self._plane_cv_idxs])
         else:
             CV_scaled = self._scaler.transform(CV_unscaled)
-        data_interp = self._lookup_tree(q=CV_scaled,nnear=self._n_near,p=self._p_fac)
+        data_interp = self._lookup_tree.query(query_samples=CV_scaled,nearest_neighbors=self._n_near,inverse_distance_exponent=self._p_fac)
         return data_interp
 
     def VisualizeTableLevel(self, val_mix_frac:float, var_to_plot:str=None):
