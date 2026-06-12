@@ -563,8 +563,9 @@ class PVOptimizer:
                 if (val_phi >= self.__phi_min) and (val_phi <= self.__phi_max):
                     flamelets = os.listdir(flamelet_dir + "/burnerflame_data/" + phi)
                     for f in flamelets:
-                        self.__valid_filepathnames.append(flamelet_dir + "/burnerflame_data/"+ phi + "/" + f)
-                        j_flamelet += 1
+                        if "int" not in f:
+                            self.__valid_filepathnames.append(flamelet_dir + "/burnerflame_data/"+ phi + "/" + f)
+                            j_flamelet += 1
 
         with open(self.__valid_filepathnames[0],'r') as fid:
             self.__flamelet_variables = fid.readline().strip().split(',')
