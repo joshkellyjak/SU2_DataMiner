@@ -30,13 +30,14 @@ from tqdm import tqdm
 import sys,os
 from Common.DataDrivenConfig import Config_FGM, Config
 from Common.CommonMethods import GetReferenceData 
-from Common.Properties import DefaultSettings_FGM
+from Common.Properties import DefaultSettings_FGM, FGMVars
 import cantera as ct
 import gmsh 
 import pickle
 from multiprocessing import Pool 
 from Common.Interpolators import Invdisttree 
 from random import sample 
+import meshio
 
 class SU2TableGenerator_Base:
     _Config = None 
@@ -123,7 +124,7 @@ class SU2TableGenerator_Base:
         full_data_file = self._Config.GetOutputDir()+"/LUT_data_full.csv"
         with open(full_data_file,'r') as fid:
             self._manifold_variables = fid.readline().strip().split(',')
-        #D_full = np.loadtxt(full_data_file,delimiter=',',skiprows=1)
+
         self._control_var_scaler = MinMaxScaler()
         CV_full, D_full = GetReferenceData(full_data_file, self._controlling_variables, self._manifold_variables)
         data_scaler = MinMaxScaler()
@@ -159,6 +160,7 @@ class SU2TableGenerator_Base:
                 rms_local = np.average(np.power(PPV_predicted - D_test_scaled, 2))
                 RMS_ppv[i,j] = rms_local 
         [imin,jmin] = divmod(RMS_ppv.argmin(), RMS_ppv.shape[1])
+        print(min(RMS_ppv))
         self._n_near = n_near_range[imin]
         self._p_fac = p_range[jmin]
         print("Done!")
@@ -180,7 +182,7 @@ class SU2TableGenerator_Base:
         
         return
     
-class SU2TableGenerator:
+class SU2TableGenerator_FGM:
 
     _Config:Config_FGM = None # Config_FGM class from which to read settings.
     _savedir:str
@@ -192,6 +194,8 @@ class SU2TableGenerator:
     _enth_full_norm:np.ndarray[float] = None      # Normalized total enthalpy values of the flamelet data.
     _mixfrac_full_norm:np.ndarray[float] = None   # Normalized mixture fraction values of the flamelet data.
 
+    _user_vars:list[str] = []
+    _table_vars:list[str] = None
     _Flamelet_Variables:list[str] = None  # Variable names in the concatenated flamelet data file.
     _Flamelet_Data:np.ndarray[float] = None     # Concatenated flamelet data.
 
@@ -209,8 +213,19 @@ class SU2TableGenerator:
     _refined_cell_size:float = 1e-3#2.5e-3#1.5e-3   # Table level refined cell size.
     _refinement_radius:float = 5e-3#5e-2     # Table level radius within which refinement is applied.
     _curvature_threshold:float = 0.3    # Curvature threshold above which refinement is applied.
+    __Np_target:int=3000    # Target number of nodes per table level.
+
+    _conditional_refinement_vars:list[str] = []     # Thermochemical state variables for which to refine mesh
+    _conditional_lower_bound:list[float] = []       # Lower bounds of refinement zones
+    _conditional_upper_bound:list[float] = []       # Upper bounds of refinement zones
+    _conditional_refinement_factor:list[float] = [] # Refinement factors to apply.
+    _reactant_refinement_factor:float = 1.0         # Refinement factor applied to premixed reactants.
+    _product_refinement_factor:float=1.0            # Refinement factor applied to products.
+
+    __target_node_count:bool=False  # Refine grid based on target number of nodes.
 
     _table_nodes = []       # Progress variable, total enthalpy, and mixture fraction node values for each table level.
+    _table_data:list[np.ndarray[float]] = []
     _table_nodes_norm = []  # Normalized table nodes for each level.
     _table_connectivity = []    # Table node connectivity per table level.
     _table_hullnodes = []   # Hull node indices per table level.
@@ -220,7 +235,7 @@ class SU2TableGenerator:
                                       DefaultSettings_FGM.name_enth,\
                                       DefaultSettings_FGM.name_mixfrac]  # FGM controlling variables
     _lookup_tree:Invdisttree = None     # KD tree with inverse distance weighted interpolation for flamelet data interpolation.
-    _flamelet_data_scaler:MinMaxScaler = None   # Scaler for flamelet data controlling variables.
+    _scaler:MinMaxScaler = None
     _n_near:int = 14     # Number of nearest neighbors from which to evaluate flamelet data.
     _p_fac:int = 3      # Power by which to weigh distances from query point.
     _custom_KDtreeparams:bool = False 
@@ -259,6 +274,21 @@ class SU2TableGenerator:
             raise Exception("Output directory %s not present on current hardware." % save_dir)
         self._savedir = save_dir 
 
+    def SetTableVars(self, user_vars_in:list[str]):
+        self._user_vars = []
+        for cv in self._Config.GetControllingVariables():
+            if cv not in user_vars_in:
+                print("%s not in user-defined variables, adding to table" % cv)
+                self._user_vars.append(cv)
+        flamelet_vars_lower = [v.lower() for v in self._Flamelet_Variables]
+        for var in user_vars_in:
+            if var.lower() not in flamelet_vars_lower:
+                raise Exception("%s not found in flamelet manifold data")
+            ivar = flamelet_vars_lower.index(var.lower())
+            self._user_vars.append(self._Flamelet_Variables[ivar])
+
+        return 
+    
     def SetNTableLevels(self, N_levels:int):
         """
         Define the number of table levels in the mixture fraction direction.
@@ -273,6 +303,20 @@ class SU2TableGenerator:
             raise Exception("Number of table levels should be higher than 2.")
         return 
     
+    def SetNnodes_Target(self, N_nodes_target:int=2000):
+        """Define the approximate number of nodes per table level.
+
+        :param N_nodes_target: desired number of nodes per table level, defaults to 2000
+        :type N_nodes_target: int, optional
+        :raises Exception: if non-positive values are provided.
+        """
+        if N_nodes_target <= 0:
+            raise Exception("Target number of table nodes should be positive")
+        self.__Np_target = N_nodes_target
+        self.__target_node_count = True 
+
+        return 
+    
     def SetBaseCellSize(self, cell_size:float):
         """
         Define the base cell size for the table levels.
@@ -285,6 +329,7 @@ class SU2TableGenerator:
             self._base_cell_size = cell_size 
         else:
             raise Exception("Proviced cell size should be higher than zero.")
+        self.__target_node_count = False
         return 
     
     def SetRefinedCellSize(self, cell_size:float):
@@ -299,6 +344,7 @@ class SU2TableGenerator:
             self._refined_cell_size = cell_size 
         else:
             raise Exception("Proviced cell size should be higher than zero.")
+        self.__target_node_count = False
         return
     
     def SetRefinementThreshold(self, val_threshold:float):
@@ -357,18 +403,70 @@ class SU2TableGenerator:
         self.__run_parallel = True 
         return 
     
+    def ConditionalRefinement(self, varname:str, lowerbound:float=-np.inf, upperbound:float=np.inf, coef:float=0.5):
+        """Specify conditional refinement based on interpolated thermochemical state data. Cell sizes are reduced by a factor "coef" where the table data lies between the specified lower bound and upper bound (inclusive). 
+
+        :param varname: thermochemical state variable name.
+        :type varname: str
+        :param lowerbound: lower bound above which refinement is applied, defaults to -np.inf
+        :type lowerbound: float, optional
+        :param upperbound: upper bound below which refinement is applied, defaults to np.inf
+        :type upperbound: float, optional
+        :param coef: mesh refinement factor, defaults to 0.5
+        :type coef: float, optional
+        :raises Exception: if variable is not in the set of flamelet thermochemical state variables.
+        :raises Exception: if lower bound value exceeds upper bound value.
+        :raises Exception: if the coefficient value is negative.
+        """
+        if varname not in self._Flamelet_Variables:
+            raise Exception("%s is not in the list of available thermochemical state variables" % varname)
+        if lowerbound > upperbound:
+            raise Exception("Upper bound value should exceed lower bound value")
+        if coef <= 0:
+            raise Exception("Refinement coeffcient should be positive")
+        self._conditional_refinement_vars.append(varname)
+        self._conditional_lower_bound.append(lowerbound)
+        self._conditional_upper_bound.append(upperbound)
+        self._conditional_refinement_factor.append(coef)
+        return 
+    
+    def RefineReactants(self, fac:float=1.0):
+        """Apply refinement to each table level on the side of the premixed reactants.
+
+        :param fac: mesh refinement factor, defaults to 1.0
+        :type fac: float, optional
+        :raises Exception: if refinement factor is negative.
+        """
+        if fac <= 0:
+            raise Exception("Refinement coefficient should be positive")
+        self._reactant_refinement_factor = fac
+        return 
+    
+    def RefineProducts(self, fac:float=1.0):
+        """Apply refinement to each table level on the side of the reaction products.
+
+        :param fac: mesh refinement factor, defaults to 1.0
+        :type fac: float, optional
+        :raises Exception: if refinement factor is negative.
+        """
+        if fac <= 0:
+            raise Exception("Refinement coefficient should be positive")
+        self._product_refinement_factor=fac
+        return 
+    
     def __DefineFlameletDataInterpolator(self):
 
         print("Configuring KD-tree for most accurate lookups")
 
         print("Loading flamelet data...")
         # Define scaler for FGM controlling variables.
-        full_data_file = self._Config.GetOutputDir()+"/"+self._Config.GetConcatenationFileHeader()+"_full.csv"
+        full_data_file = "/".join((self._Config.GetOutputDir(), "%s_full.csv" % self._Config.GetConcatenationFileHeader()))
+
         with open(full_data_file,'r') as fid:
             self._Flamelet_Variables = fid.readline().strip().split(',')
         D_full = np.loadtxt(full_data_file,delimiter=',',skiprows=1)
         self._scaler = MinMaxScaler()
-        CV_full = D_full[:,:3]
+        CV_full = D_full[:,[self._Flamelet_Variables.index(cv) for cv in self._Config.GetControllingVariables()]]
         self.__min_CV, self.__max_CV = np.min(CV_full,axis=0), np.max(CV_full,axis=0)
 
         min_mixfrac_dataset = self.__min_CV[2]
@@ -380,8 +478,8 @@ class SU2TableGenerator:
         CV_full_scaled = self._scaler.fit_transform(CV_full)
 
         # Exctract train and test data
-        train_data_file = self._Config.GetOutputDir()+"/"+self._Config.GetConcatenationFileHeader()+"_train.csv"
-        test_data_file = self._Config.GetOutputDir()+"/"+self._Config.GetConcatenationFileHeader()+"_test.csv"
+        train_data_file = "/".join((self._Config.GetOutputDir(), "%s_train.csv" % self._Config.GetConcatenationFileHeader()))
+        test_data_file = "/".join((self._Config.GetOutputDir(), "%s_test.csv" % self._Config.GetConcatenationFileHeader()))
         
         var_to_test_for = "ProdRateTot_PV"
         
@@ -401,12 +499,11 @@ class SU2TableGenerator:
         print("Done!")
         
         if not self._custom_KDtreeparams:
-            print("Search for best tree parameters...")
             # Do brute-force search to get the optimum number of nearest neighbors and distance power.
-            n_near_range = range(1, 25)
+            n_near_range = range(2, 30)
             p_range = range(1, 6)
             RMS_ppv = np.zeros([len(n_near_range), len(p_range)])
-            for i in tqdm(range(len(n_near_range))):
+            for i in tqdm(range(len(n_near_range)), desc="Searching for best tree parameters"):
                 for j in range(len(p_range)):
                     PPV_predicted = self._lookup_tree(q=CV_test_scaled, nnear=n_near_range[i], p=p_range[j])[:, self._Flamelet_Variables.index(var_to_test_for)]
                     rms_local = np.average(np.power(PPV_predicted - PPV_test, 2))
@@ -469,19 +566,7 @@ class SU2TableGenerator:
         self._table_nodes_norm = [None] * self._N_table_levels
         self._table_connectivity = [None] * self._N_table_levels
         self._table_hullnodes = [None] * self._N_table_levels
-        self.table_data = [None] * self._N_table_levels
-    
-        flamelet_vars = []
-        for var in self._Flamelet_Variables:
-            flamelet_vars.append(var)
-        flamelet_vars.remove("ProgressVariable")
-        flamelet_vars.remove("EnthalpyTot")
-        flamelet_vars.remove("MixtureFraction")
-        if "FlameletID" in self._Flamelet_Variables:
-            flamelet_vars.remove("FlameletID")
-
-        self.table_vars = flamelet_vars 
-        nVars = len(self.table_vars)
+        self._table_data = [None] * self._N_table_levels
 
         # Generate the table cells for each table level.
         NTria = 0
@@ -495,28 +580,23 @@ class SU2TableGenerator:
                 self._table_nodes[iLevel] = results[iLevel][0]
                 self._table_connectivity[iLevel] = results[iLevel][1]
                 self._table_hullnodes[iLevel] = results[iLevel][2]
-                data_interp = results[iLevel][3]
-                table_data_level = [None] * nVars
-                for iVar in range(nVars):
-                    var = self.table_vars[iVar]
-                    table_data_level[iVar] = data_interp[:, self._Flamelet_Variables.index(var)]
-                self.table_data[iLevel] = table_data_level
+                self._table_data[iLevel] = results[iLevel][3]
+                for icv, cv in enumerate(self._Config.GetControllingVariables()):
+                    self._table_data[iLevel][:, self._Flamelet_Variables.index(cv)] = self._table_nodes[iLevel][:, icv]
+
                 NTria += np.shape(self._table_connectivity[iLevel])[0]
                 NHull += np.shape(self._table_hullnodes[iLevel])[0]
                 NNodes += np.shape(self._table_nodes[iLevel])[0]
         else:
             for iLevel in range(self._N_table_levels):
-                table_data_level = [None] * nVars
                 result = self.ComputeTableNodes(iLevel)
                 self._table_nodes[iLevel] = result[0]
                 self._table_connectivity[iLevel] = result[1]
                 self._table_hullnodes[iLevel] = result[2]
-                data_interp = result[3]
-                for iVar in range(nVars):
-                    var = self.table_vars[iVar]
-                    table_data_level[iVar] = data_interp[:, self._Flamelet_Variables.index(var)]
-                self.table_data[iLevel] = table_data_level
-
+                self._table_data[iLevel] = result[3]
+                for icv, cv in enumerate(self._Config.GetControllingVariables()):
+                    self._table_data[iLevel][:, self._Flamelet_Variables.index(cv)] = self._table_nodes[iLevel][:, icv]
+                
                 NTria += np.shape(self._table_connectivity[iLevel])[0]
                 NHull += np.shape(self._table_hullnodes[iLevel])[0]
                 NNodes += np.shape(self._table_nodes[iLevel])[0]
@@ -564,6 +644,11 @@ class SU2TableGenerator:
         else:
             file_out = self._savedir + "/LUT_"+self._Config.GetConfigName()+".drg"
 
+        if len(self._user_vars) > 0:
+            table_vars = self._user_vars.copy()
+        else:
+            table_vars = self._Flamelet_Variables.copy()
+
         print("Writing LUT file with name " + file_out)
         fid = open(file_out, "w+")
         fid.write("Dragon library\n\n")
@@ -593,31 +678,30 @@ class SU2TableGenerator:
             fid.write("%i\n" % np.shape(HullNodes)[0])
         fid.write("\n")
 
-        fid.write("[Number of variables]\n%i\n\n" % len(self._Flamelet_Variables))
+        fid.write("[Number of variables]\n%i\n\n" % len(table_vars))
         fid.write("[Variable names]\n")
-        for iVar, Var in enumerate(self._Flamelet_Variables):
+        for iVar, Var in enumerate(table_vars):
             fid.write(str(iVar + 1)+":"+Var+"\n")
         fid.write("\n")
 
         fid.write("</Header>\n\n")
 
-        print("Writing table data...")
         fid.write("<Data>\n")
-        for iLevel in tqdm(range(len(self._table_nodes))):
+        for iLevel in tqdm(range(len(self._table_nodes)), desc="Writing table data"):
             fid.write("<Level>\n")
             Np = np.shape(self._table_nodes[iLevel])[0]
             for iNode in range(Np):
-                fid.write("\t".join("%+.14e" % cv for cv in self._table_nodes[iLevel][iNode, :]))
-                for iVar in range(len(self.table_vars)):
-                    fid.write("\t%+.14e" % self.table_data[iLevel][iVar][iNode])
+
+                for var in table_vars:
+                    fid.write("\t%+.14e" % self._table_data[iLevel][iNode, self._Flamelet_Variables.index(var)])
+                
                 fid.write("\n")
             fid.write("</Level>\n")
         fid.write("</Data>\n\n")
         print("Done!")
 
-        print("Writing table connectivity...")
         fid.write("<Connectivity>\n")
-        for iLevel in tqdm(range(len(self._table_connectivity))):
+        for iLevel in tqdm(range(len(self._table_connectivity)),desc="Writing table connectivity"):
             fid.write("<Level>\n")
             for iCell in range(len(self._table_connectivity[iLevel])):
                 fid.write("\t".join("%i" % c for c in self._table_connectivity[iLevel][iCell, :]+1) + "\n")
@@ -625,9 +709,8 @@ class SU2TableGenerator:
         fid.write("</Connectivity>\n\n")
         print("Done!")
 
-        print("Writing hull nodes...")
         fid.write("<Hull>\n")
-        for iLevel in tqdm(range(len(self._table_hullnodes))):
+        for iLevel in tqdm(range(len(self._table_hullnodes)),desc="Writing hull nodes"):
             fid.write("<Level>\n")
             for iCell in range(len(self._table_hullnodes[iLevel])):
                 fid.write(("%i" % (self._table_hullnodes[iLevel][iCell]+1)) + "\n")
@@ -637,6 +720,39 @@ class SU2TableGenerator:
 
         fid.close()
         return 
+    def WriteOutParaview(self,file_name_out:str="table_level"):
+        """Save table level data invtk format
+        
+        :param file_name_out: output file header.
+        :type file_name_out: str 
+        """
+
+        if len(self._user_vars) > 0:
+            table_vars = self._user_vars.copy()
+        else:
+            table_vars = self._Flamelet_Variables.copy()
+
+        for iLevel in range(len(self._table_nodes)):
+
+            # Create 2D connectivity of table level
+            cv_level = self._table_nodes[iLevel]
+            pts = self._scaler.transform(cv_level)
+            conn = np.asarray(self._table_connectivity[iLevel], dtype=np.int64)
+            
+            # Retrieve table data
+            point_data = {}
+            for var in table_vars:
+                point_data[var] = np.asarray(self._table_data[iLevel][:, self._Flamelet_Variables.index(var)])
+
+            # Generate 2D mesh ready for output
+            mesh = meshio.Mesh(
+                points=pts,
+                cells=[("triangle", conn)],
+                point_data=point_data
+            )
+            mesh.write("%s_%i.vtk" % (file_name_out, iLevel))
+
+        return
     
     def ComputeTableLevelMesh(self, val_mix_frac:float):
         """
@@ -648,15 +764,14 @@ class SU2TableGenerator:
         :rtype Connecivity: NDarray
         :return MeshNodes: 
         """
-        Coord_refinement, Coord_hull, hull_area,z_norm, CV_mesh, table_level_data  = self.__ComputeCurvature(val_mix_frac)
-        MeshNodes_Norm, table_level_data = self.__Compute2DMesh(XY_hull=Coord_hull, XY_refinement=Coord_refinement,val_mixfrac_norm=z_norm, level_area=hull_area)
+
+        Coord_hull, hull_area  = self.__TableLevelOutline(val_mix_frac)
+        MeshNodes_Norm, connectivity, HullNodes, table_level_data= self.__Compute2DMesh(CV_hull=Coord_hull,level_area=hull_area)
         
-        Tria = Delaunay(MeshNodes_Norm[:, :2])
-        HullNodes = Tria.convex_hull[:, 0]
         MeshNodes_dim = self._scaler.inverse_transform(MeshNodes_Norm)
-        return Tria.simplices, MeshNodes_dim, HullNodes, table_level_data
+        return connectivity, MeshNodes_dim, HullNodes, table_level_data
     
-    def __ComputeCurvature(self, val_mix_frac:float):
+    def __TableLevelOutline(self, val_mix_frac:float):
         """
         Compute the curvature of the reaction rate surface at a constant mixture fraction level. Identify the locations of high curvature where table refinement is required.
 
@@ -695,7 +810,7 @@ class SU2TableGenerator:
         zgrid = val_mix_frac*np.ones(np.shape(xgrid))
 
         # 2: Locate nodes that are above the burner-stabilized enthalpy line
-        CV_grid_init = np.vstack((xgrid.flatten(), ygrid.flatten(), zgrid.flatten())).transpose()
+        CV_grid_init = np.column_stack((xgrid.flatten(), ygrid.flatten(), zgrid.flatten()))
         pv_grid = CV_grid_init[:,0]
         h_grid = CV_grid_init[:,1]
 
@@ -709,44 +824,10 @@ class SU2TableGenerator:
 
         # 3: Generate convex hull on initial pv-h grid
         hull = ConvexHull(CV_grid_norm[:, :2])
-        x_hull = CV_grid_norm[hull.vertices, 0]
-        y_hull = CV_grid_norm[hull.vertices, 1]
-
-        # 4: Locate refinement locations based on pv source term curvature
-        Q_interp = self.__EvaluateFlameletInterpolator(CV_unscaled=CV_grid_init)
-        ppv_grid = Q_interp[:, self._Flamelet_Variables.index("ProdRateTot_PV")]
-        ppv_grid = np.reshape(ppv_grid, np.shape(xgrid))
-        idx_ref = self.__ComputeSourceTermCurvature(ppv_grid)
-
-        x_refinement = CV_grid_norm_init[idx_ref, 0]
-        y_refinement = CV_grid_norm_init[idx_ref, 1]
-    
-
-        # 5: Generate refinement locations at reactant and product progress variable
-        h_unb_range = np.linspace(h_min_unb, h_max, self._Config.GetNpTemp())
-        pv_unb_range = pv_unb * np.ones(np.shape(h_unb_range))
-        z_unb_range = val_mix_frac*np.ones(np.shape(h_unb_range))
-        CV_unb = np.hstack((pv_unb_range[:,np.newaxis], h_unb_range[:,np.newaxis],z_unb_range[:,np.newaxis]))
-        CV_unb_norm = self._scaler.transform(CV_unb)
-
-        h_b_range = np.linspace(h_min, h_max, self._Config.GetNpTemp())
-        pv_b_range = pv_b * np.ones(np.shape(h_b_range))
-        z_b_range = val_mix_frac*np.ones(np.shape(h_b_range))
-        CV_b = np.hstack((pv_b_range[:,np.newaxis], h_b_range[:,np.newaxis],z_b_range[:,np.newaxis]))
-        CV_b_norm = self._scaler.transform(CV_b)
-
-        x_refinement = np.append(x_refinement, CV_unb_norm[:,0])
-        x_refinement = np.append(x_refinement, CV_b_norm[:,0])
-        y_refinement = np.append(y_refinement, CV_unb_norm[:,1])
-        y_refinement = np.append(y_refinement, CV_b_norm[:,1])
-
-        XY_refinement = np.vstack((x_refinement, y_refinement)).T
-        XY_hull = np.vstack((x_hull, y_hull)).T
-
-        val_mix_frac_norm = CV_grid_norm[0, -1]
+        CV_hull = CV_grid_norm[hull.vertices, :]
+        level_area = hull.area
         
-
-        return XY_refinement, XY_hull, hull.area, val_mix_frac_norm, CV_grid, Q_interp
+        return CV_hull, level_area
     
     def __ComputeSourceTermCurvature(self, PPV_interp:np.ndarray[float]):
         Q_norm = (PPV_interp - np.min(PPV_interp))/(np.max(PPV_interp) - np.min(PPV_interp))
@@ -760,104 +841,135 @@ class SU2TableGenerator:
         idx_ref = np.where(d2Q_norm > self._curvature_threshold)
         return idx_ref 
     
-    def __Compute2DMesh(self, XY_hull:np.ndarray, XY_refinement:np.ndarray, val_mixfrac_norm:float, level_area:float):
+    def __refinelocation(self, x:float,y:float,z:float):
+        CV_norm = np.array([[x,y,z]])
+        CV_dim = self._scaler.inverse_transform(CV_norm)
+        data_interp = self.__EvaluateFlameletInterpolator(CV_dim)[0]
+        refine_fac = 1.0
+        for var, lower, upper, c in zip(self._conditional_refinement_vars, self._conditional_lower_bound, self._conditional_upper_bound, self._conditional_refinement_factor):
+            test_val = data_interp[self._Flamelet_Variables.index(var)]
+            if (test_val >= lower) and (test_val <= upper):
+                refine_fac = min(refine_fac, c)
+        
+
+        return refine_fac
+    
+
+    def __Compute2DMesh(self, CV_hull:np.ndarray, level_area:float):
+        """Generate 2D mesh of thermochemical state space for a table level.
+
+        :param XY_hull: Progress variable-total enthalpy locations of the table level outline.
+        :type XY_hull: np.ndarray
+        :param XY_refinement: Locations where refinement is to be applied.
+        :type XY_refinement: np.ndarray
+        :param val_mixfrac_norm: Scaled value of the mixture fraction
+        :type val_mixfrac_norm: float
+        :param level_area: area of the table level.
+        :type level_area: float
+        :return: table nodes, connectivity, boundary indices, interpolated flamelet data
+        :rtype: tuple
         """
-        Generate a 2D mesh for the current table level.
 
-        :param XY_hull: Array containing normalized pv and enth coordinates of the outline of the table level.
-        :type XY_hull: NDArray
-        :param XY_refinement: Array containing normalized pv and enth coordinates where refinement should be applied.
-        :type XY_refinement: NDArray
-        :return: mesh nodes of the 2D table mesh.
-        :rtype: NDArray
-        """
-        gmsh.initialize() 
+        def meshgeom(base_cell_size:float, CV_outline:np.ndarray[float]):
+            gmsh.initialize() 
+            gmsh.option.setNumber("General.Terminal", 0)
+            gmsh.option.setNumber("General.Verbosity", 1)
+            gmsh.model.add("table_level")
+            gmsh.option.setNumber("Mesh.Algorithm", 5)
+            factory = gmsh.model.geo
 
-        gmsh.option.setNumber("General.Terminal", 0)
-        gmsh.option.setNumber("General.Verbosity", 1)
-        gmsh.model.add("table_level")
-        factory = gmsh.model.geo
+            # Generate hull points and create a physical surface.
+            if np.shape(CV_outline)[1] < 3:
+                CV_outline = np.hstack((CV_outline, np.zeros([len(CV_outline),1])))
+            hull_pts = []
+            for cv in CV_outline:
+                hull_pts.append(factory.addPoint(cv[0],cv[1],cv[2]))
+            hull_lines = []
+            for i in range(len(hull_pts)):
+                j = (i+1) % (len(hull_pts))
+                hull_lines.append(factory.addLine(hull_pts[i], hull_pts[j]))
+            crvloop = factory.addCurveLoop(hull_lines, reorient=True)
+            surf = factory.addPlaneSurface([crvloop])
 
-        base_cell_size = self._base_cell_size * level_area
-        refined_cell_size = self._refined_cell_size * level_area 
-        refinement_radius = self._refinement_radius * np.sqrt(level_area)
+            gmsh.model.addPhysicalGroup(2, [surf], name="table_level")
+            factory.synchronize()
+            
+            gmsh.option.setNumber("Mesh.MeshSizeMax", base_cell_size)
+            pv_scaled_unb = min(CV_outline[:,0])
+            pv_scaled_b = max(CV_outline[:,0])
+            def meshSizeCallback(dim,tag,x,y,z,lc):
+                fac = self.__refinelocation(x, y, z)
+                if x <= pv_scaled_unb + 1e-2*(pv_scaled_b - pv_scaled_unb):
+                    fac = min(fac, self._reactant_refinement_factor)
+                if x >= pv_scaled_b - 1e-2*(pv_scaled_b - pv_scaled_unb):
+                    fac = min(fac, self._product_refinement_factor)
+                return base_cell_size * fac
+            
+            gmsh.model.mesh.setSizeCallback(meshSizeCallback)
 
-        hull_pts = []
-        for i in range(int(len(XY_hull)/2)):
-            hull_pts.append(factory.addPoint(XY_hull[i, 0], XY_hull[i, 1], 0, base_cell_size))
-        hull_pts_2 = [hull_pts[-1]]
-        for i in range(int(len(XY_hull)/2), len(XY_hull)):
-            hull_pts_2.append(factory.addPoint(XY_hull[i, 0], XY_hull[i, 1], 0, base_cell_size))
-        hull_pts_2.append(hull_pts[0])
-        embed_pts = []
-        for i in range(len(XY_refinement)):
-            pt_idx = factory.addPoint(XY_refinement[i, 0], XY_refinement[i, 1], 0, refined_cell_size)
-            embed_pts.append(pt_idx)
+            gmsh.model.mesh.generate(2)
+            nodeTags, nodes, _ = gmsh.model.mesh.getNodes(includeBoundary=True,tag=surf,dim=2)  
+            nodes = np.asarray(nodes, dtype=float).reshape(-1, 3)
+            nodeTags = np.asarray(nodeTags, dtype=np.int64)
 
+            innerTags, nodes_inner, _ =gmsh.model.mesh.getNodes(includeBoundary=False,tag=surf, dim=2)  
+            nodes_inner = np.asarray(nodes_inner, dtype=float).reshape(-1, 3)
+            innerTags = np.asarray(innerTags, dtype=np.int64)
 
-        hull_curve_1 = factory.addPolyline(hull_pts)
-        hull_curve_2 = factory.addPolyline(hull_pts_2)
+            hullTags = np.argwhere(np.isin(nodeTags, innerTags,invert=True))
+            
+            order = np.argsort(nodeTags)
+            nodeTags_sorted = nodeTags[order]
+            # 2) 2D elements
+            _, _, elemNodeTags = gmsh.model.mesh.getElements(2, surf)
+            tris = []
+            for nodes_flat in elemNodeTags:
+                tri_tags = np.asarray(nodes_flat, dtype=np.int64).reshape(-1, 3)
+                tris.append(self.__map_tags(tri_tags, nodeTags_sorted,order).reshape(-1, 3))
+
+            tris = np.vstack(tris)
+
+            return nodes, tris, hullTags
         
-        CL = factory.addCurveLoop([hull_curve_1, hull_curve_2])
-        
-        surf = factory.addPlaneSurface([CL])
-        gmsh.model.addPhysicalGroup(1, [hull_curve_1], name="hull_curve_1")
-        gmsh.model.addPhysicalGroup(1, [hull_curve_2], name="hull_curve_2")
-        gmsh.model.addPhysicalGroup(2, [surf], name="table_level")
-        gmsh.model.geo.synchronize()
+        # Discretize thermochemical state space with target node count or user-defined cell sizes.
+        if self.__target_node_count:
+            # Iterate coarse cell size to reach target number of nodes.
+            sufficient_refinement = False 
+            niter_max = 20
+            iter = 0
+            relaxation = 0.5
 
-        gmsh.model.mesh.field.add("Distance", 1)
-        gmsh.model.mesh.field.setNumbers(1, "PointsList", embed_pts)
-        gmsh.model.mesh.field.setNumber(1, "Sampling", 100)
-        gmsh.model.mesh.field.add("Threshold", 2)
-        gmsh.model.mesh.field.setNumber(2, "InField", 1)
-        gmsh.model.mesh.field.setNumber(2, "SizeMin", refined_cell_size)
-        gmsh.model.mesh.field.setNumber(2, "SizeMax", base_cell_size)
-        gmsh.model.mesh.field.setNumber(2, "DistMin", refinement_radius)
-        gmsh.model.mesh.field.setNumber(2, "DistMax", 1.5*refinement_radius)
+            # Initial guess
+            f_refinement = 0.3
+            base_cell_size = 50*level_area / self.__Np_target
+            while not sufficient_refinement and iter < niter_max:
+                nodes, tris, hulltags = meshgeom(base_cell_size,  CV_hull)
+                n_nodes = len(nodes)
+                rel_diff = abs(float(n_nodes - self.__Np_target)/self.__Np_target)
 
-        gmsh.model.mesh.field.add("Min", 7)
-        gmsh.model.mesh.field.setNumbers(7, "FieldsList", [2])
-        gmsh.model.mesh.field.setAsBackgroundMesh(7)
-        
-        lc = base_cell_size
-        def meshSizeCallback(dim,tag,x,y,z,lc):
-            return lc
-        
-        gmsh.model.mesh.setSizeCallback(meshSizeCallback)
-        gmsh.option.setNumber("Mesh.Algorithm", 5)
-        gmsh.model.mesh.generate(2)
-        nodes = gmsh.model.mesh.getNodes(dim=2, tag=-1, includeBoundary=True, returnParametricCoord=False)[1]
-        MeshPoints = np.array([nodes[::3], nodes[1::3]]).T
+                # Terminate if relative difference is less than 1%
+                if rel_diff > 0.01:
+                    base_cell_size *= (1 + relaxation * (float(n_nodes / self.__Np_target) - 1))
+                else:
+                    sufficient_refinement = True 
+                iter += 1
+        else:
+            base_cell_size = level_area * self._base_cell_size
+            nodes, tris,hulltags = meshgeom(base_cell_size,  CV_hull)
 
-        # Remove mesh nodes that are out of bounds.
-        pv_norm, enth_norm = MeshPoints[:, 0], MeshPoints[:, 1]
+        # Interpolate flamelet data onto table nodes
+        MeshPoints = nodes
 
-        mixfrac_norm = val_mixfrac_norm*np.ones(np.shape(pv_norm))
-        CV_level_norm = np.vstack((pv_norm, enth_norm, mixfrac_norm)).T 
-        CV_level_dim = self._scaler.inverse_transform(CV_level_norm)
-
-        MeshPoints = np.zeros([np.shape(MeshPoints)[0], 3])
-        MeshPoints[:, 0] = pv_norm 
-        MeshPoints[:, 1] = enth_norm 
-        MeshPoints[:, 2] = mixfrac_norm
+        CV_level_dim = self._scaler.inverse_transform(MeshPoints)
 
         table_level_data = self.__EvaluateFlameletInterpolator(CV_level_dim)
 
-        return MeshPoints, table_level_data
+        return MeshPoints, tris, hulltags, table_level_data
     
-    def __GetStochMixtureFraction(self):
-        fuel_definition = self._Config.GetFuelDefinition()
-        fuel_weights = self._Config.GetFuelWeights()
-        fuel_string = ",".join(fuel_definition[i] + ":" + str(fuel_weights[i]) for i in range(len(fuel_definition)))
-
-        ox_definition = self._Config.GetOxidizerDefinition()
-        ox_weights = self._Config.GetOxidizerWeights()
-        ox_string = ",".join(ox_definition[i] + ":" + str(ox_weights[i]) for i in range(len(ox_definition)))
-
-        self._Config.gas.set_equivalence_ratio(1.0, fuel_string, ox_string)
-        mixfrac_stoch = self._Config.gas.mixture_fraction(fuel_string, ox_string)
-        return mixfrac_stoch
+    def __map_tags(self,tags,nodeTags_sorted,order):
+        tags = np.asarray(tags, dtype=np.int64).ravel()
+        pos = np.searchsorted(nodeTags_sorted, tags)
+        return order[pos]
     
     def SaveTableGenerator(self, file_name:str):
         """Save the current TableGenerator object settings such that subsequent tables can be
@@ -869,34 +981,3 @@ class SU2TableGenerator:
         file = open(self._savedir + "/"+file_name +".tgen", "wb")
         pickle.dump(self, file)
         file.close()
-
-    def Inverse_LookUp_T(self, val_pv, val_mixfrac, val_T, val_h_start=2000):
-        CV_array = np.array([[val_pv, val_h_start, val_mixfrac]])
-        delta = 1e32
-        while np.abs(delta) > 1e-2:
-            Q_interp = self.__EvaluateFlameletInterpolator(CV_array)
-            val_T_interp = Q_interp[0, self._Flamelet_Variables.index("Temperature")]
-            val_cp_interp  = Q_interp[0, self._Flamelet_Variables.index("Cp")]
-            delta = val_T - val_T_interp
-            delta_h = val_cp_interp * delta 
-            CV_array[0,1] += delta_h
-        return CV_array[0,1]
-    
-if __name__ == "__main__":
-    config_input_file = sys.argv[-2]
-    N_cores = int(sys.argv[-1])
-    Config = Config_FGM(config_input_file)
-    T = SU2TableGenerator(Config)
-    if N_cores > 1:
-        T.SetNCores(N_cores)
-    T.SetMixtureFractionLimits(mix_frac_min=0.009, mix_frac_max=0.022)
-    T.InsertMixtureFractionLevel(0.01446751783896619)
-    T.InsertMixtureFractionLevel(0.01447)
-    T.InsertMixtureFractionLevel(0.01445)
-    T.VisualizeTableLevel(0.01446751783896619)
-    T.SetNTableLevels(200)
-    T.GenerateTableNodes()
-    T.WriteTableFile()
-    # #T.InterpolateTableData()
-    # T.WriteTableFile()
-    # T.SaveTableGenerator("LUT_"+Config.GetConfigName())
