@@ -1,3 +1,27 @@
+###############################################################################################
+#       #      _____ __  _____      ____        __        __  ____                   #        #
+#       #     / ___// / / /__ \    / __ \____ _/ /_____ _/  |/  (_)___  ___  _____   #        #
+#       #     \__ \/ / / /__/ /   / / / / __ `/ __/ __ `/ /|_/ / / __ \/ _ \/ ___/   #        #
+#       #    ___/ / /_/ // __/   / /_/ / /_/ / /_/ /_/ / /  / / / / / /  __/ /       #        #
+#       #   /____/\____//____/  /_____/\__,_/\__/\__,_/_/  /_/_/_/ /_/\___/_/        #        #
+#       #                                                                            #        #
+###############################################################################################
+
+############################## FILE NAME: FlameletSolvers.py ##################################
+#=============================================================================================#
+# author: Evert Bunschoten                                                                    |
+#    :PhD Candidate ,                                                                         |
+#    :Flight Power and Propulsion                                                             |
+#    :TU Delft,                                                                               |
+#    :The Netherlands                                                                         |
+#                                                                                             |
+#                                                                                             |
+# Description:                                                                                |
+#  Solvers used for flamelet data generation in SU2 DataMiner.                                |
+#                                                                                             |
+# Version: 3.1.0                                                                              |
+#                                                                                             |
+#=============================================================================================#
 import cantera as ct
 from os import sep, path, mkdir, getcwd
 from typing import Dict
@@ -8,6 +32,8 @@ from Common.Properties import DefaultSettings_FGM, FGMVars
 from Common.CommonMethods import ComputeLewisNumber
 
 class FlameletSolver_Cantera:
+    """Base class for Cantera flamelet solutions
+    """
     _Config:Config_FGM = None
     _flamelet_type:str = "None"
 
@@ -48,9 +74,6 @@ class FlameletSolver_Cantera:
     _thermochemical_solution:pd.DataFrame = None
     _is_premixed:bool = True
     _is_scalar:bool = False
-
-    __solution_fileformat:str = "csv"
-    __supported_formats:list[str] = ["csv", "yaml"]
 
     def __init__(self, config_input:Config_FGM):
         self._Config = config_input
@@ -386,7 +409,7 @@ class FlameletSolver_Cantera:
         self._thermochemical_solution["ReactantMixtureFraction"] = reactant_mixture_fraction
         self._thermochemical_solution["ReactantEquivalenceRatio"] = reactant_equivalence_ratio
         self._thermochemical_solution["ReactantTemperature"] = self._T_reactants
-        return 
+        return
     
     def _extractFlameletDiscretization(self):
         grid= self._flameletSolution.grid
@@ -424,7 +447,7 @@ class FlameletSolver_Cantera:
         initialGuessData = self._prepareInitialGuessData()
         self._flameletSolution.set_initial_guess(data=initialGuessData)
 
-        return 
+        return
     
     def _prepareInitialGuessData(self):
         initialGuessData = pd.DataFrame()
@@ -450,6 +473,8 @@ class FlameletSolver_Cantera:
      
     
 class FreeFlameSolver(FlameletSolver_Cantera):
+    """Solver class for adiabatic free flamelets
+    """
     __mass_flow_rate:float = 0.0
 
     def __init__(self, config_input:Config_FGM):
@@ -546,6 +571,8 @@ class FreeFlameSolver(FlameletSolver_Cantera):
         return self.__mass_flow_rate
     
 class BurnerFlameSolver(FlameletSolver_Cantera):
+    """Solver class for burner-stabilized flamelets
+    """
     __adiabatic_massflow:float = 0.0
     __val_massflow:float
     def __init__(self, config_input:Config_FGM):
@@ -666,9 +693,11 @@ class BurnerFlameSolver(FlameletSolver_Cantera):
         u = self._thermochemical_solution[FGMVars.Velocity.name][0]
         rho = self._thermochemical_solution[FGMVars.Density.name][0]
         self.__val_massflow =  u*rho
-        return 
+        return
 
 class EquilibriumSolver(FlameletSolver_Cantera):
+    """Solver class for chemical equilibrium data
+    """
     __is_reaction_products:bool = False
     __is_lean:bool = False
     __accumulated_solution:pd.DataFrame = pd.DataFrame()
@@ -870,6 +899,8 @@ class EquilibriumSolver(FlameletSolver_Cantera):
         return self.__solution_reactants
     
 class CooledFlameInterpolator(FlameletSolver_Cantera):
+    """Class for interpolated data between burner-stabilized flamelet and chemical equilibrium data
+    """
     __burnerFlameSolution:pd.DataFrame = None
     __equilibriumSolution:pd.DataFrame = None
 
@@ -986,11 +1017,10 @@ class CooledFlameInterpolator(FlameletSolver_Cantera):
         self.setReactantTemperature(self._thermochemical_solution[FGMVars.Temperature.name][0])
         
         return
-    
-    
 
 class CounterFlowDiffusionFlameSolver(FlameletSolver_Cantera):
-
+    """Solver class for strained counter-flow diffusion flamelets
+    """
     __strain_rate:float = 1.0
     __fuel_density:float = None
     __fuel_velocity:float = None
@@ -1002,8 +1032,8 @@ class CounterFlowDiffusionFlameSolver(FlameletSolver_Cantera):
         self._flameletTypeOutputFolder = "counterflame_data"
         self._flamelet_type = "CounterFlowDiffusionFlame"
         self._plotLabel = "Counter-flow diffusion flame"
-        self._is_premixed = False 
-        self._is_scalar = False 
+        self._is_premixed = False
+        self._is_scalar = False
         self.setInitialGrid(2e-1, 300)
         self.setGridRefinementCriteria(ratio=3, slope=0.04, curve=0.06, prune=0.02)
         return
@@ -1077,7 +1107,7 @@ class CounterFlowDiffusionFlameSolver(FlameletSolver_Cantera):
         super()._writeInflowSettings()
         self._thermochemical_solution["StrainRate"] = self.__strain_rate
         self._thermochemical_solution["SpreadRate"] = self._flameletSolution.spread_rate
-        return 
+        return
     
     def loadSolution(self, flameletFileName:str):
         super().loadSolution(flameletFileName)
@@ -1085,7 +1115,7 @@ class CounterFlowDiffusionFlameSolver(FlameletSolver_Cantera):
         n_nodes = self._thermochemical_solution.shape[0]
         self.setInitialGrid(grid_length, n_nodes)
         self.__strain_rate = self._thermochemical_solution["StrainRate"][0]
-        return 
+        return
     
     def _prepareInitialGuessData(self):
         initialGuessData = super()._prepareInitialGuessData()
