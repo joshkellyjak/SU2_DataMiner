@@ -12,6 +12,7 @@ class FlameletSolver_Cantera:
     _flamelet_type:str = "None"
 
     _flameletTypeOutputFolder:str = ""
+    _plotLabel:str = None
     _output_filepath:str = getcwd()
     _flamelet_filename:str
 
@@ -95,7 +96,7 @@ class FlameletSolver_Cantera:
     
     def _prepareStorageFolder(self):
 
-        folder_for_flamelet_type = self.__createFolderForFlameletType()
+        folder_for_flamelet_type = self._createFolderForFlameletType()
         mixture_subfolder = self.__createSubFolderForMixture()
 
         filepath_for_flamelet_data = sep.join((folder_for_flamelet_type, mixture_subfolder))
@@ -105,7 +106,7 @@ class FlameletSolver_Cantera:
         self._output_filepath = filepath_for_flamelet_data
         return
     
-    def __createFolderForFlameletType(self):
+    def _createFolderForFlameletType(self):
         storage_folder = sep.join((self._Config.GetOutputDir(), self.getFlameletFolder()))
         if not path.isdir(storage_folder):
             mkdir(storage_folder)
@@ -167,6 +168,9 @@ class FlameletSolver_Cantera:
     
     def getFlameletType(self):
         return self._flamelet_type
+    
+    def getPlotLabel(self):
+        return self._plotLabel
     
     def setInitialGrid(self, initial_grid_length_in_meters:float=1.8e-2, number_of_nodes:int=100):
         self._initial_grid_length = initial_grid_length_in_meters
@@ -452,6 +456,7 @@ class FreeFlameSolver(FlameletSolver_Cantera):
         FlameletSolver_Cantera.__init__(self, config_input)
         self._flameletTypeOutputFolder = "freeflame_data"
         self._flamelet_type = "Freeflame"
+        self._plotLabel = "Adiabatic free flame"
         self._is_premixed = True
         self._is_scalar = False
         self._n_1D_iterations = self._Config.GetNpTemp()
@@ -547,6 +552,7 @@ class BurnerFlameSolver(FlameletSolver_Cantera):
         FlameletSolver_Cantera.__init__(self, config_input)
         self._flameletTypeOutputFolder = "burnerflame_data"
         self._flamelet_type = "Burnerflame"
+        self._plotLabel = "Burner-stabilized flame"
         self._is_premixed = True
         self._is_scalar = False
         self.setGridRefinementCriteria(ratio=3, slope=0.15, curve=0.15, prune=0.05)
@@ -673,6 +679,7 @@ class EquilibriumSolver(FlameletSolver_Cantera):
         FlameletSolver_Cantera.__init__(self, config_input)
         self._flameletTypeOutputFolder = "equilibrium_data"
         self._flamelet_type = "Equilibrium"
+        self._plotLabel = "Chemical equilibrium data"
         self._is_premixed = True
         self._is_scalar = True
         self._n_1D_iterations = self._Config.GetNpTemp()
@@ -813,8 +820,9 @@ class EquilibriumSolver(FlameletSolver_Cantera):
             self.__solution_products = self.__accumulated_solution
         else:
             self.__solution_reactants = self.__accumulated_solution
-            
-        self._canteraSolution.set_mixture_fraction(self.__accumulated_solution[FGMVars.MixtureFraction.name].iloc[-1], self._Config.GetFuelString(), self._Config.GetOxidizerString())
+        
+        val_mixfrac = np.clip(self.__accumulated_solution[FGMVars.MixtureFraction.name].iloc[-1], 0.0, 1.0)
+        self._canteraSolution.set_mixture_fraction(val_mixfrac, self._Config.GetFuelString(), self._Config.GetOxidizerString())
         if self._Config.DefineMixtureStatus():
             self._reactant_mixture_status = self._canteraSolution.mixture_fraction(self._Config.GetFuelString(), self._Config.GetOxidizerString())
         else:
@@ -869,6 +877,7 @@ class CooledFlameInterpolator(FlameletSolver_Cantera):
         super().__init__(config)
         self._flameletTypeOutputFolder = "interpolated_burnerflame_data"
         self._flamelet_type = "BurnerflameInt"
+        self._plotLabel = "Interpolated burner flame"
         self._is_premixed = True
         self._is_scalar = True
         self._n_1D_iterations = self._Config.GetNpMdotExtra()
@@ -992,6 +1001,7 @@ class CounterFlowDiffusionFlameSolver(FlameletSolver_Cantera):
         super().__init__(config_input)
         self._flameletTypeOutputFolder = "counterflame_data"
         self._flamelet_type = "CounterFlowDiffusionFlame"
+        self._plotLabel = "Counter-flow diffusion flame"
         self._is_premixed = False 
         self._is_scalar = False 
         self.setInitialGrid(2e-1, 300)
@@ -1105,6 +1115,22 @@ class CounterFlowDiffusionFlameSolver(FlameletSolver_Cantera):
     def setInputVariable(self, val_input:float):
         self.setReactantTemperature(val_input)
         return
+    
+    def _prepareStorageFolder(self):
+
+        folder_for_flamelet_type = self._createFolderForFlameletType()
+        mixture_subfolder = self.__createSubFolderForStrain()
+
+        filepath_for_flamelet_data = sep.join((folder_for_flamelet_type, mixture_subfolder))
+        if not path.isdir(filepath_for_flamelet_data):
+            mkdir(filepath_for_flamelet_data)
+        
+        self._output_filepath = filepath_for_flamelet_data
+        return
+    
+    def __createSubFolderForStrain(self):
+        strain_subfolder = "strain_%.3e" % (self.__strain_rate)
+        return strain_subfolder
     
 FlameletSolverDict:dict = {"FREEFLAME" : FreeFlameSolver,\
                            "BURNERFLAME" : BurnerFlameSolver,\
