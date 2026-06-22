@@ -511,8 +511,8 @@ class DataGenerator_Cantera(DataGenerator_Base):
         return
     
     def computeNonPremixedFlamelets(self):
-        if "COUNTERFLAME" in self.__flameletSolverDict.values():
-            self.__flameletSolverDict["COUNTERFLAME"].solveForMixtureStatus()
+        if "COUNTERFLAME" in self.__flameletSolverDict.keys():
+            self.__flameletSolverDict["COUNTERFLAME"].solveForMixtureStatus(0)
         return
     
     def ComputeFlamelets(self):
@@ -592,10 +592,10 @@ def ComputeFlameletData(Config:Config_FGM, run_parallel:bool=False, N_processors
 def ComputeBoundaryData(Config:Config_FGM, run_parallel:bool=False, N_processors:int=2):
 
     Config_local:Config_FGM = copy.copy(Config)
-
+    Config_local.DefineMixtureStatus(True)
+    
     def ComputeEquilibriumData(mix_input):
         F = DataGenerator_Cantera(Config_local)
-        F.RunMixtureFraction()
         F.includeFlameletType("EQUILIBRIUM")
         for flamelet_type in FlameletSolverDict.keys():
             if flamelet_type != "EQUILIBRIUM":
