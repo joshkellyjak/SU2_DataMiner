@@ -2,7 +2,6 @@ import numpy as np
 import tkinter as tk
 from tkinter.filedialog import askopenfilenames
 import os
-import pandas as pd
 import matplotlib.pyplot as plt
 from Common.DataDrivenConfig import Config_FGM,Config_NICFD
 from Common.Properties import DefaultSettings_FGM, FGMVars
@@ -13,7 +12,7 @@ class DataPlotter_FGM(DataPlotter_Base):
 
     _Config:Config_FGM = None
 
-    __flameletFileNames = None 
+    __flameletFileNames = None
     __manual_select:bool = True
 
 
