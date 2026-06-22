@@ -996,7 +996,6 @@ class CounterFlowDiffusionFlameSolver(FlameletSolver_Cantera):
         self._is_scalar = False 
         self.setInitialGrid(2e-1, 300)
         self.setGridRefinementCriteria(ratio=3, slope=0.04, curve=0.06, prune=0.02)
-        self._initializeFlameletSolver()
         return
     
     def _initializeFlameletSolver(self):
@@ -1022,7 +1021,7 @@ class CounterFlowDiffusionFlameSolver(FlameletSolver_Cantera):
     def _solverSpecificPreprocessing(self):
         if not self._from_restart and not self._from_file:
             self._setInitialGrid()
-            #self._initializeFlameletSolver()
+            self._initializeFlameletSolver()
         
         self._flameletSolution.P = ct.one_atm
 
@@ -1041,7 +1040,7 @@ class CounterFlowDiffusionFlameSolver(FlameletSolver_Cantera):
         self.__strain_rate = val_strain_rate
         return
     
-    def _setFlameletFileName(self):
+    def getFlameletFileName(self):
         flamelet_filename = "%s_strain%.3e_Tu%.1f" % (self._flamelet_type, \
                                                         self.__strain_rate, \
                                                         self._T_reactants)
