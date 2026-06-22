@@ -991,7 +991,7 @@ class CounterFlowDiffusionFlameSolver(FlameletSolver_Cantera):
     def __init__(self, config_input):
         super().__init__(config_input)
         self._flameletTypeOutputFolder = "counterflame_data"
-        self._flamelet_type = "Counter-flow diffusion flame"
+        self._flamelet_type = "CounterFlowDiffusionFlame"
         self._is_premixed = False 
         self._is_scalar = False 
         self.setInitialGrid(2e-1, 300)
@@ -1054,10 +1054,11 @@ class CounterFlowDiffusionFlameSolver(FlameletSolver_Cantera):
             output_message = "%s simulation at strain=%.2f s^-1 did not ignite " % (self._flamelet_type,\
                                                                                   self.__strain_rate)
         else:
-            output_message = "Successful %s simulation at strain=%.2f s^-1" % (self._flamelet_type,\
+            output_message = "Successful %s simulation at Tu=%.1f strain=%.2f s^-1" % (self._flamelet_type,\
+                                                                            self._T_reactants,\
                                                                             self.__strain_rate)
         if self._print_iteration:
-            output_message += "(%i/%i)" % (self._iteration, self._n_1D_iterations)
+            output_message += "(%i/%i)" % (self._iteration+1, self._n_1D_iterations)
 
         print(output_message)
         return
@@ -1080,6 +1081,30 @@ class CounterFlowDiffusionFlameSolver(FlameletSolver_Cantera):
         initialGuessData = super()._prepareInitialGuessData()
         initialGuessData["spreadRate"] = self._thermochemical_solution["SpreadRate"]
         return initialGuessData
+    
+    def _parseInputSettings(self, flamelet_solution_settings):
+        if "strain_rate" in flamelet_solution_settings.keys():
+            self.setStrainRate(flamelet_solution_settings["strain_rate"])
+        if "reactant_temperature" in flamelet_solution_settings.keys():
+            self.setReactantTemperature(flamelet_solution_settings["reactant_temperature"])
+        return super()._parseInputSettings(flamelet_solution_settings)
+   
+    
+    def _writeSolverSettings(self, solution_index:int, setting_1D:float):
+        super()._writeSolverSettings(solution_index, setting_1D)
+        freeflame_settings = {"reactant_temperature":setting_1D}
+        return freeflame_settings
+    
+
+    def _prepareSettingRange(self):
+        super()._prepareSettingRange()
+        Tu_bounds = self._Config.GetUnbTempBounds()
+        Tu_range = np.linspace(Tu_bounds[0], Tu_bounds[1], self._n_1D_iterations)
+        return Tu_range
+    
+    def setInputVariable(self, val_input:float):
+        self.setReactantTemperature(val_input)
+        return
     
 FlameletSolverDict:dict = {"FREEFLAME" : FreeFlameSolver,\
                            "BURNERFLAME" : BurnerFlameSolver,\
