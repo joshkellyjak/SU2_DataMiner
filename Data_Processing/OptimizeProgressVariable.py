@@ -37,7 +37,7 @@ from sklearn.preprocessing import MinMaxScaler
 
 from Common.Properties import FGMVars, DefaultSettings_FGM
 from Common.DataDrivenConfig import Config_FGM
-from Data_Generation.FlameletSolvers import * 
+from Data_Generation.FlameletSolvers import *
 
 class PVOptimizer:
     """Optimize the progress variable weights for all flamelets in the manifold given relevant species in the mixture.
@@ -82,7 +82,7 @@ class PVOptimizer:
     _species_bounds_set:list[str] = []
     _species_custom_lb:list[float] = []
     _species_custom_ub:list[float] = []
-    _bounds:Bounds = None 
+    _bounds:Bounds = None
     
     _output_dir:str = None
 
@@ -111,7 +111,7 @@ class PVOptimizer:
         T_u_bounds = self._Config.GetUnbTempBounds()
         self.__Tu_max = T_u_bounds[1]
         self.__Tu_min = T_u_bounds[0]
-        return 
+        return
     
     def OptimizePV(self):
         """Run the progress variable species selection and weights optimization process."""
@@ -167,7 +167,7 @@ class PVOptimizer:
         self._convergence_history_filename = os.sep.join((self._output_dir, historyFileName))
         with open(self._convergence_history_filename, "w") as fid:
             fid.write("y value," + ",".join("alpha-"+Sp for Sp in self._pv_definition_optim) + "\n")
-        return 
+        return
     
     def __setDefaultOptimizerOptions(self):
         if not self.__custom_population_set:
@@ -175,7 +175,7 @@ class PVOptimizer:
 
         if not self.__custom_generation_set:
             self._N_generations = 5 * self._population_size
-        return 
+        return
     
     def __prepareBounds(self):
         nVar = len(self._pv_definition_optim)
@@ -192,7 +192,7 @@ class PVOptimizer:
                 pass
 
         self._bounds = Bounds(lb=lb, ub=ub)
-        return 
+        return
     
     def __optimize(self):
         
@@ -217,7 +217,7 @@ class PVOptimizer:
         
         # Scale optimized progress variable weights for normalization sake.
         self._scaleProgressVariable()
-        return 
+        return
     
     def _displayAndSaveResults(self):
         # Visualize weights and save convergence trend.
@@ -232,13 +232,13 @@ class PVOptimizer:
         
         np.save(pv_species_file, self._pv_definition_optim, allow_pickle=True)
         np.save(pv_weights_file, self._pv_weights_optim, allow_pickle=True)
-        return 
+        return
     
     def __prepareOutputDir(self):
         self._output_dir = os.sep.join((self._Config.GetOutputDir(), "PV_Optimization"))
         if not os.path.isdir(self._output_dir):
             os.mkdir(self._output_dir)
-        return 
+        return
     
     def SetOutputDir(self, output_dir:str):
         """Specify custom directory where to store progress variable optimization history.
@@ -465,7 +465,7 @@ class PVOptimizer:
             raise Exception("Population size should be higher than one.")
         self.__custom_population_set = True
         self._population_size = popsize
-        return 
+        return
     
     def SetCurveStepThreshold(self, val_tol:float=1e-4):
         """Set the threshold value for monotonizing flamelet data.
@@ -515,7 +515,7 @@ class PVOptimizer:
                                         strategy='best1exp',\
                                         seed=1,\
                                         tol=1e-3)
-        return result 
+        return result
     
     def __optimizeSimplex(self, intermediateResult):
         result = minimize(self.penalty_function, \
@@ -523,7 +523,7 @@ class PVOptimizer:
                           method='Nelder-Mead', \
                           bounds=self._bounds,\
                           callback=self._Optimization_Callback)
-        return result 
+        return result
     
     
     
@@ -534,7 +534,7 @@ class PVOptimizer:
         self._convergence_history_filename = os.sep.join((self._output_dir, historyFileName))
         with open(self._convergence_history_filename, "w") as fid:
             fid.write("y value," + ",".join("alpha-"+Sp for Sp in self._pv_definition_optim) + "\n")
-        return 
+        return
     
     
     def _scaleProgressVariable(self):
@@ -613,7 +613,7 @@ class PVOptimizer:
                     for flameletFile in flameletFilesForMixture:
                         flameletFilePath = os.sep.join((flameletsFolder, flameletFile))
                         flameletSolver.loadSolution(flameletFilePath)
-                        if self.__flameletIsWithinBounds(flameletSolver)and self.__domainIsNotTooLong(flameletSolver):
+                        if self.__flameletIsWithinBounds(flameletSolver) and self.__domainIsNotTooLong(flameletSolver):
                             self.__valid_filepathnames.append(flameletFilePath)
                             self._Y_flamelets[jFlamelet] = flameletSolver.getMassFractions()
                             self.__AddedD_flamelets[jFlamelet] = self.__retrieveAdditionalData(flameletSolver)
@@ -624,7 +624,7 @@ class PVOptimizer:
         nValidFlamelets = len(self._Y_flamelets)
         if nValidFlamelets == 0:
             raise Exception("No premixed flamelet solutions within limits were identified")
-        return 
+        return
 
     def __retrieveAdditionalData(self, flameletSolution:FlameletSolver_Cantera):
         thermochemicalData = flameletSolution.getThermoChemicalData()
@@ -634,7 +634,7 @@ class PVOptimizer:
             if var == FGMVars.Beta_Enth_Thermal.name:
                 additionalData[var] = beta_h1
             elif var == FGMVars.Beta_Enth.name:
-                additionalData[var] = beta_h2 
+                additionalData[var] = beta_h2
             elif var == FGMVars.Beta_MixFrac.name:
                 additionalData[var] = beta_Z
             else:
@@ -645,13 +645,14 @@ class PVOptimizer:
         for var in self.__additional_variables:
             if var not in varnames:
                 raise Exception("%s was not found in flamelet data" % var)
-        return 
+        return
     
     def __flameletIsWithinBounds(self, flameletSolver:FlameletSolver_Cantera):
         mixtureStatus = flameletSolver.getMixtureStatus()
         reactantTemperature = flameletSolver.getReactantTemperature()
         return (reactantTemperature >= self.__Tu_min) and (reactantTemperature <= self.__Tu_max) \
-            and (mixtureStatus >= self.__phi_min) and (mixtureStatus <= self.__phi_max) 
+            and (mixtureStatus >= self.__phi_min) and (mixtureStatus <= self.__phi_max) \
+            and flameletSolver.isPremixed()
     
     def __domainIsNotTooLong(self, flameletSolver:FlameletSolver_Cantera):
         solutionData = flameletSolver.getThermoChemicalData()
@@ -685,8 +686,8 @@ class PVOptimizer:
                 YMin[sp] = min(YMin[sp][0], np.min(flameletMassFraction[sp]))
                 YMax[sp] = max(YMax[sp][0], np.max(flameletMassFraction[sp]))
 
-        massFractionRange = YMax - YMin 
-        return massFractionRange 
+        massFractionRange = YMax - YMin
+        return massFractionRange
     
     def __removeInertSpecies(self, massFractionRange:pd.DataFrame):
         filteredRange = massFractionRange.copy()
@@ -740,12 +741,12 @@ class PVOptimizer:
         :rtype: _type_
         """
         Y_filtered = Y_flamelet[self._pv_definition_optim].values
-        includeAdditionalData = additionalData is not None 
+        includeAdditionalData = additionalData is not None
        
         if includeAdditionalData:
-            otherdata = additionalData.values 
+            otherdata = additionalData.values
         else:
-            otherdata = None 
+            otherdata = None
         # Generate monotonic mass fraction increment vector for the current flamelet.
         idx_mon = self._MakeMonotonic(Y_filtered, otherdata)
         if any(idx_mon):
@@ -816,7 +817,7 @@ class PVOptimizer:
     def updateProgressVariableInConfig(self):
         self._Config.SetProgressVariableDefinition(self._pv_definition_optim, self._pv_weights_optim)
         self._Config.SaveConfig()
-        return 
+        return
     
 class PVOptimizer_Niu(PVOptimizer):
     def __init__(self, Config:Config_FGM):
