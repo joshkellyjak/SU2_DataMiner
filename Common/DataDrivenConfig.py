@@ -1512,7 +1512,7 @@ class Config_FGM(Config):
         self.__generate_counterflames = "COUNTERFLAME" in self.__flamelet_types
         self.__generate_equilibrium = "EQUILIBRIUM" in self.__flamelet_types
         self.__generate_extra_interpolated_burnerflames = "BURNERFLAME_INT" in self.__flamelet_types
-        return 
+        return
     
     def excludeFlameletType(self, flamelet_type:str):
         if flamelet_type not in FlameletSolverOptions:
@@ -1521,7 +1521,7 @@ class Config_FGM(Config):
         if flamelet_type in self.__flamelet_types:
             self.__flamelet_types.remove(flamelet_type)
 
-        self.__checkFlameletTypes()    
+        self.__checkFlameletTypes()
         if len(self.__flamelet_types) == 0:
             raise Exception("At least one flamelet type should be included in the manifold")
     
