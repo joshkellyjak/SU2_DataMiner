@@ -206,7 +206,7 @@ class FlameletConcatenator:
         return
     
     def __isWithinMixtureBounds(self, flameletSolver:FlameletSolver_Cantera):
-        if self.__ignore_mixture_bounds:
+        if self.__ignore_mixture_bounds or not flameletSolver.isPremixed():
             return True
         else:
             mixture_status = flameletSolver.getMixtureStatus()
@@ -246,7 +246,7 @@ class FlameletConcatenator:
                 LookUp_data = self.__retrievePassiveLookUpData(solutionData)
                 Sources_data = self.__retrieveSourceTerms(solutionData)
 
-                if flameletSolution.isScalar():
+                if flameletSolution.isScalar() or not flameletSolution.isPremixed():
                     tracingVariable_query = np.linspace(0, 1.0, self.__Np_per_flamelet)
                 else:
                     tracingVariable_query = 0.5 - 0.5*np.cos(np.linspace(0, np.pi, self.__Np_per_flamelet))
@@ -275,7 +275,25 @@ class FlameletConcatenator:
         if self.__reactionProductsForLUT(flameletSolver):
             solutionData = solutionData.iloc[:self.__Np_equilibrium,:]
 
+        if not flameletSolver.isPremixed() and not self.__ignore_mixture_bounds:
+            solutionData = self.__clipNonPremixedFlameletToMixtureBounds(solutionData)
         return solutionData
+    
+    def __clipNonPremixedFlameletToMixtureBounds(self, solutionData:pd.DataFrame):
+        if self.__Config.GetMixtureStatus():
+            mixfrac_upper = self.__mix_status_max
+            mixfrac_lower = self.__mix_status_min
+        else:
+            phi_upper = self.__mix_status_max
+            phi_lower = self.__mix_status_min
+            self.__Config.gas.set_equivalence_ratio(phi_upper, self.__Config.GetFuelString(), self.__Config.GetOxidizerString())
+            mixfrac_upper = self.__Config.gas.mixture_fraction(self.__Config.GetFuelString(), self.__Config.GetOxidizerString())
+            self.__Config.gas.set_equivalence_ratio(phi_lower, self.__Config.GetFuelString(), self.__Config.GetOxidizerString())
+            mixfrac_lower = self.__Config.gas.mixture_fraction(self.__Config.GetFuelString(), self.__Config.GetOxidizerString())
+        mixfrac_solution = solutionData[FGMVars.MixtureFraction.name]
+        within_bounds = np.logical_and(mixfrac_solution >= mixfrac_lower, mixfrac_solution <= mixfrac_upper)
+        solutionData_out = solutionData.iloc[within_bounds]
+        return solutionData_out
     
     def __WriteOutputFiles(self):
         """Collect all flamelet data arrays, split into train, test, and validation portions, and write to appropriately named files.
