@@ -803,7 +803,7 @@ class Config_FGM(Config):
 
     __lookup_variables:list[str] = ["Heat_Release"] # Extra look-up variables to read from flamelet data
 
-    __Np_per_flamelet:int = 2**DefaultSettings_FGM.batch_size_exponent    # Number of data points to interpolate from flamelet data.
+    __Np_per_flamelet:int = None    # Number of data points to interpolate from flamelet data.
 
     # MLP output groups and architecture information.
     __MLP_output_groups:list[list[str]] = None  # Output variables for each MLP.
