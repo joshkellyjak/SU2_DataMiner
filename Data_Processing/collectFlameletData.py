@@ -127,6 +127,9 @@ class FlameletConcatenator:
 
     def __SynchronizeSettings(self):
         self.__Np_per_flamelet = self.__Config.GetNpConcatenation()
+        if self.__Np_per_flamelet is not None:
+            self.__custom_resolution = True 
+
         [self.__mix_status_min, self.__mix_status_max] = self.__Config.GetMixtureBounds()
 
         self.SetAuxilarySpecies(self.__Config.GetPassiveSpecies())
@@ -210,7 +213,8 @@ class FlameletConcatenator:
             return True
         else:
             mixture_status = flameletSolver.getMixtureStatus()
-            return (mixture_status <= self.__mix_status_max) and (mixture_status >= self.__mix_status_min)
+            margin = 1e-2
+            return (mixture_status-margin <= self.__mix_status_max) and (mixture_status+margin >= self.__mix_status_min)
         
     def __incrementNumberOfFlameletData(self, flameletSolver:FlameletSolver_Cantera):
         thermochemical_solution = flameletSolver.getThermoChemicalData()
