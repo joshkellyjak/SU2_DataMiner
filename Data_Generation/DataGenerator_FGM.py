@@ -77,8 +77,7 @@ class DataGenerator_Cantera(DataGenerator_Base):
     __define_equivalence_ratio:bool = not DefaultSettings_FGM.run_mixture_fraction # Define unburnt mixture via the equivalence ratio
     __unb_mixture_status:list[float] = []
     __flameletSolverDict:Dict[str, FlameletSolver_Cantera]
-    __translate_to_matlab:bool = False # Save a copy of the flamelet data file in Matlab table generator format
-
+    
     __run_freeflames:bool = DefaultSettings_FGM.include_freeflames      # Run adiabatic flame computations
     __run_extra_interpolated_burnerflames:bool = True       # Run extra interpolated burner-stabilized flame computations
     __run_burnerflames:bool = DefaultSettings_FGM.include_burnerflames    # Run burner stabilized flame computations
@@ -265,7 +264,6 @@ class DataGenerator_Cantera(DataGenerator_Base):
     def getFlameletTypes(self):
         return self._Config.getFlameletTypes()
 
-
     def RunFreeFlames(self, input:bool=True):
         """Include adiabatic free-flame data in the manifold.
 
@@ -373,12 +371,6 @@ class DataGenerator_Cantera(DataGenerator_Base):
 
         self._Config.SetTransportModel(transport_model)
         self.__SynchronizeSettings()
-        return
-
-    def TranslateToMatlab(self):
-        """Save a copy of the flamelet data in Matlab TableMaster format.
-        """
-        self.__translate_to_matlab = True
         return
 
     def SetOutputDir(self, output_dir_new:str):
@@ -593,7 +585,8 @@ def ComputeBoundaryData(Config:Config_FGM, run_parallel:bool=False, N_processors
 
     Config_local:Config_FGM = copy.copy(Config)
     Config_local.DefineMixtureStatus(True)
-    
+    flameletTypes_orig = Config_local.getFlameletTypes().copy()
+
     def ComputeEquilibriumData(mix_input):
         F = DataGenerator_Cantera(Config_local)
         F.includeFlameletType("EQUILIBRIUM")
@@ -614,3 +607,5 @@ def ComputeBoundaryData(Config:Config_FGM, run_parallel:bool=False, N_processors
     else:
         for z in mixture_range:
             ComputeEquilibriumData(z)
+
+    Config.setFlameletTypes(flameletTypes_orig)
