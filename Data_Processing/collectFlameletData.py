@@ -128,7 +128,7 @@ class FlameletConcatenator:
     def __SynchronizeSettings(self):
         self.__Np_per_flamelet = self.__Config.GetNpConcatenation()
         if self.__Np_per_flamelet is not None:
-            self.__custom_resolution = True 
+            self.__custom_resolution = True
 
         [self.__mix_status_min, self.__mix_status_max] = self.__Config.GetMixtureBounds()
 
