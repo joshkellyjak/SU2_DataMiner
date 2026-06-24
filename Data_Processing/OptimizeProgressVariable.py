@@ -468,7 +468,7 @@ class PVOptimizer:
                           result.x, \
                           method='Nelder-Mead', \
                           bounds=bounds,\
-                          callback=self._Optimization_Callback)
+                          callback=self._Optimization_Callback,options={"maxiter" : self._N_generations})
 
         # Post-processing for best solution.
         self._Optimization_Callback(result.x)
