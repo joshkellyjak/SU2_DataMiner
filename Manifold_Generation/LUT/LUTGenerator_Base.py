@@ -161,7 +161,7 @@ class SU2TableGenerator_Base:
                 self._table_connectivity[iLevel] = tableLevel[1]
                 self._table_hullnodes[iLevel] = tableLevel[2]
                 self._data_in_table[iLevel] = tableLevel[3]
-        return 
+        return
     
     def _smoothTableLevelData(self):
         self.__printmsg("Smoothing table data...")
