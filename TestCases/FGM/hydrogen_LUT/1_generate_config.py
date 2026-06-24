@@ -1,4 +1,4 @@
-from su2dataminer.config import Config_FGM 
+from su2dataminer.config import Config_FGM
 
 config = Config_FGM()
 config.SetFuelDefinition(["H2"], [1.0])

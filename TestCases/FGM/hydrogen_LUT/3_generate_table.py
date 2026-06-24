@@ -1,4 +1,4 @@
-from su2dataminer.config import Config_FGM 
+from su2dataminer.config import Config_FGM
 from su2dataminer.manifold import TableGenerator_FGM
 config = Config_FGM("hydrogen_tabulation.cfg")
 
