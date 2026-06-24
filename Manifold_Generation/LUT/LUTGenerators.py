@@ -125,8 +125,8 @@ class TableGenerator_NICFD(SU2TableGenerator_Base):
         rhoe_table_nodes = self._scaler_controlling_variables.inverse_transform(cv_table_nodes[:, :2])
         state_data_out = np.zeros([len(rhoe_table_nodes), EntropicVars.N_STATE_VARS.value])
         for i, rhoe in enumerate(rhoe_table_nodes):
-            self.__datagenerator.UpdateFluid(rhoe[0], rhoe[1])
             try:
+                self.__datagenerator.UpdateFluid(rhoe[0], rhoe[1])
                 state_data, correct_phase = self.__datagenerator.GetStateVector()
                 if correct_phase:
                     state_data_out[i] = state_data

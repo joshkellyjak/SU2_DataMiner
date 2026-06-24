@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from su2dataminer.config import Config_NICFD
-from su2dataminer.manifold import SU2TableGenerator_NICFD
+from su2dataminer.manifold import TableGenerator_NICFD
 
 config = Config_NICFD()
 config.SetFluid("CarbonDioxide")
@@ -17,9 +17,8 @@ config.EnableLiquidPhase(True)
 config.EnableSuperCritical(True)
 config.IncludeTransportProperties(True)
 
-tablegen = SU2TableGenerator_NICFD(config)
-tablegen.SetCellSize_Coarse(8e-2)
-tablegen.SetCellSize_Refined(4e-2)
-tablegen.SetTableDiscretization("adaptive")
-tablegen.GenerateTable()
-tablegen.WriteTableFile("LUT_test")
+tablegen = TableGenerator_NICFD(config)
+tablegen.setMaximumCellSize(8e-2)
+tablegen.generateTable()
+tablegen.writeSU2Table("LUT_test")
+tablegen.writeParaviewTable("LUT_test")

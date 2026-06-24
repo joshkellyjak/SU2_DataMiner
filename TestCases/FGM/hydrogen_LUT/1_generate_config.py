@@ -1,0 +1,17 @@
+from su2dataminer.config import Config_FGM 
+
+config = Config_FGM()
+config.SetFuelDefinition(["H2"], [1.0])
+config.SetReactionMechanism("h2o2.yaml")
+config.SetTransportModel("multicomponent")
+config.SetUnbTempBounds(300, 600)
+config.DefineMixtureStatus(False)
+config.SetMixtureBounds(0.25, 3.0)
+config.SetNpMix(60)
+config.SetNpTemp(60)
+config.RunFreeFlames(True)
+config.RunBurnerFlames(True)
+config.RunEquilibrium(True)
+config.SetAverageLewisNumbers(0.5, 300)
+config.SetConfigName("hydrogen_tabulation")
+config.SaveConfig()
