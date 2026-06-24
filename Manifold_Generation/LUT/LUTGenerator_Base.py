@@ -145,7 +145,7 @@ class SU2TableGenerator_Base:
         self._data_in_table = [None]*self._N_table_levels
         if self.__run_parallel:
             pool = Pool(self.__N_cores)
-            results = pool.map(self.__meshTableLevel, [i for i in range(self._N_table_levels)])
+            results = pool.map(self.meshTableLevel, [i for i in range(self._N_table_levels)])
             pool.close()
 
             for iLevel in range(self._N_table_levels):
@@ -155,7 +155,7 @@ class SU2TableGenerator_Base:
                 self._data_in_table[iLevel] = results[iLevel][3]
         else:
             for iLevel in range(len(self._table_levels)):
-                tableLevel = self.__meshTableLevel(iLevel)
+                tableLevel = self.meshTableLevel(iLevel)
                 
                 self._table_nodes[iLevel] = tableLevel[0]
                 self._table_connectivity[iLevel] = tableLevel[1]
@@ -232,7 +232,7 @@ class SU2TableGenerator_Base:
         return
     
     
-    def __meshTableLevel(self, level_index:int):
+    def meshTableLevel(self, level_index:int):
         """Discretize and interpolate the fluid data of a single table level.
 
         :param level_index: table level index
