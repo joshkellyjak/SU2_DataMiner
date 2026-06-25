@@ -31,7 +31,7 @@ tgen.setTargetNodeCount(4e4)
 # or the maximum cell size
 #tgen.setMaximumCellSize(2.0e-2)
 
-# Custom refinement; reduce cell size by a specified factor where the 
+# Custom refinement; reduce cell size by a specified factor where the
 # thermodynamic quantity is within specified limits
 tgen.addRefinementCriterion("s", lowerbound=725,upperbound=780, coef=0.4)
 tgen.addRefinementCriterion("Density",0, 50, 0.4)
