@@ -12,11 +12,11 @@ from Common.DataDrivenConfig import Config_FGM
 from Data_Generation.DataGenerator_FGM import ComputeFlameletData
 
 # Load FGM configuration
-Config = Config_FGM("TableGeneration_H2_n.cfg")
+Config = Config_FGM("TableGeneration_H2.cfg")
 
 # refinement values:
 # free_flame_refine={"ratio": 3.0, "slope": 0.1, "curve": 0.1, "prune":0.01},
 # this leads to Np = 180
 
-ComputeFlameletData(Config, run_parallel=False, N_processors=1, loglevel=0)
+ComputeFlameletData(Config, run_parallel=True, N_processors=2, loglevel=0)
 

@@ -2,7 +2,7 @@ from Common.DataDrivenConfig import Config_FGM
 import os
 
 Config = Config_FGM()
-Config.SetConfigName("TableGeneration_H2_n")
+Config.SetConfigName("TableGeneration_H2")
 
 # Methane-air flamelets at a single equivalence ratio phi = 0.80
 Config.SetFuelDefinition(fuel_species=["H2"], fuel_weights=[1.0])
@@ -21,11 +21,14 @@ Config.SetSrcInterpExponent(2.0)   # Decay of interpolated flamelets
 Config.SetInitialGridLength(1.8e-2)  # Initial flamelet domain length in metres
 
 # Explicitly select which flamelet types to generate.
-Config.setFlameletTypes(["FREEFLAME","BURNERFLAME","EQUILIBRIUM","INT_BURNERFLAME"])
+Config.RunFreeFlames(True)
+Config.RunBurnerFlames(True)
+Config.RunExtraInterpolatedBurnerFlames(True)
+Config.RunEquilibrium(True)
 
 # Enable preferential diffusion through the multicomponent transport model.
 Config.SetTransportModel('multicomponent')
-Config.SetConcatenationFileHeader("LUT_data_n")
+Config.SetConcatenationFileHeader("LUT_data")
 
 
 # Preparing flamelet output directory.
