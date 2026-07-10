@@ -46,7 +46,7 @@ from Manifold_Generation.MLP.Trainer_Base import MLPTrainer, TensorFlowFit,Physi
 from Common.CommonMethods import readStateDataFromFile
 from Common.Properties import DefaultSettings_FGM as DefaultProperties
 from Common.Properties import FGMVars
-from Data_Generation.FlameletSolvers import FreeFlameSolver 
+from Data_Generation.FlameletSolvers import FreeFlameSolver
 
 class Train_Flamelet_Direct(TensorFlowFit):
     __Config:Config_FGM
