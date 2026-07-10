@@ -23,6 +23,7 @@ config.RunFreeFlames(True)
 config.RunBurnerFlames(False)
 config.RunEquilibrium(True)
 config.AddOutputGroup(['Temperature'])
+config.setFlameletTypes(["FREEFLAME"])
 config.SaveConfig()
 
 ComputeFlameletData(config)
@@ -32,8 +33,8 @@ F = FlameletConcatenator(config, verbose_level=0)
 F.ConcatenateFlameletData()
 F.CollectBoundaryData()
 
-flamelet_to_test = choice(os.listdir("freeflame_data/phi_0.5/"))
-flamelet_data_file = "freeflame_data/phi_0.5/%s" % flamelet_to_test
+flamelet_to_test = choice(os.listdir("freeflame_data/phi_0.5000/"))
+flamelet_data_file = "freeflame_data/phi_0.5000/%s" % flamelet_to_test
 
 with open(flamelet_data_file,'r') as fid:
     vars_flamelet = fid.readline().strip().split(',')
