@@ -28,10 +28,9 @@
 #---------------------------------------------------------------------------------------------#
 import cantera as ct
 import numpy as np
-import csv
 from typing import Dict
 import copy
-from os import path, mkdir, getcwd
+from os import getcwd
 
 from joblib import Parallel, delayed
 from threadpoolctl import threadpool_limits
@@ -303,14 +302,6 @@ class DataGenerator_Cantera(DataGenerator_Base):
         self.__SynchronizeSettings()
         return
 
-    # def RunCounterFlowFlames(self, input:bool=True):
-    #     """Include counter-flow diffusion flame data in the manifold.
-
-    #     :param input: Generate counter-flow diffusion flamelet data.
-    #     :type input: bool
-    #     """
-    #     self.__run_counterflames = input
-    #     return
 
     def RunExtraInterpolatedBurnerFlames(self, input:bool=True):
         """Include extra interpolated burner-stabilized flame data in the manifold.
@@ -388,102 +379,6 @@ class DataGenerator_Cantera(DataGenerator_Base):
         flameletSolver:FlameletSolver_Cantera = self.__flameletSolverDict[flamelet_type]
         flameletSolver.solveAndSaveFor(**solver_settings)
         return
-    
-    def ComputeCounterFlowFlames(self, v_fuel:float, v_ox:float, T_ub:float):
-        """Generate counter-flow diffusion flamelet data for a given temperature, and reactant velocities.
-        Strain rate is gradually increased until extinction in order to distribute data over the progress variable spectrum.
-
-        :param v_fuel: Fuel reactant velocity in meters per second.
-        :type v_fuel: float
-        :param v_ox: Oxidizer reactant velocity in meters per second.
-        :type v_ox: float
-        :param T_ub: Reactant temperature in Kelvin.
-        :type T_ub: float
-        :raises Exception: If either of the velocity values is lower than zero.
-        :raises Exception: If the reactant temperature is lower than 200 K.
-        """
-        if (v_fuel <= 0) or (v_ox <= 0):
-            raise Exception("Reactant velocities should be higher than zero.")
-        if T_ub < 200:
-            raise Exception("Reactant temperature should be higher than 200K.")
-        counterflame = ct.CounterflowDiffusionFlame(self.gas, width=18e-3)
-
-        self.gas.set_mixture_fraction(1.0, self.__fuel_string, self.__oxidizer_string)
-        self.gas.TP = T_ub, ct.one_atm
-        rho_fuel = self.gas.density
-
-        self.gas.set_mixture_fraction(0.0, self.__fuel_string, self.__oxidizer_string)
-        self.gas.TP = T_ub, ct.one_atm
-        rho_oxidizer = self.gas.density
-
-        counterflame.P = ct.one_atm
-        counterflame.fuel_inlet.Y = self.__fuel_string
-        counterflame.fuel_inlet.T = T_ub
-        counterflame.fuel_inlet.mdot = rho_fuel*v_fuel
-        counterflame.oxidizer_inlet.Y = self.__oxidizer_string
-        counterflame.oxidizer_inlet.T = T_ub
-        counterflame.oxidizer_inlet.mdot = rho_oxidizer*v_ox
-        counterflame.set_refine_criteria(**self.__counter_flame_refine)
-
-        counterflame.solve(loglevel=self.__loglevel, auto=True)
-
-        variables, data_calc = self.__SaveFlameletData(counterflame, self.gas)
-
-        counterflame_filename = "counterflamelet_strain_0_Tu"+str(round(T_ub, 4))+".csv"
-        if not path.isdir(self.GetOutputDir()+"/counterflame_data"):
-            mkdir(self.GetOutputDir()+"/counterflame_data")
-        fid = open(self.GetOutputDir()+"/counterflame_data/"+counterflame_filename, 'w+')
-        fid.write(variables + "\n")
-        csvWriter = csv.writer(fid)
-        csvWriter.writerows(data_calc)
-        fid.close()
-        # Compute counterflow diffusion flames at increasing strain rates at 1 bar
-        # The strain rate is assumed to increase by 25% in each step until the flame is
-        # extinguished
-        strain_factor = 1.25
-        # Exponents for the initial solution variation with changes in strain rate
-        # Taken from Fiala and Sattelmayer (2014)
-        exp_d_a = -0.05
-        exp_u_a = 1. / 2.
-        exp_V_a = 1.
-        exp_lam_a = 2.
-        exp_mdot_a = 1. / 2.
-
-        n_iter = 1
-        strain_overload = False
-        while not strain_overload:
-            # Create an initial guess based on the previous solution
-            # Update grid
-            counterflame.flame.grid *= strain_factor ** exp_d_a
-            normalized_grid = counterflame.grid / (counterflame.grid[-1] - counterflame.grid[0])
-            # Update mass fluxes
-            counterflame.fuel_inlet.mdot *= strain_factor ** exp_mdot_a
-            counterflame.oxidizer_inlet.mdot *= strain_factor ** exp_mdot_a
-            # Update velocities
-            counterflame.set_profile('velocity', normalized_grid,
-                        counterflame.velocity * strain_factor ** exp_u_a)
-            counterflame.set_profile('spread_rate', normalized_grid,
-                        counterflame.spread_rate * strain_factor ** exp_V_a)
-            # Update pressure curvature
-            counterflame.set_profile('lambda', normalized_grid, counterflame.L * strain_factor ** exp_lam_a)
-
-            try:
-                # Try solving the flame
-                counterflame.solve(loglevel=self.__loglevel)
-                self.last_counterflame_massfraction = counterflame.Y
-                variables, data_calc = self.__SaveFlameletData(counterflame, self.gas)
-
-                counterflame_filename = "counterflamelet_strain_"+str(n_iter)+"_Tu"+str(round(T_ub, 4))+".csv"
-                fid = open(self.GetOutputDir()+"/counterflame_data/"+counterflame_filename, 'w+')
-                fid.write(variables + "\n")
-                csvWriter = csv.writer(fid)
-                csvWriter.writerows(data_calc)
-                fid.close()
-                print("Successful Counter-Flow Diffusion Flame at Strain Iteration " + str(n_iter))
-            except:
-                print("Unsuccessful Counter-Flow Diffusion Flame at Strain Iteration " + str(n_iter))
-                strain_overload = True
-            n_iter += 1
 
     def computePremixedFlameletsFor(self, mix_status:float):
         """Generate flamelet data for a given mixture fraction or equivalence ratio.
@@ -496,10 +391,13 @@ class DataGenerator_Cantera(DataGenerator_Base):
         if mix_status < 0:
             raise Exception("Mixture status value should be positive.")
         
-        for type, flameletsolver in zip(self.__flameletSolverDict.keys(), self.__flameletSolverDict.values()):
-            if type != "COUNTERFLAME":
-                flameletsolver.retrieveSolverSettings(self.__flameletSolverDict)
-                flameletsolver.solveForMixtureStatus(mix_status)
+        correct_order = FlameletSolverDict.keys()
+        for c in correct_order:
+            if c in self.__flameletSolverDict.keys() and c != "COUNTERFLAME":
+                flameletSolver = self.__flameletSolverDict[c]
+                flameletSolver.retrieveSolverSettings(self.__flameletSolverDict)
+                flameletSolver.solveForMixtureStatus(mix_status)
+
         return
     
     def computeNonPremixedFlamelets(self):
