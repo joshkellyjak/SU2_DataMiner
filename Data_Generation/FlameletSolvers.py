@@ -461,7 +461,10 @@ class FlameletSolver_Cantera:
         self._initializeFlameletSolver()
 
         initialGuessData = self._prepareInitialGuessData()
-        self._flameletSolution.set_initial_guess(data=initialGuessData)
+        try:
+            self._flameletSolution.set_initial_guess(data=initialGuessData)
+        except:
+            print("Initializing the flamelet solution from data frame will be included in the upcoming Cantera version.")
 
         return
     
