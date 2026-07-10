@@ -46,6 +46,7 @@ from Manifold_Generation.MLP.Trainer_Base import MLPTrainer, TensorFlowFit,Physi
 from Common.CommonMethods import readStateDataFromFile
 from Common.Properties import DefaultSettings_FGM as DefaultProperties
 from Common.Properties import FGMVars
+from Data_Generation.FlameletSolvers import FreeFlameSolver 
 
 class Train_Flamelet_Direct(TensorFlowFit):
     __Config:Config_FGM
@@ -861,15 +862,18 @@ class TrainMLP_FGM(TrainMLP):
 def PlotFlameletData(Trainer:MLPTrainer, Config:Config_FGM, train_name:str):
     N_plot = 3
 
-    flamelet_dir = Config.GetOutputDir()
+    flameletSolver = FreeFlameSolver(Config)
+    freeflame_dirs = os.sep.join((Config.GetOutputDir(), flameletSolver.getFlameletFolder()))
+    freeflame_phis = os.listdir(freeflame_dirs)
 
-    freeflame_phis = os.listdir(flamelet_dir + "/freeflame_data/")
     idx_phi_plot = np.random.randint(0, len(freeflame_phis), N_plot)
 
     freeflamelet_input_files = []
     for phi in idx_phi_plot:
-        freeflame_files = os.listdir(flamelet_dir + "/freeflame_data/"+freeflame_phis[phi])
-        freeflamelet_input_files.append(flamelet_dir + "/freeflame_data/"+freeflame_phis[phi]+ "/"+freeflame_files[np.random.randint(0, len(freeflame_files))])
+        flameletFolder = os.sep.join((freeflame_dirs, freeflame_phis[phi]))
+        freeflame_files = os.listdir(flameletFolder)
+        flameletFile = os.sep.join((flameletFolder, freeflame_files[np.random.randint(0, len(freeflame_files))]))
+        freeflamelet_input_files.append(flameletFile)
 
     # Prepare a figure window for each output variable.
     figs = []
