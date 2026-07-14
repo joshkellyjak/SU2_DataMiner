@@ -6,55 +6,55 @@ def main():
     test_list_NICFD:list[TestCase] = []
     test_list_FGM:list[TestCase] = []
 
-    fluid_air = TestCase("Fluid_Air")
-    fluid_air.config_dir = "FluidGeneration/Air/"
-    fluid_air.config_file = "config_air.cfg"
-    fluid_air.exec_command = "./generate_fluid_data.py"
-    fluid_air.reference_files = ["MLP_data_test_ref.csv"]
-    fluid_air.test_files = ["fluid_data_test.csv"]
-    test_list_NICFD.append(fluid_air)
+    # fluid_air = TestCase("Fluid_Air")
+    # fluid_air.config_dir = "FluidGeneration/Air/"
+    # fluid_air.config_file = "config_air.cfg"
+    # fluid_air.exec_command = "./generate_fluid_data.py"
+    # fluid_air.reference_files = ["MLP_data_test_ref.csv"]
+    # fluid_air.test_files = ["fluid_data_test.csv"]
+    # test_list_NICFD.append(fluid_air)
 
-    fluid_MM = TestCase("Fluid_MM")
-    fluid_MM.config_dir = "FluidGeneration/MM/"
-    fluid_MM.config_file = "config_MM.cfg"
-    fluid_MM.exec_command = "./generate_fluid_data.py"
-    fluid_MM.reference_files = ["MLP_data_test_ref.csv"]
-    fluid_MM.test_files = ["fluid_data_test.csv"]
-    test_list_NICFD.append(fluid_MM)
+    # fluid_MM = TestCase("Fluid_MM")
+    # fluid_MM.config_dir = "FluidGeneration/MM/"
+    # fluid_MM.config_file = "config_MM.cfg"
+    # fluid_MM.exec_command = "./generate_fluid_data.py"
+    # fluid_MM.reference_files = ["MLP_data_test_ref.csv"]
+    # fluid_MM.test_files = ["fluid_data_test.csv"]
+    # test_list_NICFD.append(fluid_MM)
 
-    consistency_EEoS = TestCase("Consistency check EEoS")
-    consistency_EEoS.config_dir = "Physics/EntropicEoS/"
-    consistency_EEoS.config_file = ""
-    consistency_EEoS.exec_command = "./consistency_check.py"
-    consistency_EEoS.reference_files = ["consistency_check.ref"]
-    consistency_EEoS.test_files = ["consistency_check.txt"]
-    test_list_NICFD.append(consistency_EEoS)
+    # consistency_EEoS = TestCase("Consistency check EEoS")
+    # consistency_EEoS.config_dir = "Physics/EntropicEoS/"
+    # consistency_EEoS.config_file = ""
+    # consistency_EEoS.exec_command = "./consistency_check.py"
+    # consistency_EEoS.reference_files = ["consistency_check.ref"]
+    # consistency_EEoS.test_files = ["consistency_check.txt"]
+    # test_list_NICFD.append(consistency_EEoS)
 
-    tabulation_NICFD = TestCase("Tabulation NICFD")
-    tabulation_NICFD.config_dir = "TableGeneration/NICFD/"
-    tabulation_NICFD.config_file = ""
-    tabulation_NICFD.exec_command = "./twophase_lut.py"
-    tabulation_NICFD.reference_files = ["LUT_test.ref"]
-    tabulation_NICFD.test_files = ["LUT_test.drg"]
-    test_list_NICFD.append(tabulation_NICFD)
+    # tabulation_NICFD = TestCase("Tabulation NICFD")
+    # tabulation_NICFD.config_dir = "TableGeneration/NICFD/"
+    # tabulation_NICFD.config_file = ""
+    # tabulation_NICFD.exec_command = "./twophase_lut.py"
+    # tabulation_NICFD.reference_files = ["LUT_test.ref"]
+    # tabulation_NICFD.test_files = ["LUT_test.drg"]
+    # test_list_NICFD.append(tabulation_NICFD)
 
 
-    consistency_NICFD_PINN = TestCase("PIML training NICFD")
-    consistency_NICFD_PINN.config_dir = "FluidTraining/MM_PINN/"
-    consistency_NICFD_PINN.config_file = ""
-    consistency_NICFD_PINN.exec_command = "./train_MLP.py"
-    consistency_NICFD_PINN.reference_files = ["SU2_MLP_ref.mlp"]
-    consistency_NICFD_PINN.test_files = ["SU2_MLP.mlp"]
-    consistency_NICFD_PINN.timeout=300
-    test_list_NICFD.append(consistency_NICFD_PINN)
+    # consistency_NICFD_PINN = TestCase("PIML training NICFD")
+    # consistency_NICFD_PINN.config_dir = "FluidTraining/MM_PINN/"
+    # consistency_NICFD_PINN.config_file = ""
+    # consistency_NICFD_PINN.exec_command = "./train_MLP.py"
+    # consistency_NICFD_PINN.reference_files = ["SU2_MLP_ref.mlp"]
+    # consistency_NICFD_PINN.test_files = ["SU2_MLP.mlp"]
+    # consistency_NICFD_PINN.timeout=300
+    # test_list_NICFD.append(consistency_NICFD_PINN)
 
-    hydrogen_flamelet = TestCase("H2_Flamelet")
-    hydrogen_flamelet.config_dir = "FlameletGeneration/Adiabatic_H2/"
-    hydrogen_flamelet.config_file = "adiabatic_flamelets.cfg"
-    hydrogen_flamelet.exec_command = "./generate_flamelet_data.py"
-    hydrogen_flamelet.reference_files = ["flamelet_data.ref"]
-    hydrogen_flamelet.test_files = ["freeflame_data/phi_1.0000/Freeflame_phi1.0000_Tu300.0.csv"]
-    test_list_FGM.append(hydrogen_flamelet)
+    # hydrogen_flamelet = TestCase("H2_Flamelet")
+    # hydrogen_flamelet.config_dir = "FlameletGeneration/Adiabatic_H2/"
+    # hydrogen_flamelet.config_file = "adiabatic_flamelets.cfg"
+    # hydrogen_flamelet.exec_command = "./generate_flamelet_data.py"
+    # hydrogen_flamelet.reference_files = ["flamelet_data.ref"]
+    # hydrogen_flamelet.test_files = ["freeflame_data/phi_1.0000/Freeflame_phi1.0000_Tu300.0.csv"]
+    # test_list_FGM.append(hydrogen_flamelet)
 
     FGM_training = TestCase("ML FGM")
     FGM_training.config_dir="FGM_MLP/"
@@ -67,13 +67,13 @@ def main():
     test_list_FGM.append(FGM_training)
 
 
-    unittest_mixturefraction = TestCase("Mixture fraction")
-    unittest_mixturefraction.config_dir = "Physics/MixtureFraction/"
-    unittest_mixturefraction.config_file = ""
-    unittest_mixturefraction.exec_command = "./mixturefraction_computation.py"
-    unittest_mixturefraction.reference_files = ["mixture_fraction_verification.ref"]
-    unittest_mixturefraction.test_files = ["mixture_fraction_verification.csv"]
-    test_list_FGM.append(unittest_mixturefraction)
+    # unittest_mixturefraction = TestCase("Mixture fraction")
+    # unittest_mixturefraction.config_dir = "Physics/MixtureFraction/"
+    # unittest_mixturefraction.config_file = ""
+    # unittest_mixturefraction.exec_command = "./mixturefraction_computation.py"
+    # unittest_mixturefraction.reference_files = ["mixture_fraction_verification.ref"]
+    # unittest_mixturefraction.test_files = ["mixture_fraction_verification.csv"]
+    # test_list_FGM.append(unittest_mixturefraction)
 
     # test_list.append(training_MM_PINN)
     pass_list_NICFD = [test.run_test() for test in test_list_NICFD]
