@@ -71,14 +71,14 @@ class FlameletSolver_Cantera:
     __grid_refinement_prune:float = 0.01
     _max_grid_points:int=2000
 
-    __cantera_loglevel:int=0    
+    __cantera_loglevel:int=0
     __flameletSolverLogLevel:int=1
 
     _flamelet_is_burning:bool = True
     _converged_solution:bool = True
 
     _output_filepath:str = getcwd()                 # System file location where flamelet data are saved.
-    _thermochemical_solution:pd.DataFrame = None    # Flamelet solution data 
+    _thermochemical_solution:pd.DataFrame = None    # Flamelet solution data
 
     def __init__(self, config_input:Config_FGM):
         self._Config = config_input

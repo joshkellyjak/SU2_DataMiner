@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import sys
-import numpy as np
 from su2dataminer.config import Config_FGM
 from su2dataminer.generate_data import ComputeFlameletData,ComputeBoundaryData
 from su2dataminer.process_data import FlameletConcatenator
