@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import sys
+import numpy as np
 from su2dataminer.config import Config_FGM
 from su2dataminer.generate_data import ComputeFlameletData,ComputeBoundaryData
 from su2dataminer.process_data import FlameletConcatenator
@@ -52,6 +53,10 @@ T.CommenceTraining()
 config.UpdateMLPHyperParams(T)
 config.PrintBanner()
 
+hist = np.loadtxt("architectures_Group1/Worker_0/Model_0/TrainingHistory.csv",delimiter=',',skiprows=1)
+for h in hist:
+    print(h)
+    
 if consistent_hp_params:
     sys.exit(0)
 else:
