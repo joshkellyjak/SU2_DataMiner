@@ -199,7 +199,7 @@ class FlameletConcatenator:
             for phi in mixtures[::self.__mfrac_skip]:
                 flameletsFolder = os.sep.join((storageFolder, phi))
                 flameletFilesForMixture = os.listdir(flameletsFolder)
-
+                flameletFilesForMixture.sort()
                 for flameletFile in flameletFilesForMixture:
                     flameletFilePath = os.sep.join((flameletsFolder, flameletFile))
                     flameletSolver.loadSolution(flameletFilePath)
