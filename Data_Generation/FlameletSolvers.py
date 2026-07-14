@@ -62,6 +62,7 @@ class FlameletSolver_Cantera:
 
     # Initial grid and grid refinement options.
     _initial_grid_length:float = 1.8e-2
+    _max_grid_length:float = 10.0
     __initial_grid_number_of_points:int = 30
     _initial_grid:np.ndarray[float] = None
 
@@ -89,18 +90,28 @@ class FlameletSolver_Cantera:
         return
     
     def solveFor(self, **flamelet_solution_settings):
+        """Calculate flamelet solution for custom settings.
+        """
         self._parseInputSettings(flamelet_solution_settings)
         self.startSolver()
         return
     
     def solveAndSaveFor(self, **flamelet_solution_settings):
+        """Calculate flamelet and save solution for custom settings.
+        """
         self._parseInputSettings(flamelet_solution_settings)
         self.startSolver()
         self.saveFlameletSolution()
         return
     
     def solveForMixtureStatus(self, val_mixture_status:float, save:bool=True):
+        """Calculate flamelet solutions for a specific mixture.
 
+        :param val_mixture_status: mixture fraction or equivalence ratio.
+        :type val_mixture_status: float
+        :param save: store flamelet solutions, defaults to True
+        :type save: bool, optional
+        """
         self.setMixtureStatus(val_mixture_status)
 
         vals_input_settings = self._prepareSettingRange()
@@ -117,6 +128,8 @@ class FlameletSolver_Cantera:
         return
     
     def saveFlameletSolution(self):
+        """Store flamelet solution in appropriately named folder.
+        """
         self._prepareStorageFolder()
         self._writeOutput()
         return
@@ -152,6 +165,8 @@ class FlameletSolver_Cantera:
         return mixture_subfolder
     
     def startSolver(self):
+        """Initiate flamelet simulation and report status to terminal.
+        """
         self._prepareFlameletSimulation()
         self._computeFlameletSolution()
         self._postProcessResults()
@@ -183,14 +198,43 @@ class FlameletSolver_Cantera:
     
 
     def setReactantTemperature(self, Temp_reactants:float=DefaultSettings_FGM.T_min):
+        """Specify the temperature of the reactants at the inflow boundary.
+
+        :param Temp_reactants: reactant temperature value in Kelvin, defaults to 300K
+        :type Temp_reactants: float, optional
+        :raises Exception: if the specified value is not strictly positive.
+        """
+        if Temp_reactants <= 0:
+            raise Exception("Reactant temperature should be strictly positive.")
         self._T_reactants = Temp_reactants
         return
     
     def setPressure(self, val_pressure:float=DefaultSettings_FGM.pressure):
+        """Specify the pressure at which flamelet solutions are calculated.
+
+        :param val_pressure: pressure in Pascals, defaults to 101325 Pa.
+        :type val_pressure: float, optional
+        :raises Exception: when specified value is not strictly positive.
+        """
+        if val_pressure <= 0:
+            raise Exception("Pressure should be strictly positive")
         self._pressure = val_pressure
         return
     
     def setMixtureStatus(self, val_mixture_status:float):
+        """Specify the equivalence ratio or mixture fraction for premixed flamelets.
+
+        :param val_mixture_status: equivalence ratio or mixture fraction, depending on the mixture status definition in the config.
+        :type val_mixture_status: float
+        :raises Exception: if the mixture fraction is higher than one.
+        :raises Exception: if the mixture status is not strictly positive.
+        """
+        if self._Config.GetMixtureStatus():
+            if val_mixture_status > 1.0:
+                raise Exception("Mixture fraction should be between zero and one.")
+        if val_mixture_status < 0.0:
+            raise Exception("Mixture status should be strictly positive.")
+        
         self._reactant_mixture_status = val_mixture_status
         return
     
@@ -210,11 +254,26 @@ class FlameletSolver_Cantera:
         return self._plotLabel
     
     def setInitialGrid(self, initial_grid_length_in_meters:float=1.8e-2, number_of_nodes:int=100):
+        """Specify the settings for the initial grid used to calculate the flamelet solution.
+
+        :param initial_grid_length_in_meters: maximum grid length, defaults to 1.8e-2
+        :type initial_grid_length_in_meters: float, optional
+        :param number_of_nodes: number of nodes in the initial grid, defaults to 100
+        :type number_of_nodes: int, optional
+        :raises Exception: if the initial grid length is negative or exceeds the maximum grid length.
+        :raises Exception: if the specified number of nodes is lower than 10.
+        """
+        if initial_grid_length_in_meters < 0 or initial_grid_length_in_meters >= self._max_grid_length:
+            raise Exception("Initial grid length should be between 0 and %.1f." % self._max_grid_length)
+        
+        if number_of_nodes < 10:
+            raise Exception("The initial grid should contain at least 10 nodes.")
+
         self._initial_grid_length = initial_grid_length_in_meters
         self.__initial_grid_number_of_points = number_of_nodes
         return
     
-    def setGridRefinementCriteria(self, ratio:float=2.0, slope:float=0.025, curve:float=0.025, prune=0.01):
+    def setGridRefinementCriteria(self, ratio:int=2, slope:float=0.025, curve:float=0.025, prune=0.01):
         self.__grid_refinement_ratio = ratio
         self.__grid_refinement_curve = curve
         self.__grid_refinement_prune = prune
@@ -225,10 +284,20 @@ class FlameletSolver_Cantera:
         return self.__grid_refinement_ratio, self.__grid_refinement_slope, self.__grid_refinement_curve, self.__grid_refinement_prune
     
     def setCanteraVerbose(self, verbose_level:int=0):
+        """Specify verbosity of Cantera solution process.
+
+        :param verbose_level: Cantera verbosity level, defaults to 0
+        :type verbose_level: int, optional
+        """
         self.__cantera_loglevel = verbose_level
         return
     
     def setSolverVerbose(self, verbose_level:int=1):
+        """Specify the verbosity of the FlameletSolver solution process.
+
+        :param verbose_level: FlameletSolver verbosity level, defaults to 1
+        :type verbose_level: int, optional
+        """
         self.__flameletSolverLogLevel = verbose_level
         return
     
@@ -297,7 +366,7 @@ class FlameletSolver_Cantera:
             self._converged_solution = True
 
             no_ignition = np.max(self._flameletSolution.T) <= DefaultSettings_FGM.T_threshold
-            domain_too_long = (max(self._flameletSolution.grid) - min(self._flameletSolution.grid)) > 10.0
+            domain_too_long = (max(self._flameletSolution.grid) - min(self._flameletSolution.grid)) > self._max_grid_length
             too_few_nodes = len(self._flameletSolution.grid) < 10
             if no_ignition or domain_too_long or too_few_nodes:
                 self._flamelet_is_burning = False
@@ -318,6 +387,11 @@ class FlameletSolver_Cantera:
         return
     
     def getFlameletSolution(self):
+        """Retrieve Cantera oneDim solution
+
+        :return: Cantera flamelet solution object.
+        :rtype: cantera.oneDim
+        """
         return self._flameletSolution
     
     def isConverged(self):
@@ -327,6 +401,11 @@ class FlameletSolver_Cantera:
         return self._flamelet_is_burning
     
     def getThermoChemicalData(self):
+        """Retrieve thermochemical state data extracted from flamelet solution.
+
+        :return: flamelet solution data.
+        :rtype: pandas.DataFrame
+        """
         return self._thermochemical_solution
     
     def _extractSolutionDataForOutput(self):
@@ -448,6 +527,11 @@ class FlameletSolver_Cantera:
         return
     
     def loadSolution(self, flameletFileName:str):
+        """Load flamelet solution data from csv file and initialize flamelet simulation from loaded data.
+
+        :param flameletFileName: solution file path name.
+        :type flameletFileName: str
+        """
         self._from_file = True
         self._thermochemical_solution = pd.read_csv(flameletFileName)
         self._initial_grid = self._thermochemical_solution["Distance"]
@@ -487,6 +571,11 @@ class FlameletSolver_Cantera:
         return self._is_scalar
     
     def getMassFractions(self):
+        """Retrieve mass fraction data from flamelet solution.
+
+        :return: data frame with species mass fractions.
+        :rtype: pandas.DataFrame
+        """
         Y = self._flameletSolution.Y
         species_names = self._canteraSolution.species_names
         struct = {sp : y for sp, y in zip(species_names, Y)}
@@ -589,6 +678,11 @@ class FreeFlameSolver(FlameletSolver_Cantera):
         return
     
     def getMassFlowRate(self):
+        """Retrieve adiabatic mass flow rate.
+
+        :return: mass flow rate evaluated at the inflow boundary.
+        :rtype: float
+        """
         return self.__mass_flow_rate
     
 class BurnerFlameSolver(FlameletSolver_Cantera):
@@ -619,6 +713,14 @@ class BurnerFlameSolver(FlameletSolver_Cantera):
         return
     
     def setReactantMassFlow(self, val_massflow_inlet:float):
+        """Specify the mass flow rate at the inflow boundary.
+
+        :param val_massflow_inlet: mass flux in kg /m /s
+        :type val_massflow_inlet: float
+        :raises Exception: if the specified value is negative.
+        """
+        if val_massflow_inlet < 0:
+            raise Exception("Mass flow rate should be strictly positive.")
         self.__val_massflow = val_massflow_inlet
         return
     
