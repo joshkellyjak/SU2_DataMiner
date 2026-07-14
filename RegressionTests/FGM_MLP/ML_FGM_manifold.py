@@ -41,6 +41,7 @@ F.CollectBoundaryData()
 
 train_filename = config.GetOutputDir()+"/"+config.GetConcatenationFileHeader()+"_train.csv"
 trainData = np.loadtxt(train_filename,delimiter=',',skiprows=1)
+print(trainData.shape)
 for t in trainData:
     print(",".join(("%+.5e" % f for f in t)))
 
