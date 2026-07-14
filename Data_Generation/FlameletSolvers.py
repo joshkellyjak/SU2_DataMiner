@@ -39,12 +39,13 @@ class FlameletSolver_Cantera:
 
     _flameletTypeOutputFolder:str = ""
     _plotLabel:str = None
-    _output_filepath:str = getcwd()
     _flamelet_filename:str
+    _is_premixed:bool = True
+    _is_scalar:bool = False
 
     _canteraSolution:ct.Solution = None
-
     _flameletSolution:ct.FlameBase = None
+
     _iteration:int = 0
     _n_1D_iterations:int = 10
     _print_iteration:bool =False
@@ -59,6 +60,7 @@ class FlameletSolver_Cantera:
     _reactant_mixture_status:float = 0.0
     _pressure:float = ct.one_atm
 
+    # Initial grid and grid refinement options.
     _initial_grid_length:float = 1.8e-2
     __initial_grid_number_of_points:int = 30
     _initial_grid:np.ndarray[float] = None
@@ -67,16 +69,16 @@ class FlameletSolver_Cantera:
     __grid_refinement_slope:float = 0.025
     __grid_refinement_curve:float = 0.025
     __grid_refinement_prune:float = 0.01
-
     _max_grid_points:int=2000
-    __cantera_loglevel:int=0
+
+    __cantera_loglevel:int=0    
     __flameletSolverLogLevel:int=1
 
     _flamelet_is_burning:bool = True
     _converged_solution:bool = True
-    _thermochemical_solution:pd.DataFrame = None
-    _is_premixed:bool = True
-    _is_scalar:bool = False
+
+    _output_filepath:str = getcwd()                 # System file location where flamelet data are saved.
+    _thermochemical_solution:pd.DataFrame = None    # Flamelet solution data 
 
     def __init__(self, config_input:Config_FGM):
         self._Config = config_input
