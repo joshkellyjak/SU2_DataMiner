@@ -39,6 +39,11 @@ F = FlameletConcatenator(config, verbose_level=0)
 F.ConcatenateFlameletData()
 F.CollectBoundaryData()
 
+train_filename = config.GetOutputDir()+"/"+config.GetConcatenationFileHeader()+"_train.csv"
+trainData = np.loadtxt(train_filename,delimiter=',',skiprows=1)
+for t in trainData:
+    print(",".join(("%+.5e" % f for f in t)))
+
 T = TrainMLP_FGM(config, 0)
 T.EnableBCLoss(False)
 T.SetTrainHardware("CPU")
@@ -52,10 +57,6 @@ T.CommenceTraining()
 
 config.UpdateMLPHyperParams(T)
 config.PrintBanner()
-
-hist = np.loadtxt("architectures_Group1/Worker_0/Model_0/TrainingHistory.csv",delimiter=',',skiprows=1)
-for h in hist:
-    print(h)
     
 if consistent_hp_params:
     sys.exit(0)
