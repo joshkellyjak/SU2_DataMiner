@@ -53,7 +53,7 @@ def main():
     hydrogen_flamelet.config_file = "adiabatic_flamelets.cfg"
     hydrogen_flamelet.exec_command = "./generate_flamelet_data.py"
     hydrogen_flamelet.reference_files = ["flamelet_data.ref"]
-    hydrogen_flamelet.test_files = ["freeflame_data/phi_1.0/freeflamelet_phi1.0_Tu300.0.csv"]
+    hydrogen_flamelet.test_files = ["freeflame_data/phi_1.0000/Freeflame_phi1.0000_Tu300.0.csv"]
     test_list_FGM.append(hydrogen_flamelet)
 
     FGM_training = TestCase("ML FGM")

@@ -38,7 +38,7 @@ supported_fluid_names = get_global_param_string("FluidsList").split(',')
 #---------------------------------------------------------------------------------------------#
 # Importing DataMiner classes and functions
 #---------------------------------------------------------------------------------------------#
-from Common.Properties import DefaultSettings_NICFD, DefaultSettings_FGM
+from Common.Properties import DefaultSettings_NICFD, DefaultSettings_FGM, FlameletSolverOptions
 from Common.Config_base import Config
 from Common.CommonMethods import *
 
@@ -787,6 +787,8 @@ class Config_FGM(Config):
     __generate_equilibrium:bool = DefaultSettings_FGM.include_equilibrium     # Generate chemical equilibrium data
     __generate_counterflames:bool = DefaultSettings_FGM.include_counterflames   # Generate counter-flow diffusion flamelets.
 
+    __flamelet_types:list[str] = [FlameletSolverOptions[0]]
+
     __write_MATLAB_files:bool = False  # Write TableGenerator compatible flamelet files.
 
     gas:ct.Solution = None  # Cantera solution object.
@@ -801,7 +803,7 @@ class Config_FGM(Config):
 
     __lookup_variables:list[str] = ["Heat_Release"] # Extra look-up variables to read from flamelet data
 
-    __Np_per_flamelet:int = 2**DefaultSettings_FGM.batch_size_exponent    # Number of data points to interpolate from flamelet data.
+    __Np_per_flamelet:int = None    # Number of data points to interpolate from flamelet data.
 
     # MLP output groups and architecture information.
     __MLP_output_groups:list[list[str]] = None  # Output variables for each MLP.
@@ -1489,6 +1491,45 @@ class Config_FGM(Config):
         """
         return self.__run_mixture_fraction
 
+    def includeFlameletType(self, flamelet_type:str="FREEFLAME"):
+
+        if flamelet_type not in FlameletSolverOptions:
+            raise Exception("%s is not recognized as a viable flamelet type" % flamelet_type)
+        
+        if flamelet_type not in self.__flamelet_types:
+            self.__flamelet_types.append(flamelet_type)
+        
+        return
+
+    def setFlameletTypes(self, flamelet_types:list[str]):
+        self.__flamelet_types = flamelet_types.copy()
+        self.__checkFlameletTypes()
+        return
+    
+    def __checkFlameletTypes(self):
+        self.__generate_burnerflames = "BURNERFLAME" in self.__flamelet_types
+        self.__generate_freeflames = "FREEFLAME" in self.__flamelet_types
+        self.__generate_counterflames = "COUNTERFLAME" in self.__flamelet_types
+        self.__generate_equilibrium = "EQUILIBRIUM" in self.__flamelet_types
+        self.__generate_extra_interpolated_burnerflames = "BURNERFLAME_INT" in self.__flamelet_types
+        return
+    
+    def excludeFlameletType(self, flamelet_type:str):
+        if flamelet_type not in FlameletSolverOptions:
+            raise Exception("%s is not recognized as a viable flamelet type" % flamelet_type)
+        
+        if flamelet_type in self.__flamelet_types:
+            self.__flamelet_types.remove(flamelet_type)
+
+        self.__checkFlameletTypes()
+        if len(self.__flamelet_types) == 0:
+            raise Exception("At least one flamelet type should be included in the manifold")
+    
+        return
+
+    def getFlameletTypes(self):
+        return self.__flamelet_types
+
     def RunFreeFlames(self, input:bool=DefaultSettings_FGM.include_freeflames):
         """
         Include adiabatic free flame data in the manifold.
@@ -1498,8 +1539,8 @@ class Config_FGM(Config):
 
         """
         self.__generate_freeflames = input
+        self.includeFlameletType("FREEFLAME")
         return
-
     def RunBurnerFlames(self, input:bool=DefaultSettings_FGM.include_burnerflames):
         """
         Include burner-stabilized flame data in the manifold.
@@ -1509,6 +1550,7 @@ class Config_FGM(Config):
 
         """
         self.__generate_burnerflames = input
+        self.includeFlameletType("BURNERFLAME")
         return
 
     def RunEquilibrium(self, input:bool=DefaultSettings_FGM.include_equilibrium):
@@ -1520,6 +1562,7 @@ class Config_FGM(Config):
 
         """
         self.__generate_equilibrium = input
+        self.includeFlameletType("EQUILIBRIUM")
         return
 
     def RunCounterFlames(self, input:bool=DefaultSettings_FGM.include_counterflames):
@@ -1531,6 +1574,7 @@ class Config_FGM(Config):
 
         """
         self.__generate_counterflames = input
+        self.includeFlameletType("COUNTERFLAME")
         return
 
     def RunExtraInterpolatedBurnerFlames(self, input:bool=True):
@@ -1542,6 +1586,7 @@ class Config_FGM(Config):
 
         """
         self.__generate_extra_interpolated_burnerflames = input
+        self.includeFlameletType("INT_BURNERFLAME")
         return
 
     def GenerateFreeFlames(self):
@@ -1877,7 +1922,7 @@ class Config_FGM(Config):
             Le_av = self.__Le_avg_method(Le_sp)
         return Le_av
 
-    def SetAverageLewisNumbers(self, mixture_status:float=None, reactant_temperature:float=None):
+    def SetAverageLewisNumbers(self, equivalence_ratio:float=None, reactant_temperature:float=None):
         """Define the constant specie Lewis numbers for a given mixture status and reactant temperature.
 
         :param mixture_status: equivalence ratio or mixture fraction, defaults to the average of the manifold bounds.
@@ -1886,12 +1931,10 @@ class Config_FGM(Config):
         :type reactant_temperature: float, optional
         :raises Exception: if negative mixture status value or temperature is provided.
         """
-        if mixture_status != None:
-            if mixture_status < 0:
+        if equivalence_ratio:
+            if equivalence_ratio < 0:
                 raise Exception("Mixture status value should be positive.")
-            if self.__run_mixture_fraction and mixture_status > 1:
-                raise Exception("Mixture fraction should be between zero and one.")
-        if reactant_temperature != None:
+        if reactant_temperature:
             if reactant_temperature < 0:
                 raise Exception("Reactant temperature should be positive.")
 
@@ -1905,19 +1948,20 @@ class Config_FGM(Config):
             T_reactants = reactant_temperature
         self.__Le_avg_T_unb = T_reactants
 
-        if (mixture_status == None):
-            if (self.__Le_avg_eq_ratio == None):
-                mixture_status_gas = 0.5*(self.__mix_status_lower + self.__mix_status_upper)
+        if not equivalence_ratio:
+            if not self.__Le_avg_eq_ratio:
+                if self.__run_mixture_fraction:
+                    mixture_status_gas = 0.5
+                else:
+                    mixture_status_gas = 0.5*(self.__mix_status_lower + self.__mix_status_upper)
             else:
                 mixture_status_gas = self.__Le_avg_eq_ratio
         else:
-            mixture_status_gas = mixture_status
+            mixture_status_gas = equivalence_ratio
         self.__Le_avg_eq_ratio = mixture_status_gas
         self.gas.TP =T_reactants, DefaultSettings_FGM.pressure
-        if self.__run_mixture_fraction:
-            self.gas.set_mixture_fraction(self.__Le_avg_eq_ratio, self.__fuel_string, self.__oxidizer_string)
-        else:
-            self.gas.set_equivalence_ratio(self.__Le_avg_eq_ratio, self.__fuel_string, self.__oxidizer_string)
+
+        self.gas.set_equivalence_ratio(self.__Le_avg_eq_ratio, self.__fuel_string, self.__oxidizer_string)
 
         Le_reactants = ComputeLewisNumber(self.gas)
         self.gas.equilibrate("HP")
@@ -2370,7 +2414,7 @@ class Config_FGM(Config):
     def WriteSU2MLP(self, file_name_out:str, group_idx:int=-1):
         if group_idx == -1:
             for iGroup in range(self.GetNMLPOutputGroups()):
-                write_SU2_MLP(file_name_out+"_"+str(iGroup+1),\
+                writeMLPForSU2(file_name_out+"_"+str(iGroup+1),\
                              weights=self._MLP_weights[iGroup],\
                              biases=self._MLP_biases[iGroup],\
                              activation_function_name=self.__activation_function[iGroup],\
@@ -2382,7 +2426,7 @@ class Config_FGM(Config):
                              additional_header_info_function=self.__write_progress_variable_definition)
         else:
             iGroup = group_idx
-            write_SU2_MLP(file_name_out+"_"+str(iGroup+1),\
+            writeMLPForSU2(file_name_out+"_"+str(iGroup+1),\
                              weights=self._MLP_weights[iGroup],\
                              biases=self._MLP_biases[iGroup],\
                              activation_function_name=self.__activation_function[iGroup],\
@@ -2404,7 +2448,7 @@ class Config_FGM(Config):
         scaler_function="robust"
         scaler_function_vals_in = self._scaler_function_vals_in[0]
         scaler_function_vals_out = np.zeros([1,2])
-        write_SU2_MLP(header+"_NULL",weights=weights,biases=biases,activation_function_name=activation_function,controlling_vars=control_vars,train_vars=train_vars,scaler_function=scaler_function,scaler_function_vals_in=scaler_function_vals_in,scaler_function_vals_out=scaler_function_vals_out,additional_header_info_function=self.__write_progress_variable_definition)
+        writeMLPForSU2(header+"_NULL",weights=weights,biases=biases,activation_function_name=activation_function,controlling_vars=control_vars,train_vars=train_vars,scaler_function=scaler_function,scaler_function_vals_in=scaler_function_vals_in,scaler_function_vals_out=scaler_function_vals_out,additional_header_info_function=self.__write_progress_variable_definition)
         return
     def __write_progress_variable_definition(self, fid):
         fid.write("Progress variable definition: " + "+".join(("%+.6e*%s" % (w, s)) for w, s in zip(self.__pv_weights, self.__pv_definition)))
@@ -2419,7 +2463,6 @@ class Config_FGM(Config):
         :type file_name: str
         """
         self.__SynchronizeSettings()
-
         file = open(self._config_name+'.cfg','wb')
         pickle.dump(self, file)
         file.close()

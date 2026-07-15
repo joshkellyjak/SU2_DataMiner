@@ -31,68 +31,84 @@ def ComputeLewisNumber(flame:ct.Solution):
     Le_species = flame.thermal_conductivity/flame.cp_mass/flame.density_mass/(flame.mix_diff_coeffs+1e-15)
     return Le_species
 
-def avg_Le_start_end(Le_sp:np.ndarray):
-    Le_av = 0.5*(Le_sp[0] + Le_sp[-1])
-    return Le_av
+def avg_Le_const(from_flamelet_solution:np.ndarray, replacment_value:float):
+    """Replace local solution of the species Lewis number with a constant value
 
-def avg_Le_arythmic(Le_sp:np.ndarray):
-    Le_av = np.average(Le_sp)
-    return Le_av
-
-def avg_Le_min_max(Le_sp:np.ndarray):
-    Le_av = 0.5*(np.min(Le_sp)+np.max(Le_sp))
-    return Le_av
-
-def avg_Le_unity(Le_sp:np.ndarray):
-    Le_av = np.ones(np.shape(Le_sp))
-    return Le_av
-
-def avg_Le_const(Le_sp:np.ndarray, Le_const:float):
-    Le_av = Le_const * np.ones(np.shape(Le_sp))
-    return Le_av
-
-def avg_Le_local(Le_sp:np.ndarray):
-    return Le_sp
-
-
-def GetReferenceData(dataset_file:str, x_vars:list[str], train_variables:list[str],dtype=np.float32):
-    """Read csv file and collect input-output pairs into a numpy array of a set data type.
-
-    :param dataset_file: file path name to csv file
-    :type dataset_file: str
-    :param x_vars: controlling variables
-    :type x_vars: list[str]
-    :param train_variables: output variables
-    :type train_variables: list[str]
-    :param dtype: data type by which to output data arrays, defaults to np.float32
-    :type dtype: dtype, optional
-    :return: data arrays for controlling variable and dependent variable data.
-    :rtype: np.ndarray[float],np.ndarray[float]
+    :param from_flamelet_solution: species Lewis number from flamelet solution
+    :type from_flamelet_solution: np.ndarray
+    :param replacment_value: constant species Lewis number
+    :type replacment_value: float
+    :return: array with constant species Lewis numbers
+    :rtype: np.ndarray[float]
     """
+    const_species_lewis_number = replacment_value * np.ones(np.shape(from_flamelet_solution))
+    return const_species_lewis_number
 
-    # Open data file and get variable names from the first line
-    fid = open(dataset_file, 'r')
-    line = fid.readline()
-    fid.close()
-    line = line.strip()
-    line_split = line.split(',')
-    if(line_split[0][0] == '"'):
-        varnames = [s[1:-1] for s in line_split]
-    else:
-        varnames = line_split
+class readStateDataFromFile:
+    __dataset_filepath:str=""
+    __controlling_variable_names:list[str]=[]
+    __state_variable_names:list[str]=[]
+    __dtype:type=np.float32
+    __varnames_from_file:list[str]=None
 
-    # Get indices of controlling and train variables
-    iVar_x = [varnames.index(v) for v in x_vars]
-    iVar_y = [varnames.index(v) for v in train_variables]
+    def __new__(self, dataset_filepath:str, controlling_variables:list[str], state_variables:list[str],dtype=np.float32):
+        """Load data for a set of controlling variables and for a set of state variables from a csv file.
 
-    # Retrieve respective data from data set
-    D = np.loadtxt(dataset_file, delimiter=',', skiprows=1, dtype=dtype)
-    X_data = D[:, iVar_x]
-    Y_data = D[:, iVar_y]
+        :param dataset_filepath: _description_
+        :type dataset_filepath: str
+        :param controlling_variables: _description_
+        :type controlling_variables: list[str]
+        :param state_variables: _description_
+        :type state_variables: list[str]
+        :param dtype: _description_, defaults to np.float32
+        :type dtype: _type_, optional
+        :return: _description_
+        :rtype: _type_
+        """
+        self.__dataset_filepath=dataset_filepath
+        self.__controlling_variable_names = controlling_variables.copy()
+        self.__state_variable_names = state_variables.copy()
+        self.__dtype=dtype
+        
+        self.__varnames_from_file = self.__getLabelsFromCSVFile(self)
+        self.__checkIfVarInFile(self, self.__controlling_variable_names)
+        self.__checkIfVarInFile(self, self.__state_variable_names)
+        
+        return self.__loadDataFromFile(self)
+    
+    def __getLabelsFromCSVFile(self):
+        fid = open(self.__dataset_filepath, 'r')
+        first_line = fid.readline()
+        fid.close()
+        line_split = first_line.strip().split(',')
+        varnames = [varname.strip("\"").strip("\'") for varname in line_split]
+        return varnames
+    
+    def __checkIfVarInFile(self, varnames_to_check:list[str]):
+        unsupported_vars = []
+        for var in varnames_to_check:
+            if var not in self.__varnames_from_file:
+                unsupported_vars.append(var)
+        if any(unsupported_vars):
+            raise Exception("The variables %s were not found in the file" % (",".join(var for var in unsupported_vars)))
+        return
+    
+    def __loadDataFromFile(self):
+        index_controlling_variables = [self.__varnames_from_file.index(v) for v in self.__controlling_variable_names]
+        index_state_variables = [self.__varnames_from_file.index(v) for v in self.__state_variable_names]
 
-    return X_data, Y_data
+        # Retrieve respective data from data set
+        data_from_csv_file = np.loadtxt(self.__dataset_filepath, delimiter=',', skiprows=1, dtype=self.__dtype)
+        if data_from_csv_file.shape[1] != len(self.__varnames_from_file):
+            raise Exception("Number of labels is not equal to the number of data entries in %s" % self.__dataset_filepath)
+        
+        data_controlling_variables = data_from_csv_file[:, index_controlling_variables]
+        data_state_variables = data_from_csv_file[:, index_state_variables]
+        return data_controlling_variables, data_state_variables
 
-def write_SU2_MLP(file_out:str, weights:list[np.ndarray], biases:list[np.ndarray],activation_function_name:str,train_vars:list[str], controlling_vars:list[str], scaler_function:str,scaler_function_vals_in:list[list[float]],scaler_function_vals_out:list[float],additional_header_info_function=None):
+    
+
+def writeMLPForSU2(file_out:str, weights:list[np.ndarray], biases:list[np.ndarray],activation_function_name:str,train_vars:list[str], controlling_vars:list[str], scaler_function:str,scaler_function_vals_in:list[list[float]],scaler_function_vals_out:list[float],additional_header_info_function=None):
     """Write ASCII file that can be loaded into SU2 through the MLPCpp submodule containing the network weights and biases.
 
     :param file_out: MLP output file name
@@ -117,7 +133,6 @@ def write_SU2_MLP(file_out:str, weights:list[np.ndarray], biases:list[np.ndarray
     :type additional_header_info_function: function, optional
     """
     n_layers = len(weights)+1
-
     weights_for_output = weights
     biases_for_output = biases
 
