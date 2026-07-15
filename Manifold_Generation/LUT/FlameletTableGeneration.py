@@ -483,7 +483,7 @@ class SU2TableGenerator:
             plt.show()
         return
 
-    def GenerateTableNodes(self):
+    def generateTableNodes(self):
         """
         Generate the table nodes and connectivity.
         """
@@ -576,7 +576,7 @@ class SU2TableGenerator:
         return [Nodes_dim, Tria, HullIdx, TableDataLevel]
 
 
-    def WriteTableFile(self, output_filepath:str=None):
+    def writeSU2Table(self, output_filepath:str=None):
         """
         Save the table data and connectivity as a Dragon library file. If no file name is provided,
         the table file will be named according to the Config_FGM class name.
@@ -598,14 +598,14 @@ class SU2TableGenerator:
         fid = open(file_out, "w+")
 
         if self._is_2D_table:
-            self.__WriteTableFile2D(fid)
+            self.__writeSU2Table2D(fid)
         else:
-            self.__WriteTableFile3D(fid)
+            self.__writeSU2Table3D(fid)
 
         fid.close()
         return
 
-    def __WriteTableFile2D(self, fid):
+    def __writeSU2Table2D(self, fid):
         """Write a 2D Dragon library file (version 1.0.1) for a single mixture-fraction level.
         The controlling variables are ProgressVariable and EnthalpyTot only."""
 
@@ -667,7 +667,7 @@ class SU2TableGenerator:
         print("Done!")
         return
 
-    def __WriteTableFile3D(self, fid):
+    def __writeSU2Table3D(self, fid):
         """Write a 3D multi-level Dragon library file (version 1.1.0)."""
 
         fid.write("Dragon library\n\n")
@@ -1070,8 +1070,8 @@ class SU2TableGenerator:
         species in ``species_list`` are forced to zero when their absolute value is
         below ``abs_tol``.
 
-        This method must be called after :meth:`GenerateTableNodes` and before
-        :meth:`WriteTableFile`.
+        This method must be called after :meth:`generateTableNodes` and before
+        :meth:`writeSU2Table`.
 
         :param species_list: species names to clamp (e.g. ``['CO', 'H2']``).
         :type species_list: list[str]
@@ -1166,8 +1166,8 @@ if __name__ == "__main__":
     T.InsertMixtureFractionLevel(0.01445)
     T.VisualizeTableLevel(0.01446751783896619)
     T.SetNTableLevels(200)
-    T.GenerateTableNodes()
-    T.WriteTableFile()
+    T.generateTableNodes()
+    T.writeSU2Table()
     # #T.InterpolateTableData()
-    # T.WriteTableFile()
+    # T.writeSU2Table()
     # T.SaveTableGenerator("LUT_"+Config.GetConfigName())

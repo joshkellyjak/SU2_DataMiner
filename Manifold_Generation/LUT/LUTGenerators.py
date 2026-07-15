@@ -30,7 +30,7 @@ from su2dataminer.generate_data import DataGenerator_CoolProp
 from Common.DataDrivenConfig import Config_NICFD,Config_FGM
 from Manifold_Generation.LUT.LUTGenerator_Base import SU2TableGenerator_Base
 from Manifold_Generation.LUT.MeshTools import MeshThermodynamicPlane
-class TableGenerator_NICFD(SU2TableGenerator_Base):
+class SU2TableGenerator_NICFD(SU2TableGenerator_Base):
     _Config:Config_NICFD = None
     __datagenerator:DataGenerator_CoolProp = None
     __thermodynamic_data:pd.DataFrame = None
@@ -91,7 +91,7 @@ class TableGenerator_NICFD(SU2TableGenerator_Base):
     
     def _passRefinementOptions(self, mesher:MeshThermodynamicPlane):
         if self._Config.TwoPhase():
-            rhoe_saturation_curve = self.__datagenerator.ComputeSaturationCurve(N_samples=1000)
+            rhoe_saturation_curve = self.__datagenerator.ComputeSaturationCurve(N_samples=2000)
             saturation_curve_pts_scaled = self._scaler_controlling_variables.transform(rhoe_saturation_curve)
             mesher.setSaturationCurvePoints(saturation_curve_pts_scaled)
         return super()._passRefinementOptions(mesher)
@@ -146,7 +146,7 @@ class TableGenerator_NICFD(SU2TableGenerator_Base):
             fid.write("Table constains single-phase data\n\n")
         return
     
-class TableGenerator_FGM(SU2TableGenerator_Base):
+class SU2TableGenerator_FGM(SU2TableGenerator_Base):
     _Config:Config_FGM = None
     __refineGradients:bool = False
     _refine_for_gradients_of:list[str] = []

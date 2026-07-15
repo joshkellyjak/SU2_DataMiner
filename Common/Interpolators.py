@@ -232,7 +232,17 @@ class fluidDataInterpolator:
     __state_vars:list[str] = None
 
     def __init__(self,cv_data:np.ndarray[float], state_data:pd.DataFrame, number_of_nearest_neighbors:int=None, inverse_distance_exponent:float=None):
-     
+        """Inverse distance weighted interpolation algorithm for the interpolation of thermodynamic state data from unstructured point clouds.
+
+        :param cv_data: scaled controlling variable data from point cloud samples
+        :type cv_data: np.ndarray[float]
+        :param state_data: interpolation data from point cloud samples.
+        :type state_data: pd.DataFrame
+        :param number_of_nearest_neighbors: number of nearest neighbors from which fluid data is interpolated, defaults to None
+        :type number_of_nearest_neighbors: int, optional
+        :param inverse_distance_exponent: exponent applied to the inverse distance of the nearest neighbors, defaults to None
+        :type inverse_distance_exponent: float, optional
+        """
         self.__controlling_variable_nodes = cv_data
         self.__lookup_data = state_data.values
         self.__state_vars = list(state_data.keys())

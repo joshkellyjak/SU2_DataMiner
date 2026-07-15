@@ -81,12 +81,18 @@ class SU2TableGenerator_Base:
     _verbosity:int=1
 
     def __init__(self, config_in:Config):
+        """Initialize the table generator and retrieve settings from configuration
+
+        :param config_in: SU2 DataMiner configuration object.
+        :type config_in: Config
+        """
         self._Config = copy(config_in)
         self._nDim_table = len(self._Config.GetControllingVariables())
         return
     
     def generateTable(self):
-        
+        """Initiate the table generation process.
+        """
         self._processTableLevels()
 
         self._defineFluidDataInterpolator()

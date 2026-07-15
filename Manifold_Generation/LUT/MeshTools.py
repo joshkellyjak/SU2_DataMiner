@@ -309,11 +309,13 @@ class MeshThermodynamicPlane(Mesh2DPlane):
     def __createSaturationCurveGeom(self):
         
         sat_curve_pts, sat_curve_lower, sat_curve_upper = self.__saturationOffsetCurves()
-        
-        sat_curve_lower_pts, sat_curve_upper_pts, segment_lengths = self.__samplePointsAlongSaturationCurve(sat_curve_pts, sat_curve_lower, sat_curve_upper)
+        if len(sat_curve_lower) > 0:
+            sat_curve_lower_pts, sat_curve_upper_pts, segment_lengths = self.__samplePointsAlongSaturationCurve(sat_curve_pts, sat_curve_lower, sat_curve_upper)
 
-        return self.__encloseSaturationCurve(sat_curve_lower_pts, sat_curve_upper_pts, segment_lengths)
-    
+            return self.__encloseSaturationCurve(sat_curve_lower_pts, sat_curve_upper_pts, segment_lengths)
+        else:
+            return []
+        
     def __encloseSaturationCurve(self, lower_offset_pts:np.ndarray[int], upper_offset_pts:np.ndarray[int], segment_lengths:list[float]):
         connecting_lines = []
         Npoints = len(lower_offset_pts)
@@ -359,7 +361,6 @@ class MeshThermodynamicPlane(Mesh2DPlane):
         sat_curve_rhoe_lower, sat_curve_rhoe_upper = self.__createSaturationCurveOffsets(norm_vector)
 
         valid_pts = self.__clipSaturationCurveToPlane(sat_curve_rhoe_lower, sat_curve_rhoe_upper)
-
         sat_curve_pts = self.__saturation_curve_points[valid_pts, :]
         norm_vector = norm_vector[valid_pts, :]
         sat_curve_rhoe_lower = sat_curve_rhoe_lower[valid_pts]
@@ -385,8 +386,8 @@ class MeshThermodynamicPlane(Mesh2DPlane):
 
     def __clipSaturationCurveToPlane(self, pts_offset_lower:np.ndarray[float], pts_offset_upper:np.ndarray[float]):
 
-        ref_area = shoelace(self._pointCloud_hullNodes)
-
+        hull_pts_orig = concave_hull(self._pointCloud_hullNodes, length_threshold=self._base_cell_size)
+        ref_area = shoelace(hull_pts_orig)
         within_hull = np.zeros(len(self.__saturation_curve_points),dtype=np.bool)
 
         for i in range(len(self.__saturation_curve_points)):
