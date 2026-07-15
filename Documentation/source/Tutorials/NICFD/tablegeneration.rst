@@ -226,7 +226,7 @@ For example, adding the following criterion refines the table in the region wher
 
 .. code-block::
 
-    tgen.AddRefinementCriterion("Density", 0, 100.0)
+    tgen.applyRefinementWithin("Density", 0, 100.0)
 
 
 .. figure:: refined_density.png
@@ -239,7 +239,7 @@ Similarly, if additional refinement is required in the two-phase region, the ref
 
 .. code-block::
 
-    tgen.AddRefinementCriterion("VaporQuality", 0.0, 1.0)
+    tgen.applyRefinementWithin("VaporQuality", 0.0, 1.0)
 
 .. figure:: refined_vaporquality.png
    :scale: 50 %
@@ -254,7 +254,7 @@ This results in a refined region around a desired isentrope.
 .. code-block::
 
     isentrope = 2300
-    tgen.AddRefinementCriterion("s", isentrope-10.0, isentrope+10.0)
+    tgen.applyRefinementWithin("s", isentrope-10.0, isentrope+10.0)
 
 
 .. figure:: refined_isentrope.png
@@ -269,8 +269,8 @@ Finally, the table generator is not limited to one user-defined refinement crite
 .. code-block::
 
     isentrope = 2300
-    tgen.AddRefinementCriterion("s", isentrope-10.0, isentrope+10.0)
-    tgen.AddRefinementCriterion("Density", 0.0, 30.0)
+    tgen.applyRefinementWithin("s", isentrope-10.0, isentrope+10.0)
+    tgen.applyRefinementWithin("Density", 0.0, 30.0)
 
 
 .. figure:: refined_density_isentrope.png
