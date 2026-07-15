@@ -1,4 +1,4 @@
-from su2dataminer.config import Config_FGM 
+from su2dataminer.config import Config_FGM
 from Manifold_Generation.LUT.LUTGenerators import TableGenerator_FGM
 
 config = Config_FGM("TableGeneration_H2.cfg")
