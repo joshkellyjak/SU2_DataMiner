@@ -1541,7 +1541,6 @@ class Config_FGM(Config):
         self.__generate_freeflames = input
         self.includeFlameletType("FREEFLAME")
         return
-    
     def RunBurnerFlames(self, input:bool=DefaultSettings_FGM.include_burnerflames):
         """
         Include burner-stabilized flame data in the manifold.
