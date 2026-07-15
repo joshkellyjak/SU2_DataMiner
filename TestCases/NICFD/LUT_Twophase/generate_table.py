@@ -1,7 +1,7 @@
 # Test case for generating thermodynamic tables for two-phase NICFD problems
 
 from Common.DataDrivenConfig import Config_NICFD
-from su2dataminer.manifold import TableGenerator_NICFD
+from su2dataminer.manifold import SU2TableGenerator_NICFD
 
 config = Config_NICFD()
 config.SetFluid("MM")
@@ -23,7 +23,7 @@ config.SetEnergyBounds(200e3, 360e3)
 config.SetNpDensity(50)
 config.SetNpEnergy(50)
 
-tgen = TableGenerator_NICFD(config)
+tgen = SU2TableGenerator_NICFD(config)
 
 # Specify a target number of nodes in the table
 tgen.setTargetNodeCount(4e4)
@@ -33,9 +33,9 @@ tgen.setTargetNodeCount(4e4)
 
 # Custom refinement; reduce cell size by a specified factor where the
 # thermodynamic quantity is within specified limits
-tgen.addRefinementCriterion("s", lowerbound=725,upperbound=780, coef=0.4)
-tgen.addRefinementCriterion("Density",0, 50, 0.4)
-tgen.addRefinementCriterion("Density",0, 20, 0.2)
+tgen.applyRefinementWithin("s", lowerbound=725,upperbound=780, coef=0.4)
+tgen.applyRefinementWithin("Density",0, 50, 0.4)
+tgen.applyRefinementWithin("Density",0, 20, 0.2)
 
 # Apply smoothing to tabulated data. High value = more smoothing
 tgen.setSmoothingParameter(0.05)
