@@ -15,7 +15,7 @@ Config.SetNpMix(20)
 Config.SetUnbTempBounds(270, 600)
 Config.SetNpTemp(49)
 Config.SetNpMdot(40)          # burner flames across the mdot range
-Config.SetMdotDHTarget(20000.0)   # J/kg target ΔH between flames
+Config.SetMdotDHTarget(50000.0)   # J/kg target ΔH between flames
 Config.SetNpMdotExtra(40)    # synthetic flames linearly interpolated from lowest-mdot burner flame to equilibrium
 Config.SetSrcInterpExponent(2.0)   # Decay of interpolated flamelets
 Config.SetInitialGridLength(1.8e-2)  # Initial flamelet domain length in metres

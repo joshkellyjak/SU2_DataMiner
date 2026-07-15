@@ -1,5 +1,5 @@
-from su2dataminer.config import Config_FGM 
-from su2dataminer.process_data import FlameletConcatenator 
+from su2dataminer.config import Config_FGM
+from su2dataminer.process_data import FlameletConcatenator
 
 config = Config_FGM("TableGeneration_H2.cfg")
 config.SetAverageLewisNumbers(0.5, 300)
