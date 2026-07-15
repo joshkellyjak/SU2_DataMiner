@@ -66,6 +66,7 @@ binary file titled "tabulation_carbondioxide.cfg".
 2. Tabulation Example 
 ---------------------
 
+
 Thermodynamic tables can be created with the :ref:`SU2TableGenerator_NICFD <doc_nicfd_tabulation>` class which is initiated with the SU2 DataMiner configuration object.
 The following code snippet shows how to initiate the table generator and generate a basic look-up table for two-phase applications.
 Running this code snippet produces **two table files**. The "LUTtest.vtk" can be loaded into **ParaView** to visually inspect the table contents. 
