@@ -450,8 +450,11 @@ def ComputeFlameletData(Config:Config_FGM, run_parallel:bool=False, N_processors
         mixture_range_rich = np.linspace(mix_status_stoch, mix_bounds[1], int(Np_unb_mix/2)+1)
         mixture_range = np.append(mixture_range_lean, mixture_range_rich[1:])
     else:
-        # Equivalence ratios to calculate flamelets for are system inputs
-        mixture_range = np.linspace(mix_bounds[0], mix_bounds[1], Np_unb_mix)
+        if mix_bounds[0] == mix_bounds[1]:
+            mixture_range = [mix_bounds[0]]
+        else:
+            # Equivalence ratios to calculate flamelets for are system inputs
+            mixture_range = np.linspace(mix_bounds[0], mix_bounds[1], Np_unb_mix)
 
     def _make_generator():
         F = DataGenerator_Cantera(Config)
