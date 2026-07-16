@@ -61,8 +61,6 @@ PVO.OptimizePV()
 #---------------------------------------------------------------------------------------------#
 # Update progress variable definition in the FlameletAI configuration
 #---------------------------------------------------------------------------------------------#
-Config.SetProgressVariableDefinition(pv_species=PVO.GetOptimizedSpecies(), \
-                                     pv_weights=PVO.GetOptimizedWeights())
+PVO.updateProgressVariableInConfig()
 
 Config.PrintBanner()
-Config.SaveConfig()

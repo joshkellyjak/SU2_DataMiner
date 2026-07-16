@@ -43,9 +43,10 @@ import cantera as ct
 
 from Common.DataDrivenConfig import Config_FGM
 from Manifold_Generation.MLP.Trainer_Base import MLPTrainer, TensorFlowFit,PhysicsInformedTrainer,TrainMLP, CustomTrainer
-from Common.CommonMethods import GetReferenceData
+from Common.CommonMethods import readStateDataFromFile
 from Common.Properties import DefaultSettings_FGM as DefaultProperties
 from Common.Properties import FGMVars
+from Data_Generation.FlameletSolvers import FreeFlameSolver
 
 class Train_Flamelet_Direct(TensorFlowFit):
     __Config:Config_FGM
@@ -68,7 +69,7 @@ class Train_Flamelet_Direct(TensorFlowFit):
         :N_plot: number of equivalence ratio's to plot for in each figure.
         """
         PlotFlameletData(self, self.__Config, self._train_name)
-        self.write_SU2_MLP(self._save_dir + "/Model_"+str(self._model_index)+"/MLP_"+self._train_name)
+        self.writeMLPForSU2(self._save_dir + "/Model_"+str(self._model_index)+"/MLP_"+self._train_name)
         return super().CustomCallback()
 
     def add_additional_header_info(self, fid):
@@ -390,7 +391,7 @@ class Train_FGM_PINN(PhysicsInformedTrainer):
         :rtype: list[np.ndarray], list[np.ndarray], list[str]
         """
 
-        _, Cp_boundary = GetReferenceData(self._boundary_data_file, x_vars=self._controlling_vars, train_variables=[FGMVars.Cp.name], dtype=self._dt_np)
+        _, Cp_boundary = readStateDataFromFile(self._boundary_data_file, self._controlling_vars, [FGMVars.Cp.name], dtype=self._dt_np)
         projection_array_train, _ = self.__SetEnth_projection()
         T_scale = self._Y_scale[self._train_vars.index(FGMVars.Temperature.name)]
         h_scale = self._X_scale[self._controlling_vars.index(DefaultProperties.name_enth)]
@@ -407,7 +408,7 @@ class Train_FGM_PINN(PhysicsInformedTrainer):
         """
 
         # Extract specific heat and beta_h1 from flamelet data.
-        _, Y_boundary = GetReferenceData(self._boundary_data_file, x_vars=self._controlling_vars, train_variables=[FGMVars.Cp.name, FGMVars.Beta_Enth_Thermal.name],dtype=self._dt_np)
+        _, Y_boundary = readStateDataFromFile(self._boundary_data_file, self._controlling_vars, [FGMVars.Cp.name, FGMVars.Beta_Enth_Thermal.name],dtype=self._dt_np)
 
         Cp_boundary = Y_boundary[:,0]
         Beta_h1_boundary = Y_boundary[:,1]
@@ -612,7 +613,7 @@ class Train_FGM_PINN(PhysicsInformedTrainer):
         PlotFlameletData(self, self.__Config, self._train_name)
         self.__PlotUnbData()
         self.PlotR2Data()
-        self.write_SU2_MLP(self._save_dir + "/Model_"+str(self._model_index)+"/MLP_"+self._train_name)
+        self.writeMLPForSU2(self._save_dir + "/Model_"+str(self._model_index)+"/MLP_"+self._train_name)
         return super().CustomCallback()
 
     def add_additional_header_info(self, fid):
@@ -684,7 +685,7 @@ class NullMLP(CustomTrainer):
         """
         MLPData_filepath = self._filedata_train
         x_vars = self._controlling_vars
-        X_full, _ = GetReferenceData(MLPData_filepath + "_full.csv", x_vars, [],dtype=self._dt_np)
+        X_full, _ = readStateDataFromFile(MLPData_filepath + "_full.csv", x_vars, [],dtype=self._dt_np)
         self.scaler_function_x.fit(X_full)
 
         self._X_scale = self.scaler_function_x.scale_
@@ -729,7 +730,7 @@ class NullMLP(CustomTrainer):
         self.GetTrainData()
         self._Y_scale = np.ones(1)
         self._Y_offset = np.zeros(1)
-        self.write_SU2_MLP(self._save_dir + "/Model_"+str(self._model_index)+"/MLP_"+self._train_name)
+        self.writeMLPForSU2(self._save_dir + "/Model_"+str(self._model_index)+"/MLP_"+self._train_name)
         return
 
 class TrainMLP_FGM(TrainMLP):
@@ -861,15 +862,18 @@ class TrainMLP_FGM(TrainMLP):
 def PlotFlameletData(Trainer:MLPTrainer, Config:Config_FGM, train_name:str):
     N_plot = 3
 
-    flamelet_dir = Config.GetOutputDir()
+    flameletSolver = FreeFlameSolver(Config)
+    freeflame_dirs = os.sep.join((Config.GetOutputDir(), flameletSolver.getFlameletFolder()))
+    freeflame_phis = os.listdir(freeflame_dirs)
 
-    freeflame_phis = os.listdir(flamelet_dir + "/freeflame_data/")
     idx_phi_plot = np.random.randint(0, len(freeflame_phis), N_plot)
 
     freeflamelet_input_files = []
     for phi in idx_phi_plot:
-        freeflame_files = os.listdir(flamelet_dir + "/freeflame_data/"+freeflame_phis[phi])
-        freeflamelet_input_files.append(flamelet_dir + "/freeflame_data/"+freeflame_phis[phi]+ "/"+freeflame_files[np.random.randint(0, len(freeflame_files))])
+        flameletFolder = os.sep.join((freeflame_dirs, freeflame_phis[phi]))
+        freeflame_files = os.listdir(flameletFolder)
+        flameletFile = os.sep.join((flameletFolder, freeflame_files[np.random.randint(0, len(freeflame_files))]))
+        freeflamelet_input_files.append(flameletFile)
 
     # Prepare a figure window for each output variable.
     figs = []

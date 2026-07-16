@@ -29,7 +29,7 @@ import pickle
 import numpy as np
 
 from Common.Properties import DefaultProperties, ActivationFunctionOptions
-from Common.CommonMethods import write_SU2_MLP
+from Common.CommonMethods import writeMLPForSU2
 
 class Config:
     """Base class for the SU2 DataMiner configuration.
@@ -434,7 +434,7 @@ class Config:
         :param file_name_out: MLP file name
         :type file_name_out: str
         """
-        return write_SU2_MLP(file_name_out,\
+        return writeMLPForSU2(file_name_out,\
                              weights=self._MLP_weights,\
                              biases=self._MLP_biases,\
                              activation_function_name=self._activation_function,\
