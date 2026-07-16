@@ -1,4 +1,4 @@
-from su2dataminer.config import Config_FGM 
+from su2dataminer.config import Config_FGM
 from su2dataminer.manifold import SU2TableGenerator_FGM
 
 config = Config_FGM("methane_tabulation.cfg")
