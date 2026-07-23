@@ -404,7 +404,9 @@ class SU2TableGenerator_Base:
     
     def __writeParaViewVTK(self, cv_coordinates:np.ndarray[float], table_data:pandas.DataFrame, connectivity:np.ndarray[int], file_name_out:str):
         
-        pts = cv_coordinates
+        pts = np.asarray(cv_coordinates, dtype=float)
+        if pts.shape[1] == 2:
+            pts = np.column_stack((pts, np.zeros(len(pts))))
         conn = np.asarray(connectivity, dtype=np.int64)
         if conn.min() == 1:
             conn = conn - 1

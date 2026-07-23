@@ -123,7 +123,7 @@ is exceedingly sensitive to distance and to h.
         number_of_dimensions = unformatted_query_samples.ndim
         if number_of_dimensions == 1:
             self.__single_query_sample = True
-            return np.expand_dims(unformatted_query_samples, -1)
+            return unformatted_query_samples.reshape(1, -1)
         else:
             self.__single_query_sample = False
             return unformatted_query_samples

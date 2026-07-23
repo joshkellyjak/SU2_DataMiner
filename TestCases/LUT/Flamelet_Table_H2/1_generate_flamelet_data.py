@@ -1,5 +1,3 @@
-# Generate flamelet data for a single phi = 0.80 methane-air flame
-
 # Limit inner thread pools BEFORE any library imports to prevent oversubscription
 import os
 os.environ.setdefault("OMP_NUM_THREADS", "1")

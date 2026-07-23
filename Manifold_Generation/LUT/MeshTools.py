@@ -111,7 +111,7 @@ class Mesh2DPlane:
     def __createHullPerimiter(self):
         self._pointCloud_hullNodes = self.__findHullNodes()
         planeCurvLoop, perimiterTags = self.__createHullCurvLoop(self._pointCloud_hullNodes)
-        self.__perimiter_tag = self._gmsh_geo.addPhysicalGroup(1, perimiterTags, name="perimiter")
+        self.__perimiter_tag = self._gmsh_geo.addPhysicalGroup(1, perimiterTags, name="perimeter")
         return planeCurvLoop, perimiterTags
     
 
@@ -156,7 +156,7 @@ class Mesh2DPlane:
     
     def __filterNansFromPointCloud(self, point_cloud_3D:np.ndarray[float]):
         unique_pts_init = np.unique(point_cloud_3D, axis=0)
-        nans = np.isnan(unique_pts_init).all(1)
+        nans = np.isnan(unique_pts_init).any(1)
         pts_wo_nans = unique_pts_init[np.invert(nans)]
         return pts_wo_nans
 
@@ -388,7 +388,7 @@ class MeshThermodynamicPlane(Mesh2DPlane):
 
         hull_pts_orig = concave_hull(self._pointCloud_hullNodes, length_threshold=self._base_cell_size)
         ref_area = shoelace(hull_pts_orig)
-        within_hull = np.zeros(len(self.__saturation_curve_points),dtype=np.bool)
+        within_hull = np.zeros(len(self.__saturation_curve_points),dtype=bool)
 
         for i in range(len(self.__saturation_curve_points)):
             XY_with_pt = np.vstack((self._pointCloud_hullNodes[:,:2], pts_offset_upper[i,:]))
