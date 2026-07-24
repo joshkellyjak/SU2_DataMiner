@@ -508,7 +508,7 @@ class FlameletSolver_Cantera:
         self._concatenateThermoChemicalData(net_rates_labels, Y_dot_net)
         self._concatenateThermoChemicalData(pos_rates_labels, Y_dot_pos)
         self._concatenateThermoChemicalData(neg_rates_labels, Y_dot_neg)
-        return 
+        return
     
     def _concatenateThermoChemicalData(self, labels:list[str], data:np.ndarray[float]):
         solution_1D = (np.asarray(self._flameletSolution.T).ndim == 1)
@@ -519,7 +519,7 @@ class FlameletSolver_Cantera:
         output_df = pd.DataFrame()
         output_df[labels] = data_for_output
         self._thermochemical_solution = pd.concat((self._thermochemical_solution, output_df),axis=1)
-        return 
+        return
     
     def _writeInflowSettings(self):
         gas = ct.Solution(self._Config.GetReactionMechanism())
@@ -1102,7 +1102,7 @@ class EquilibriumSolver(FlameletSolver_Cantera):
         self._concatenateThermoChemicalData(net_rates_labels, Y_dot_net)
         self._concatenateThermoChemicalData(pos_rates_labels, Y_dot_pos)
         self._concatenateThermoChemicalData(neg_rates_labels, Y_dot_neg)
-        return 
+        return
     
 class CooledFlameInterpolator(FlameletSolver_Cantera):
     """Class for interpolated data between burner-stabilized flamelet and chemical equilibrium data
