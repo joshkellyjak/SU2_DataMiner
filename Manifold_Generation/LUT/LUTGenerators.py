@@ -235,7 +235,8 @@ class SU2TableGenerator_FGM(SU2TableGenerator_Base):
         h_min = self._Config.gas.enthalpy_mass
 
         # Define 2D grid between minimum and maximum progress variable and total enthalpy
-        pv_range = np.linspace(pv_unb, pv_b, 100)
+        delta_pv_unb = 1e-2*(pv_b - pv_unb)
+        pv_range = np.linspace(pv_unb-delta_pv_unb, pv_b, 100)
         h_range = np.linspace(h_min, h_max, 100)
         xgrid, ygrid = np.meshgrid(pv_range, h_range)
         zgrid = levelValue*np.ones(np.shape(xgrid))
