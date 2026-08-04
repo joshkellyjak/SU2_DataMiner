@@ -1,11 +1,11 @@
-import gmsh 
-import numpy as np 
+import gmsh
+import numpy as np
 from su2dataminer.config import Config_FGM
-from Data_Generation.FlameletSolvers import FreeFlameSolver 
+from Data_Generation.FlameletSolvers import FreeFlameSolver
 
 # Reactant temperature and equivalence ratio for simulation
-Tu = 350 
-eq_ratio = 0.7 
+Tu = 350
+eq_ratio = 0.7
 
 # Run an adiabatic flamelet simulation to estimate adiabatic flame speed and grid size.
 config = Config_FGM("methane_tabulation.cfg")
@@ -20,7 +20,7 @@ grid = np.array(solution["Distance"])
 dx = grid[1:]-grid[:-1]
 dx_min = min(dx)
 T = np.array(solution["Temperature"])
-dTdx = (T[1:] - T[:-1])/dx 
+dTdx = (T[1:] - T[:-1])/dx
 max_dTdx = max(dTdx)
 t_flame = (max(T) - min(T))/max_dTdx
 
@@ -36,9 +36,9 @@ gmsh.option.setNumber("Mesh.SaveAll",0)
 gmsh_geo = gmsh.model.geo
 gmsh_mesher = gmsh.model.mesh
 
-x_inlet = -4*t_flame 
-x_outlet = 10*t_flame 
-w_domain = 2*t_flame 
+x_inlet = -4*t_flame
+x_outlet = 10*t_flame
+w_domain = 2*t_flame
 dx_burner = 1.5*t_flame
 
 pts_inlet = [gmsh_geo.addPoint(x_inlet, 0, 0), gmsh_geo.addPoint(x_inlet, w_domain, 0)]
@@ -103,7 +103,7 @@ SPARK_REACTION_RATES= (200, 0, 0, 0)
 
 SPECIES_INIT = (__PV_INIT__, __ENTH_INIT__, 0, 0)
 
-% Passive reactants in flamelet problem 
+% Passive reactants in flamelet problem
 SPECIES_CLIPPING= YES
 SPECIES_CLIPPING_MAX= 1.0, 1e7, 1.0, 1.0
 SPECIES_CLIPPING_MIN= -1.0, -1e7, 0.0, 0.0
@@ -148,7 +148,7 @@ CONV_FIELD = RMS_EnthalpyTot
 CONV_RESIDUAL_MINVAL= -10
 CONV_STARTITER= 20
 SCREEN_OUTPUT = INNER_ITER RMS_PRESSURE RMS_ProgressVariable RMS_EnthalpyTot
-HISTORY_OUTPUT = WALL_TIME RMS_RES 
+HISTORY_OUTPUT = WALL_TIME RMS_RES
 VOLUME_OUTPUT = SOLUTION, PRIMITIVE, SOURCE, LOOKUP
 
 MESH_FORMAT= SU2
