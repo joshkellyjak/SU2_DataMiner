@@ -1,6 +1,7 @@
 import numpy as np
 import gmsh
 from concave_hull import concave_hull, concave_hull_indexes
+from collections.abc import Callable
 from Common.CommonMethods import shoelace, FiniteDifferenceDerivative
 
 def default_refinement_function(this, x:float, y:float, z:float):
@@ -150,6 +151,11 @@ class Mesh2DPlane:
         return hull_lines
     
     def setInitialPointCloud(self, point_could_3D:np.ndarray[float]):
+        """Provide the coordinates of the point cloud which space is discretized.
+
+        :param point_could_3D: normalized coordinates of the initial point cloud.
+        :type point_could_3D: np.ndarray[float]
+        """
         self.__pointCloud = self.__filterNansFromPointCloud(point_could_3D)
 
         return
@@ -219,6 +225,12 @@ class Mesh2DPlane:
         return hullTags
     
     def setBaseCellSize(self, cell_size_input:float):
+        """Provide the size metric for the coarse cells in the 2D mesh.
+
+        :param cell_size_input: coarse cell size
+        :type cell_size_input: float
+        :raises Exception: if the input is not strictly positive.
+        """
         if cell_size_input <= 0:
             raise Exception("Cell size should be strictly positive")
         self._base_cell_size = cell_size_input
@@ -247,17 +259,22 @@ class Mesh2DPlane:
         self._gmsh_mesher.setSizeCallback(meshSizeCallback)
         return
     
-    def setRefinementFunction(self, function_input):
+    def setRefinementFunction(self, function_input:Callable):
+        """Provide a function which dictates the local refinement in the 2D table.
+
+        :param function_input: Function that takes the normalized 3D mesh coordinates (x, y, z) as input and outputs the mesh refinement factor (0.0-1.0).
+        :type function_input: Callable
+        """
         self.refinement_function = function_input
         return
     
-    def getGmshFactory(self):
-        return self._gmsh_geo
-    
-    def getGmshMesher(self):
-        return self._gmsh_mesher
-    
     def setTargetNodeCount(self, Np_target:int=3000):
+        """Specify the target number of nodes in the 2D table. The number of nodes will be approximated within 1%.
+
+        :param Np_target: targeted number of nodes, defaults to 3000
+        :type Np_target: int, optional
+        :raises Exception: if the specified number is not strictly positive.
+        """
         if Np_target <= 0:
             raise Exception("Target number of nodes should be positive")
         self.__target_node_count = Np_target
@@ -265,12 +282,27 @@ class Mesh2DPlane:
         return
     
     def getMeshNodes(self):
+        """Returns the 3D mesh node locations.
+
+        :return: mesh node coordinates.
+        :rtype: np.ndarray[float]
+        """
         return self.__meshNodes
     
     def getConnectivity(self):
+        """Returns the connectivity information of the 2D table.
+
+        :return: mesh node connectivity information.
+        :rtype: np.ndarray[int]
+        """
         return self.__connectivity
     
     def getHullIDs(self):
+        """Returns the node indices of the perimiter of the 2D table.
+
+        :return: node indices of the perimiter.
+        :rtype: np.ndarray[int]
+        """
         return self.__hullNodeIDs
 
     def __printMessage(self, msg:str):
@@ -279,6 +311,11 @@ class Mesh2DPlane:
         return
     
     def setVerbosity(self, verbosity_level:int=1):
+        """Specify verbosity level of the table generator. No information will be displayed with a value 0. For a value 1, information on the mesh generation process are displayed in the terminal. For higher values, the 2D mesh is visualized through the Gmsh interface.
+
+        :param verbosity_level: verbosity level, defaults to 1
+        :type verbosity_level: int, optional
+        """
         self._mesher_verbosity = verbosity_level
         if self._mesher_verbosity > 1:
             self._gmsh_verbosity = 4

@@ -605,14 +605,14 @@ class SU2TableGenerator_Base:
         self.__inverse_distance_exponent = p_factor
         return
     
-    def setSmoothingParameter(self, smoothing_factor:float=0):
+    def setSmoothingParameter(self, smoothening_factor:float=0):
         """Apply smoothing to table data. High value = more smoothing, low value = no smoothing
 
-        :param smoothing_factor: _description_, defaults to 0
+        :param smoothing_factor: smoothing parameter value, defaults to 0
         :type smoothing_factor: float, optional
         """
         self.__smoothTableData = True
-        self.__smoothingLevel = smoothing_factor
+        self.__smoothingLevel = smoothening_factor
         return
     
     def setVerbosity(self, verbosity_level:int=1):
