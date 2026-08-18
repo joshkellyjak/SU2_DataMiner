@@ -8,7 +8,7 @@ Table-Based Flamelet-Generated Manifold for Methane Combustion
 ==============================================================
 
 
-This tutorial explains how to use *SU2 DataMiner* to generate a two-dimensional look-up table for methane FGM simulations in SU2.
+This tutorial explains how to use *SU2 DataMiner* to generate a two-dimensional look-up table for methane FGM simulations in SU2. Documentation on the table generator class can be found :ref:`here <doc_fgm_tabulation>`.
 The goal of the tutorial is to give the user some familiarity with the main steps involved with generating FGM tables for applications with two controlling variables.
 The steps of the tutorial are explained on this page with the use of code snippets and images. The python files for this tutorial can be found under **Tutorials->FGM->01_methane_tabulation**.
 

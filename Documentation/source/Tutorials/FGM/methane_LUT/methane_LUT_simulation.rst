@@ -5,6 +5,11 @@
 FGM Simulation of a Methane Flame using Tabulated Chemistry
 ===========================================================
 
+.. important::
+
+    Documentation in progress! 
+
+    
 This tutorial explains how to use *SU2 DataMiner* to set up the simulation of a premixed methane-air flame using the flamelet-generated manifold (FGM) method in *SU2*.
 The thermochemical state variables are retrieved from a two-dimensional look-up table. Instructions on how to generate the table can be found in :ref:`this tutorial<tutorial_methane_tabulation>`. 
 
