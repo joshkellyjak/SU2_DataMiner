@@ -18,7 +18,7 @@
 #                                                                                             |
 # Description:                                                                                |
 #   Table generator classes for generating SU2-supported tables for FGM and NICFD problems    |
-# Version: 3.1.0                                                                              |
+# Version: 3.2.0                                                                              |
 #                                                                                             |
 #=============================================================================================#
 

@@ -19,7 +19,7 @@
 # Description:                                                                                |
 #  Solvers used for flamelet data generation in SU2 DataMiner.                                |
 #                                                                                             |
-# Version: 3.1.0                                                                              |
+# Version: 3.2.0                                                                              |
 #                                                                                             |
 #=============================================================================================#
 import cantera as ct

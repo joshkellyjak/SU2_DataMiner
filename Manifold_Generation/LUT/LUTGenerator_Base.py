@@ -19,7 +19,7 @@
 # Description:                                                                                |
 #  Base class for tabulated methods in SU2 DataMiner                                          |
 #                                                                                             |
-# Version: 3.1.0                                                                              |
+# Version: 3.2.0                                                                              |
 #                                                                                             |
 #=============================================================================================#
 import numpy as np

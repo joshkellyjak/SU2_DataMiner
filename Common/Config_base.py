@@ -19,7 +19,7 @@
 # Description:                                                                                |
 #  Base class for DataMiner configuration                                                     |
 #                                                                                             |
-# Version: 3.1.0                                                                              |
+# Version: 3.2.0                                                                              |
 #                                                                                             |
 #=============================================================================================#
 
