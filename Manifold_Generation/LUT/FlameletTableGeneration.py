@@ -537,7 +537,7 @@ class SU2TableGenerator:
         PPV_test = D_test[:, self._Flamelet_Variables.index(var_to_test_for)]
         print("Done!")
         print("Setting up KD-tree...")
-        self._lookup_tree = Invdisttree(X=CV_train_scaled,z=D_train)
+        self._lookup_tree = Invdisttree(samples_state_space=CV_train_scaled,state_data=D_train)
         print("Done!")
 
         if not self._custom_KDtreeparams:
@@ -548,7 +548,7 @@ class SU2TableGenerator:
             RMS_ppv = np.zeros([len(n_near_range), len(p_range)])
             for i in tqdm(range(len(n_near_range))):
                 for j in range(len(p_range)):
-                    PPV_predicted = self._lookup_tree(q=CV_test_scaled, nnear=n_near_range[i], p=p_range[j])[:, self._Flamelet_Variables.index(var_to_test_for)]
+                    PPV_predicted = self._lookup_tree.query(query_samples=CV_test_scaled, nearest_neighbors=n_near_range[i], inverse_distance_exponent=p_range[j])[:, self._Flamelet_Variables.index(var_to_test_for)]
                     rms_local = np.average(np.power(PPV_predicted - PPV_test, 2))
                     RMS_ppv[i,j] = rms_local
             [imin,jmin] = divmod(RMS_ppv.argmin(), RMS_ppv.shape[1])
@@ -559,7 +559,7 @@ class SU2TableGenerator:
         print("Best found distance power: "+str(self._p_fac))
         print("Setting up KD-tree...")
         self._D_full = D_full
-        self._lookup_tree = Invdisttree(X=CV_full_scaled,z=D_full)
+        self._lookup_tree = Invdisttree(samples_state_space=CV_full_scaled,state_data=D_full)
         print("Done!")
         return
 
@@ -578,7 +578,7 @@ class SU2TableGenerator:
         CV_full_2d = self._D_full[:, self._plane_cv_idxs]
         self._scaler_2d = MinMaxScaler()
         CV_full_2d_scaled = self._scaler_2d.fit_transform(CV_full_2d)
-        self._lookup_tree = Invdisttree(X=CV_full_2d_scaled, z=self._D_full)
+        self._lookup_tree = Invdisttree(samples_state_space=CV_full_2d_scaled, state_data=self._D_full)
         print("Done!")
         return
 
@@ -587,7 +587,7 @@ class SU2TableGenerator:
             CV_scaled = self._scaler_2d.transform(CV_unscaled[:, self._plane_cv_idxs])
         else:
             CV_scaled = self._scaler.transform(CV_unscaled)
-        data_interp = self._lookup_tree(q=CV_scaled,nnear=self._n_near,p=self._p_fac)
+        data_interp = self._lookup_tree.query(query_samples=CV_scaled,nearest_neighbors=self._n_near,inverse_distance_exponent=self._p_fac)
         return data_interp
 
     def VisualizeTableLevel(self, val_mix_frac:float, var_to_plot:str=None):
@@ -624,7 +624,7 @@ class SU2TableGenerator:
             plt.show()
         return
 
-    def GenerateTableNodes(self):
+    def generateTableNodes(self):
         """
         Generate the table nodes and connectivity.
         """
@@ -717,7 +717,7 @@ class SU2TableGenerator:
         return [Nodes_dim, Tria, HullIdx, TableDataLevel]
 
 
-    def WriteTableFile(self, output_filepath:str=None):
+    def writeSU2Table(self, output_filepath:str=None):
         """
         Save the table data and connectivity as a Dragon library file. If no file name is provided,
         the table file will be named according to the Config_FGM class name.
@@ -739,14 +739,14 @@ class SU2TableGenerator:
         fid = open(file_out, "w+")
 
         if self._is_2D_table:
-            self.__WriteTableFile2D(fid)
+            self.__writeSU2Table2D(fid)
         else:
-            self.__WriteTableFile3D(fid)
+            self.__writeSU2Table3D(fid)
 
         fid.close()
         return
 
-    def __WriteTableFile2D(self, fid):
+    def __writeSU2Table2D(self, fid):
         """Write a 2D Dragon library file (version 1.0.1) for a single mixture-fraction level.
         The controlling variables are ProgressVariable and EnthalpyTot only."""
 
@@ -808,7 +808,7 @@ class SU2TableGenerator:
         print("Done!")
         return
 
-    def __WriteTableFile3D(self, fid):
+    def __writeSU2Table3D(self, fid):
         """Write a 3D multi-level Dragon library file (version 1.1.0)."""
 
         fid.write("Dragon library\n\n")
@@ -1211,8 +1211,8 @@ class SU2TableGenerator:
         species in ``species_list`` are forced to zero when their absolute value is
         below ``abs_tol``.
 
-        This method must be called after :meth:`GenerateTableNodes` and before
-        :meth:`WriteTableFile`.
+        This method must be called after :meth:`generateTableNodes` and before
+        :meth:`writeSU2Table`.
 
         :param species_list: species names to clamp (e.g. ``['CO', 'H2']``).
         :type species_list: list[str]
@@ -1307,8 +1307,8 @@ if __name__ == "__main__":
     T.InsertMixtureFractionLevel(0.01445)
     T.VisualizeTableLevel(0.01446751783896619)
     T.SetNTableLevels(200)
-    T.GenerateTableNodes()
-    T.WriteTableFile()
+    T.generateTableNodes()
+    T.writeSU2Table()
     # #T.InterpolateTableData()
-    # T.WriteTableFile()
+    # T.writeSU2Table()
     # T.SaveTableGenerator("LUT_"+Config.GetConfigName())

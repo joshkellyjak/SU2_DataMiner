@@ -417,17 +417,82 @@ class FlameletSolver_Cantera:
 
         solution_1D = (np.asarray(self._flameletSolution.T).ndim == 1)
 
-        # Species data
-        molar_fractions = self._flameletSolution.X
+        # Species mass fractions data
         mass_fractions = self._flameletSolution.Y
-
-        for species_index, species_name in enumerate(self._canteraSolution.species_names):
-            self._thermochemical_solution["Y-%s" % species_name] = np.asarray(mass_fractions[species_index])
+        species_labels = ["Y-%s" % sp for sp in self._canteraSolution.species_names]
+        self._concatenateThermoChemicalData(species_labels, mass_fractions)
         
+        self._collectSourceTermData()
+
         if solution_1D:
             molecular_weights = self._canteraSolution.molecular_weights[:,np.newaxis]
         else:
             molecular_weights = self._canteraSolution.molecular_weights
+        species_specific_heat = self._flameletSolution.partial_molar_cp / molecular_weights
+        species_specific_enthalpy = self._flameletSolution.partial_molar_enthalpies / molecular_weights
+
+        species_cp_labels = ["%s-%s" % (FGMVars.Cp.name, sp) for sp in self._canteraSolution.species_names]
+        species_h_labels = ["h-%s" % (sp) for sp in self._canteraSolution.species_names]
+        self._concatenateThermoChemicalData(species_cp_labels, species_specific_heat)
+        self._concatenateThermoChemicalData(species_h_labels, species_specific_enthalpy)
+        
+        Le_i = ComputeLewisNumber(self._flameletSolution)
+        if self._Config.GetTransportModel() == "unity-Lewis-number":
+            Le_i = np.ones(Le_i.shape)
+
+        Le_labels = ["Le-%s" % sp for sp in self._canteraSolution.species_names]
+        self._concatenateThermoChemicalData(Le_labels, Le_i)
+
+        # Enthalpy and mixture fraction
+        total_enthalpy = self._flameletSolution.enthalpy_mass
+
+        mixture_fraction_species_coefficients = self._Config.GetMixtureFractionCoefficients()
+        if solution_1D:
+            mixture_fraction_species_coefficients = mixture_fraction_species_coefficients[:,np.newaxis]
+        mixture_fraction_offset = self._Config.GetMixtureFractionConstant()
+        mixture_fraction = mixture_fraction_offset + np.sum(mixture_fraction_species_coefficients * mass_fractions,axis=0)
+
+        controlvar_df = pd.DataFrame()
+        controlvar_df[FGMVars.EnthalpyTot.name] = np.atleast_1d(total_enthalpy)
+        controlvar_df[FGMVars.MixtureFraction.name] = np.atleast_1d(mixture_fraction)
+
+        self._thermochemical_solution = pd.concat((self._thermochemical_solution, controlvar_df),axis=1)
+
+        thermodynamic_df = pd.DataFrame()
+        temperature = self._flameletSolution.T
+        thermodynamic_df[FGMVars.Temperature.name] = np.atleast_1d(temperature)
+
+        density = self._flameletSolution.density
+        thermodynamic_df[FGMVars.Density.name] = np.atleast_1d(density)
+
+        molar_fractions = self._flameletSolution.X
+        mean_molecular_weight = np.sum(molecular_weights * molar_fractions, axis=0)
+        thermodynamic_df[FGMVars.MolarWeightMix.name] = np.atleast_1d(mean_molecular_weight)
+
+        specific_heat_cp = self._flameletSolution.cp_mass
+        thermodynamic_df[FGMVars.Cp.name] = np.atleast_1d(specific_heat_cp)
+
+        conductivity = self._flameletSolution.thermal_conductivity
+        thermodynamic_df[FGMVars.Conductivity.name] = np.atleast_1d(conductivity)
+
+        dynamic_viscosity = self._flameletSolution.viscosity
+        thermodynamic_df[FGMVars.ViscosityDyn.name] = np.atleast_1d(dynamic_viscosity)
+
+        if solution_1D:
+            heat_release = self._flameletSolution.heat_release_rate
+        else:
+            heat_release = 0.0
+        thermodynamic_df[FGMVars.Heat_Release.name] = np.atleast_1d(heat_release)
+
+        self._thermochemical_solution = pd.concat((self._thermochemical_solution, thermodynamic_df),axis=1)
+
+        self._writeInflowSettings()
+        
+        return
+
+    def _collectSourceTermData(self):
+        mass_fractions = self._flameletSolution.Y
+        molecular_weights = self._canteraSolution.molecular_weights[:,np.newaxis]
 
         net_reaction_rate = self._flameletSolution.net_production_rates
         neg_reaction_rate = self._flameletSolution.destruction_rates
@@ -435,63 +500,27 @@ class FlameletSolver_Cantera:
         Y_dot_net = net_reaction_rate * molecular_weights
         Y_dot_pos = pos_reaction_rate * molecular_weights
         Y_dot_neg = -neg_reaction_rate * molecular_weights / (mass_fractions+1e-11)
-        for species_index, species_name in enumerate(self._canteraSolution.species_names):
-            self._thermochemical_solution["Y_dot_net-%s" % species_name] = Y_dot_net[species_index]
-        for species_index, species_name in enumerate(self._canteraSolution.species_names):
-            self._thermochemical_solution["Y_dot_pos-%s" % species_name] = Y_dot_pos[species_index]
-        for species_index, species_name in enumerate(self._canteraSolution.species_names):
-            self._thermochemical_solution["Y_dot_neg-%s" % species_name] = Y_dot_neg[species_index]
-        species_specific_heat = self._flameletSolution.partial_molar_cp / molecular_weights
-        species_specific_enthalpy = self._flameletSolution.partial_molar_enthalpies / molecular_weights
 
-        for species_index, species_name in enumerate(self._canteraSolution.species_names):
-            self._thermochemical_solution["%s-%s" % (FGMVars.Cp.name, species_name)] = species_specific_heat[species_index]
-        for species_index, species_name in enumerate(self._canteraSolution.species_names):
-            self._thermochemical_solution["h-%s" % ( species_name)] = species_specific_enthalpy[species_index]
+        net_rates_labels = ["Y_dot_net-%s" % sp for sp in self._canteraSolution.species_names]
+        pos_rates_labels = ["Y_dot_pos-%s" % sp for sp in self._canteraSolution.species_names]
+        neg_rates_labels = ["Y_dot_neg-%s" % sp for sp in self._canteraSolution.species_names]
 
-        Le_i = ComputeLewisNumber(self._flameletSolution)
-        if self._Config.GetTransportModel() == "unity-Lewis-number":
-            Le_i = np.ones(Le_i.shape)
-        for species_index, species_name in enumerate(self._canteraSolution.species_names):
-            self._thermochemical_solution["Le-%s" % species_name] = Le_i[species_index]
-
-        # Enthalpy and mixture fraction
-        total_enthalpy = self._flameletSolution.enthalpy_mass
-        self._thermochemical_solution[FGMVars.EnthalpyTot.name] = total_enthalpy
-
-        mixture_fraction_species_coefficients = self._Config.GetMixtureFractionCoefficients()
-        if solution_1D:
-            mixture_fraction_species_coefficients = mixture_fraction_species_coefficients[:,np.newaxis]
-        mixture_fraction_offset = self._Config.GetMixtureFractionConstant()
-        mixture_fraction = mixture_fraction_offset + np.sum(mixture_fraction_species_coefficients * mass_fractions,axis=0)
-        self._thermochemical_solution[FGMVars.MixtureFraction.name] = mixture_fraction
-    
-        temperature = self._flameletSolution.T
-        self._thermochemical_solution[FGMVars.Temperature.name] = temperature
-
-        density = self._flameletSolution.density
-        self._thermochemical_solution[FGMVars.Density.name] = density
-
-        mean_molecular_weight = np.sum(molecular_weights * molar_fractions, axis=0)
-        self._thermochemical_solution[FGMVars.MolarWeightMix.name] = mean_molecular_weight
-
-        specific_heat_cp = self._flameletSolution.cp_mass
-        self._thermochemical_solution[FGMVars.Cp.name] = specific_heat_cp
-
-        conductivity = self._flameletSolution.thermal_conductivity
-        self._thermochemical_solution[FGMVars.Conductivity.name] = conductivity
-
-        dynamic_viscosity = self._flameletSolution.viscosity
-        self._thermochemical_solution[FGMVars.ViscosityDyn.name] = dynamic_viscosity
-
-        
-        heat_release = self._flameletSolution.heat_release_rate
-        self._thermochemical_solution[FGMVars.Heat_Release.name] = heat_release
-
-        self._writeInflowSettings()
-        
+        self._concatenateThermoChemicalData(net_rates_labels, Y_dot_net)
+        self._concatenateThermoChemicalData(pos_rates_labels, Y_dot_pos)
+        self._concatenateThermoChemicalData(neg_rates_labels, Y_dot_neg)
         return
-
+    
+    def _concatenateThermoChemicalData(self, labels:list[str], data:np.ndarray[float]):
+        solution_1D = (np.asarray(self._flameletSolution.T).ndim == 1)
+        if solution_1D:
+            data_for_output = data.transpose()
+        else:
+            data_for_output = np.atleast_2d(data)
+        output_df = pd.DataFrame()
+        output_df[labels] = data_for_output
+        self._thermochemical_solution = pd.concat((self._thermochemical_solution, output_df),axis=1)
+        return
+    
     def _writeInflowSettings(self):
         gas = ct.Solution(self._Config.GetReactionMechanism())
         if self._Config.GetMixtureStatus():
@@ -503,9 +532,12 @@ class FlameletSolver_Cantera:
             gas.set_equivalence_ratio(self._reactant_mixture_status, self._Config.GetFuelString(), self._Config.GetOxidizerString())
             reactant_mixture_fraction = gas.mixture_fraction(self._Config.GetFuelString(), self._Config.GetOxidizerString())
         
-        self._thermochemical_solution["ReactantMixtureFraction"] = reactant_mixture_fraction
-        self._thermochemical_solution["ReactantEquivalenceRatio"] = reactant_equivalence_ratio
-        self._thermochemical_solution["ReactantTemperature"] = self._T_reactants
+        inflow_df = pd.DataFrame()
+        n_grid_points = len(self._thermochemical_solution[FGMVars.Temperature.name])
+        inflow_df["ReactantMixtureFraction"] = reactant_mixture_fraction*np.ones(n_grid_points)
+        inflow_df["ReactantEquivalenceRatio"] = reactant_equivalence_ratio*np.ones(n_grid_points)
+        inflow_df["ReactantTemperature"] = self._T_reactants*np.ones(n_grid_points)
+        self._thermochemical_solution = pd.concat((self._thermochemical_solution, inflow_df),axis=1)
         return
     
     def _extractFlameletDiscretization(self):
@@ -1058,6 +1090,20 @@ class EquilibriumSolver(FlameletSolver_Cantera):
     def getReactantData(self):
         return self.__solution_reactants
     
+    def _collectSourceTermData(self):
+        Y_dot_net = np.zeros(self._canteraSolution.n_species)
+        Y_dot_pos = np.zeros(self._canteraSolution.n_species)
+        Y_dot_neg = np.zeros(self._canteraSolution.n_species)
+
+        net_rates_labels = ["Y_dot_net-%s" % sp for sp in self._canteraSolution.species_names]
+        pos_rates_labels = ["Y_dot_pos-%s" % sp for sp in self._canteraSolution.species_names]
+        neg_rates_labels = ["Y_dot_neg-%s" % sp for sp in self._canteraSolution.species_names]
+
+        self._concatenateThermoChemicalData(net_rates_labels, Y_dot_net)
+        self._concatenateThermoChemicalData(pos_rates_labels, Y_dot_pos)
+        self._concatenateThermoChemicalData(neg_rates_labels, Y_dot_neg)
+        return
+    
 class CooledFlameInterpolator(FlameletSolver_Cantera):
     """Class for interpolated data between burner-stabilized flamelet and chemical equilibrium data
     """
@@ -1190,7 +1236,7 @@ class CounterFlowDiffusionFlameSolver(FlameletSolver_Cantera):
 
     def __init__(self, config_input):
         super().__init__(config_input)
-        self._flameletTypeOutputFolder = "counterflame_data"
+        self._flameletTypeOutputFolder = "counterflame_data_n"
         self._flamelet_type = "CounterFlowDiffusionFlame"
         self._plotLabel = "Counter-flow diffusion flame"
         self._is_premixed = False

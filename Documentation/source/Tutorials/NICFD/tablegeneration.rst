@@ -24,7 +24,9 @@ To get started, you will need to have installed SU2 DataMiner according to the :
 As for any process within the SU2 DataMiner workflow, all settings regarding the setup of the fluid data generation and tabulation are stored in an SU2 DataMiner :ref:`configuration object <NICFD>`.
 The tutorial for setting up a generic SU2 DataMiner configuration can be found :ref:`here <tutorialconfigs>`. 
 
-In this example, a look-up table will be created for the application of modeling fluid properties of carbondioxide in supercritical conditions.
+In this example, a look-up table will be created for the application of modeling fluid properties of **carbondioxide** in **two-phase**, **super-critical** conditions.
+The **Helmholtz equation of state** model is used to calculate thermodynamic properties of carbon dioxide throughout the thermodynamic state space with the density ranging between 0.2 and 400 kg/m3 and the static energy ranging between 1000 and 1e6 J/kg.
+
 The following Python code snippet shows the initial set-up of the configuration object.
 
 
@@ -39,12 +41,13 @@ The following Python code snippet shows the initial set-up of the configuration 
     config.SetFluid("CarbonDioxide")
     config.SetEquationOfState("HEOS")
 
-    # Automatically determine fluid data range.
     config.IncludeTransportProperties(True)
-    config.UseAutoRange(True)
+    config.UseAutoRange(False)
     config.SetNpDensity(200)
     config.SetNpEnergy(200)
-
+    config.SetDensityBounds(2.0, 400)
+    config.SetEnergyBounds(1000, 1e6)
+    
     # Enable gas, liquid, two-phase, and supercritical phases.
     config.EnableGasPhase(True)
     config.EnableLiquidPhase(True)
@@ -59,17 +62,15 @@ The following Python code snippet shows the initial set-up of the configuration 
 Running this code snippet will display all relevant information of the configuration in the terminal and will save the configuration as a 
 binary file titled "tabulation_carbondioxide.cfg". 
 
-Configuration settings such as the number of nodes along the density and energy direction can later be changed when setting up the table generator.
-
-
 
 2. Tabulation Example 
 ---------------------
 
+
 Thermodynamic tables can be created with the :ref:`SU2TableGenerator_NICFD <doc_nicfd_tabulation>` class which is initiated with the SU2 DataMiner configuration object.
-The following code snippet shows how to initiate the table generator and generate a basic look-up table with refinement around the saturation curve.
-Running this code snippet produces two table files. The "LUT_vtk.vtk" file can be used to inspect the table contents using post-processing software such as *ParaView*.
-The "LUT_SU2.drg" file is the table file which can be loaded into SU2 for NICFD simulations.
+The following code snippet shows how to initiate the table generator and generate a basic look-up table for two-phase applications.
+Running this code snippet produces **two table files**. The "LUTtest.vtk" can be loaded into **ParaView** to visually inspect the table contents. 
+The "LUT_test.drg" file is the table file which can be loaded into **SU2** for NICFD simulations.
 
 .. code-block::
 
@@ -79,17 +80,19 @@ The "LUT_SU2.drg" file is the table file which can be loaded into SU2 for NICFD 
 
 
     config = Config_NICFD("tabulation_carbondioxide.cfg")
+    config.EnableTwophase(True)
 
     tgen = SU2TableGenerator_NICFD(config)
-    tgen.SetTableDiscretization("adaptive")
+    tgen.setNNearestNeighbors(19)
+    tgen.setInverseDistanceExponent(2)
+    tgen.setMaximumCellSize(1e-2)
+    tgen.setVerbosity(2)
+    tgen.generateTable()
+    tgen.writeSU2Table("LUT_test")
+    tgen.writeParaviewTable("LUTtest")
 
-    tgen.GenerateTable()
-    tgen.WriteOutParaview("LUT_vtk")
-    tgen.WriteTableFile("LUT_SU2")
 
-
-
-You can inspect the table content by loading the vtk file in ParaView with the x- and y-dimensions corresponding to the scaled density and static energy.
+You can **inspect** the table content by loading the vtk file in ParaView with the x- and y-dimensions corresponding to the **scaled density and static energy**.
 
 .. figure:: tables_1.png
    :scale: 50 %
@@ -97,74 +100,35 @@ You can inspect the table content by loading the vtk file in ParaView with the x
 
    Temperature, pressure, and speed of sound of the look-up table generated with the previous code snippet.
 
-3. Discretization type
-----------------------
+The figure below shows the connectivity of the table nodes. All tables generated with *SU2 DataMiner* use **triangular cells** to connect the table nodes.
+The topology of the cells **around the saturation curve** is modified for tables with two-phase fluid data. Consult the :ref:`NICFD table generation documentation page <doc_nicfd_tabulation>` for details.
 
-Currently, the table generator supports two discretization types: Cartesian and adaptive. 
-With Cartesian discretization, the table nodes are placed on a mesh grid in the density-static energy space within the specified bounds.
-The table resolution can be adapted by changing the number of nodes in the density and energy direction. See the :ref:`documentation page on table refinement settings <doc_nicfd_tabulation_refinement>` for details.
-A Cartesian table generally contains fewer nodes than an adaptive table and is therefore more memory efficient in NICFD simulations.
-The following code snippet generates a Cartesian table with a maximum of 400x400 nodes.
-
-.. code-block::
-
-    tgen = SU2TableGenerator_NICFD(config)
-    tgen.SetTableDiscretization("cartesian")
-    tgen.SetNpDensity(400)
-    tgen.SetNpEnergy(400)
-    tgen.GenerateTable()
-    tgen.WriteOutParaview("LUT_cartesian")
-
-With an adaptive approach, the thermodynamic state space is discretized using an unstructured approach. 
-Using the adaptive approach, the thermodynamic state space is initially discretized with a Cartesian approach.
-Then, the thermodynamic state space is discretized with a coarse, unstructured grid.
-Finally, the table is locally refined based on user-defined criteria. For two-phase applications, the region around the saturation curve is refined in order to accurately capture phase transitions.
-More information on the adaptive table refinement method can be found :ref:`here <doc_nicfd_tabulation_refinement>`.
-The following code snippet generates a thermodynamic table using the adaptive method. 
-
-.. code-block::
-
-    tgen = SU2TableGenerator_NICFD(config)
-    tgen.SetTableDiscretization("adaptive")
-    tgen.SetNpDensity(20)
-    tgen.SetNpEnergy(20)
-    tgen.SetCellSize_Coarse(2e-2)
-    tgen.SetCellSize_Refined(1e-2)
-    tgen.GenerateTable()
-    tgen.WriteOutParaview("LUT_adaptive")
-
-
-.. figure:: Cartesian_adaptive_table.png
+.. figure:: discretization_base.png
    :scale: 50 %
-   :alt: 
+   :alt: this is a detailed caption of the image
 
-   Section of the Cartesian look-up table (left) and of the adaptively adapted look-up table(right)
+   Cell topology of the example table.
 
-
-
-4. Changing table limits 
+3. Changing table limits 
 ------------------------
 
-By default, the table limits are determined based on the settings in the loaded configuration.
-These settings can be overwritten by the table generator. The following code snippet shows how to manually change the table limits.
-
+The table limits are determined based on the settings in the loaded configuration. Therefore, in order to generate two tables with different limits, the table generator needs to be re-initialized from the configuration with adjusted table limits.
 
 .. code-block::
 
     config = Config_NICFD("tabulation_carbondioxide.cfg")
+    config.SetDensityBounds(2.0, 400)
+    config.SetEnergyBounds(1000, 1e6)
 
     tgen = SU2TableGenerator_NICFD(config)
-    tgen.SetNpDensity(200)
-    tgen.SetNpEnergy(200)
-    tgen.SetDensityBounds(2.0, 400)
-    tgen.SetEnergyBounds(1000, 1e6)
-    tgen.SetTableDiscretization("cartesian")
-    tgen.GenerateTable()
-    tgen.WriteOutParaview("LUT_small")
+    
+    tgen.generateTable()
+    tgen.writeParaviewTable("LUT_small")
 
-    tgen.SetEnergyBounds(1000, 2e6)
-    tgen.GenerateTable()
-    tgen.WriteOutParaview("LUT_large")
+    config.SetEnergyBounds(1000, 2e6)
+    tgen = SU2TableGenerator_NICFD(config)
+    tgen.generateTable()
+    tgen.writeParaviewTable("LUT_large")
 
 
 .. figure:: small_large_table.png
@@ -175,15 +139,12 @@ These settings can be overwritten by the table generator. The following code sni
 
 
 
-5. Adaptive table resolution and refinement 
--------------------------------------------
+4. Table resolution and refinement 
+----------------------------------
 
-The adaptive method for table refinement enables the generation of highly refined thermodynamic tables which are more suitable for challenging NICFD applications compared to using Cartesian tables.
-This section showcases some of the functionalities of the adaptive table refinement methods.
+The thermodynamic state space is discretized by 2D elements with constant size by default. The cell size can be specified manually or determined automatically based on a target number of nodes.
 For more information on the specific methods, go to the :ref:`documentation page for table refinement settings <doc_nicfd_tabulation_refinement>`.
-
-Using the adaptive method, the thermodynamic state space is discretized in coarse and fine cells.
-The size of the coarse and refined elements can be changed, based on the desired table resolution. The following code snippet shows how to generate two thermodynamic tables with different refinement settings.
+The following code snippet shows how to generate two thermodynamic tables with the maximum cell size manually specified.
 
 .. code-block::
 
@@ -195,38 +156,65 @@ The size of the coarse and refined elements can be changed, based on the desired
     config = Config_NICFD("tabulation_carbondioxide.cfg")
 
     tgen = SU2TableGenerator_NICFD(config)
-    tgen.SetNpDensity(20)
-    tgen.SetNpEnergy(20)
-    tgen.SetDensityBounds(2.0, 400)
-    tgen.SetEnergyBounds(1000, 1e6)
-    tgen.SetTableDiscretization("adaptive")
-    tgen.SetCellSize_Coarse(2e-2)
-    tgen.SetCellSize_Refined(1e-2)
-    tgen.GenerateTable()
-    tgen.WriteOutParaview("LUT_coarse")
+    tgen.setMaximumCellSize(2e-2)
+    tgen.generateTable()
+    tgen.writeParaviewTable("LUT_coarse")
 
-    tgen.SetCellSize_Coarse(1e-2)
-    tgen.SetCellSize_Refined(5e-3)
-    tgen.GenerateTable()
-    tgen.WriteOutParaview("LUT_fine")
+    tgen.setMaximumCellSize(1e-2)
+    tgen.generateTable()
+    tgen.writeParaviewTable("LUT_fine")
 
 
 
-.. figure:: coarse_refined.png
+.. figure:: Coarse_refined_cell_size.png
+   :scale: 50 %
+   :alt: 
+
+   Look-up table with lower resolution (left) and higher resolution (right)
+
+For better control of the runtime memory requirement of the table, it is also possible to generate a table with a specified approximate number of nodes.
+Using this approach, the table generator will iterate the maximum cell size until the number of nodes in the table lies within 1% of the target.
+The following code snippet shows how to generate tables with a specified target number of nodes. By setting the verbosity level to 2, the convergence history is printed in the terminal.
+
+
+.. code-block::
+
+    #!/usr/bin/env python3
+    from su2dataminer.config import Config_NICFD 
+    from su2dataminer.manifold import SU2TableGenerator_NICFD
+
+
+    config = Config_NICFD("tabulation_carbondioxide.cfg")
+
+    tgen = SU2TableGenerator_NICFD(config)
+    tgen.setVerbosity(2)
+    tgen.setTargetNodeCount(2000)
+    tgen.generateTable()
+    tgen.writeParaviewTable("LUT_coarse_n")
+
+    tgen.setTargetNodeCount(4000)
+    tgen.generateTable()
+    tgen.writeParaviewTable("LUT_fine_n")
+
+.. figure:: Coarse_refined_node_count.png
    :scale: 50 %
    :alt: 
 
    Look-up table with lower resolution (left) and higher resolution (right)
 
 
-For adaptive tables of fluid data which include two-phase data, the thermodynamic region around the saturation curve is automatically refined.
-In addition, the user can specify user-defined refinement criteria, where the table is refined **within** bounds of specific thermodynamic state properties.
-For example, adding the following criterion refines the table in the region where the fluid density lies between 0.0 and 100 kg/m3.
-
+The *SU2 DataMiner* table generator supports the use of adaptive local refinement based on thermodynamic quantities.
+The user can specify a thermodynamic quantity, the bounds **within** which refinement is applied, and the **refinement factor** applied to the affected area of the table.
+The refined cell size is equal to the product of the refinement factor and the maximum cell size. 
+The following code snippet shows the command used to double the mesh resolution in the area of the table where the density lies between 0 and 100 kg/m3.
 
 .. code-block::
 
-    tgen.AddRefinementCriterion("Density", 0, 100.0)
+    tgen.applyRefinementWithin("Density", 0, 100.0, 0.5)
+
+
+Keep in mind that applying local refinement notably increases the time it takes to generate the table, especially when iterating to reach a target number of nodes.
+The figure below shows the edges of a thermodynamic table with 4000 nodes with the density refinement criterion applied, alongside the contour of density equal to 100 kg/m3.
 
 
 .. figure:: refined_density.png
@@ -235,11 +223,13 @@ For example, adding the following criterion refines the table in the region wher
 
    Example of adaptive table refinement based on density criteria.
 
-Similarly, if additional refinement is required in the two-phase region, the refinement criterion can be based on the value of the vapor quality.
+
+Local adaptive refinement applies to all thermophysical state quantities calculated by the NICFD data generator. For two-phase problems, it is therefore also possible to apply additional refinement in only the two-phase region, demonstrated by the following code snippet.
+The refinement factor value does not need to be specified; the default value is set to 0.5.
 
 .. code-block::
 
-    tgen.AddRefinementCriterion("VaporQuality", 0.0, 1.0)
+    tgen.applyRefinementWithin("VaporQuality", 0.0, 1.0)
 
 .. figure:: refined_vaporquality.png
    :scale: 50 %
@@ -247,14 +237,14 @@ Similarly, if additional refinement is required in the two-phase region, the ref
 
    Adaptive table refinement in the two-phase region.
 
-To increase the accuracy of the look-up table in isentropic or near-isentropic flows, the refinement criterion can be applied around the expected value of the entropy.
-This results in a refined region around a desired isentrope. 
 
+For fluid simulations of nearly isentropic flows, an effective method for improving the efficiency of the table is to apply refinement around an isentrope. 
+The following code snippet demonstrates how to apply refinement around a specific isentrope in the table. 
 
 .. code-block::
 
     isentrope = 2300
-    tgen.AddRefinementCriterion("s", isentrope-10.0, isentrope+10.0)
+    tgen.applyRefinementWithin("s", isentrope-100.0, isentrope+100.0)
 
 
 .. figure:: refined_isentrope.png
@@ -263,15 +253,16 @@ This results in a refined region around a desired isentrope.
 
    Example of adaptive table refinement around an isentrope.
 
-Finally, the table generator is not limited to one user-defined refinement criterion. Multiple criteria can be applied.
 
+Finally, multiple local adaptive refinement criteria with different settings can be applied simultaneously.
+In the following code snippet, refinement is applied around the isentrope and in the low-density region of the table. 
+The order in which these refinement criteria is specified does not affect the outcome; the local cell size is determined based on the criterion with the lowest refinement factor.
 
 .. code-block::
 
     isentrope = 2300
-    tgen.AddRefinementCriterion("s", isentrope-10.0, isentrope+10.0)
-    tgen.AddRefinementCriterion("Density", 0.0, 30.0)
-
+    tgen.applyRefinementWithin("s", isentrope-100.0, isentrope+100.0, 0.5)
+    tgen.applyRefinementWithin("Density", 0, 100, 0.3)
 
 .. figure:: refined_density_isentrope.png
    :scale: 50 %
@@ -280,7 +271,7 @@ Finally, the table generator is not limited to one user-defined refinement crite
    Example of adaptive table refinement based on multiple criteria.
 
 
-6. Table quantities 
+5. Table quantities 
 -------------------
 
 The size of the look-up table depends on the number of nodes in the table and the number of thermophyscial variables. 
@@ -292,6 +283,27 @@ Density and static energy are always included in the list. If the generation of 
 
 .. code-block::
 
-    tgen.SetTableVars(["Density","Energy", "c2", "T", "p"])
+    tgen.setTableVars(["Density","Energy", "c2", "T", "p"])
 
 
+6. Table data smoothing
+-----------------------
+
+
+Several thermodynamic quantities are discontinuous accross the saturation curve. Although this is a physical process, it may cause convergence problems when running NICFD simulations, especially when initializing the flow field. 
+To improve the robustness of NICFD simulations, it helps to smoothen the table data. This will smoothen the transition between two-phase and single-phase fluid properties accross the saturation curve, making it easier for the flow solver to handle phenomena such as vaprisation onset and condensation.
+The level of table smoothing can be specified through the **smoothing parameter**, demonstrated by the command in the following code snippet.
+
+
+.. code-block:: 
+
+    tgen.setSmoothingParameter(0.5)
+
+
+Increasing the value of the smoothing parameter increases the amount of smoothing applied to the table data, but will also decrease the accuracy of the thermodynamic data in the table. For more details on the table smoothing method, consult the :ref:`documentation page <doc_nicfd_tabulation_refinement>`. for table generation.
+
+.. figure:: table_smoothing.png
+   :scale: 50 %
+   :alt: 
+
+   Tabulated vapor quality without smoothing (left) and with a smoothing factor of 0.5 (right).
