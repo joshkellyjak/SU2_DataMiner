@@ -1,31 +1,6 @@
-#!/usr/bin/env python3
 
-###############################################################################################
-#       #      _____ __  _____      ____        __        __  ____                   #        #
-#       #     / ___// / / /__ \    / __ \____ _/ /_____ _/  |/  (_)___  ___  _____   #        #
-#       #     \__ \/ / / /__/ /   / / / / __ `/ __/ __ `/ /|_/ / / __ \/ _ \/ ___/   #        #
-#       #    ___/ / /_/ // __/   / /_/ / /_/ / /_/ /_/ / /  / / / / / /  __/ /       #        #
-#       #   /____/\____//____/  /_____/\__,_/\__/\__,_/_/  /_/_/_/ /_/\___/_/        #        #
-#       #                                                                            #        #
-###############################################################################################
-
-############################ FILE NAME: generate_config.py ####################################
-#=============================================================================================#
-# author: Evert Bunschoten                                                                    |
-#    :PhD Candidate ,                                                                         |
-#    :Flight Power and Propulsion                                                             |
-#    :TU Delft,                                                                               |
-#    :The Netherlands                                                                         |
-#                                                                                             |
-#                                                                                             |
-# Description:                                                                                |
-#   Generate SU2 DataMiner configuration for hydrogen tabulation test case.                   |
-# Version: 3.1.0                                                                              |
-#                                                                                             |
-#=============================================================================================#
-
-from su2dataminer.config import Config_FGM
-import os 
+from Common.DataDrivenConfig import FlameletAIConfig
+import os
 
 Config = Config_FGM()
 Config.SetConfigName("TableGeneration")
@@ -51,8 +26,7 @@ Config.SetProgressVariableDefinition(pv_species=['H2', 'H', 'O2', 'O', 'H2O', 'O
 flamelet_data_dir = os.getcwd() + "/flamelet_data/"
 if not os.path.isdir(flamelet_data_dir):
     os.mkdir(flamelet_data_dir)
-Config.SetOutputDir(flamelet_data_dir) 
+Config.SetOutputDir(flamelet_data_dir)
 
-# Display settings and save configuration
 Config.PrintBanner()
 Config.SaveConfig()

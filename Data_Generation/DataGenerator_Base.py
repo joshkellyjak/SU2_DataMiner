@@ -1,8 +1,8 @@
 ###############################################################################################
-#       #      _____ __  _____      ____        __        __  ____                   #        #  
-#       #     / ___// / / /__ \    / __ \____ _/ /_____ _/  |/  (_)___  ___  _____   #        #  
-#       #     \__ \/ / / /__/ /   / / / / __ `/ __/ __ `/ /|_/ / / __ \/ _ \/ ___/   #        #      
-#       #    ___/ / /_/ // __/   / /_/ / /_/ / /_/ /_/ / /  / / / / / /  __/ /       #        #  
+#       #      _____ __  _____      ____        __        __  ____                   #        #
+#       #     / ___// / / /__ \    / __ \____ _/ /_____ _/  |/  (_)___  ___  _____   #        #
+#       #     \__ \/ / / /__/ /   / / / / __ `/ __/ __ `/ /|_/ / / __ \/ _ \/ ___/   #        #
+#       #    ___/ / /_/ // __/   / /_/ / /_/ / /_/ /_/ / /  / / / / / /  __/ /       #        #
 #       #   /____/\____//____/  /_____/\__,_/\__/\__,_/_/  /_/_/_/ /_/\___/_/        #        #
 #       #                                                                            #        #
 ###############################################################################################
@@ -17,19 +17,19 @@
 #                                                                                             |
 #                                                                                             |
 # Description:                                                                                |
-#  Base class for generating fluid data for data mining purposes.                             |                                                               
-#                                                                                             |  
-# Version: 3.1.0                                                                              |
+#  Base class for generating fluid data for data mining purposes.                             |
+#                                                                                             |
+# Version: 3.2.0                                                                              |
 #                                                                                             |
 #=============================================================================================#
 
-import os 
+import os
 
 #---------------------------------------------------------------------------------------------#
 # Importing DataMiner classes and functions
 #---------------------------------------------------------------------------------------------#
-from Common.Properties import DefaultProperties 
-from Common.Config_base import Config 
+from Common.Properties import DefaultProperties
+from Common.Config_base import Config
 
 
 class DataGenerator_Base:
@@ -44,7 +44,7 @@ class DataGenerator_Base:
     __output_file_header:str   # Fluid data output file header.
 
     __output_dir:str    # Path location at which to save fluid data.
-    
+
     def __init__(self, Config_in:Config=None):
         """Class constructor, define data generator optionally through SU2 DataMiner configuration. If no configuration is provided, default settings are applied.
 
@@ -63,8 +63,8 @@ class DataGenerator_Base:
         self.__output_dir = self._Config.GetOutputDir()
         self.__output_file_header = self._Config.GetConcatenationFileHeader()
 
-        return 
-    
+        return
+
     def SetOutputDir(self, output_dir:str):
         """
         Define the fluid data output directory. This directory is set as the default storage directory
@@ -79,8 +79,8 @@ class DataGenerator_Base:
         else:
             self.__output_dir = output_dir
 
-        return 
-    
+        return
+
     def GetOutputDir(self):
         """
         Get the current DataMiner configuration fluid storage directory.
@@ -94,7 +94,7 @@ class DataGenerator_Base:
             raise Exception("Saved output directory not present on current machine.")
         else:
             return self.__output_dir
-        
+
     def SetConcatenationFileHeader(self, header:str=DefaultProperties.output_file_header):
         """
         Define the file name header for the collection of fluid data.
@@ -102,31 +102,31 @@ class DataGenerator_Base:
         :param header: file name header.
         :type header: str
         """
-        self.__output_file_header = header 
-        return 
-    
+        self.__output_file_header = header
+        return
+
     def GetConcatenationFileHeader(self):
         """Get fluid data output file header.
 
         :return: output file header.
         :rtype: str
         """
-        return self.__output_file_header 
-    
+        return self.__output_file_header
+
 
     def SetTrainFraction(self, input:float=DefaultProperties.train_fraction):
         """
         Define the fraction of fluid data used for training multi-layer perceptrons.
 
         :param input: fluid data train fraction.
-        :type input: float 
+        :type input: float
         :raise: Exception: if provided fraction is equal or higher than one.
         """
         if input >= 1 or input <=0:
             raise Exception("Training data fraction should be between zero and one.")
-        self.__train_fraction = input 
-        return 
-    
+        self.__train_fraction = input
+        return
+
     def SetTestFraction(self, input:float=DefaultProperties.test_fraction):
         """
         Define the fraction of fluid data separate from the training data used for
@@ -138,32 +138,31 @@ class DataGenerator_Base:
         """
         if input >= 1 or input <=0:
             raise Exception("Test data fraction should be between zero and one.")
-        self.__test_fraction = input 
-        return 
-    
+        self.__test_fraction = input
+        return
+
     def GetTrainFraction(self):
         """
         Get fluid data fraction used for multi-layer perceptron training.
 
         :return: fluid data train fraction.
-        :rtype: float 
+        :rtype: float
         """
         return self.__train_fraction
-    
+
     def GetTestFraction(self):
         """
         Get fluid data fraction used for determining accuracy after training.
 
         :return: fluid data test fraction.
-        :rtype: float 
+        :rtype: float
         """
         return self.__test_fraction
-    
+
     def ComputeData(self):
         print("Initiating data generation proces...")
-        return 
-    
+        return
+
     def SaveData(self):
         print("Saving fluid data...")
-        return 
-    
+        return

@@ -1,0 +1,16 @@
+from su2dataminer.config import Config_FGM
+
+config = Config_FGM()
+config.SetReactionMechanism("gri30.yaml")
+config.SetTransportModel("unity-Lewis-number")
+config.SetFuelDefinition(["CH4"],[1])
+config.setFlameletTypes(["FREEFLAME","BURNERFLAME","EQUILIBRIUM","INT_BURNERFLAME"])
+config.SetMixtureBounds(0.7,0.7)
+config.SetUnbTempBounds(270, 500)
+config.SetNpTemp(30)
+config.SetMdotDHTarget(5e4)
+config.SetNpMdotExtra(30)
+config.SetControllingVariables(["ProgressVariable","EnthalpyTot"])
+config.SetPassiveSpecies(["CO","CO2"])
+config.SetConfigName("methane_tabulation")
+config.SaveConfig()

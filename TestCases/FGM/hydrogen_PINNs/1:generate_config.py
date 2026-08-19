@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 ###############################################################################################
-#       #      _____ __  _____      ____        __        __  ____                   #        #  
-#       #     / ___// / / /__ \    / __ \____ _/ /_____ _/  |/  (_)___  ___  _____   #        #  
-#       #     \__ \/ / / /__/ /   / / / / __ `/ __/ __ `/ /|_/ / / __ \/ _ \/ ___/   #        #      
-#       #    ___/ / /_/ // __/   / /_/ / /_/ / /_/ /_/ / /  / / / / / /  __/ /       #        #  
+#       #      _____ __  _____      ____        __        __  ____                   #        #
+#       #     / ___// / / /__ \    / __ \____ _/ /_____ _/  |/  (_)___  ___  _____   #        #
+#       #     \__ \/ / / /__/ /   / / / / __ `/ __/ __ `/ /|_/ / / __ \/ _ \/ ___/   #        #
+#       #    ___/ / /_/ // __/   / /_/ / /_/ / /_/ /_/ / /  / / / / / /  __/ /       #        #
 #       #   /____/\____//____/  /_____/\__,_/\__/\__,_/_/  /_/_/_/ /_/\___/_/        #        #
 #       #                                                                            #        #
 ###############################################################################################
@@ -20,13 +20,13 @@
 # Description:                                                                                |
 #  Initiate the FlameletAI configuration for training physics-informed neural networks for    |
 #  FGM applications.                                                                          |
-#                                                                                             |  
-# Version: 3.1.0                                                                              |
+#                                                                                             |
+# Version: 3.2.0                                                                              |
 #                                                                                             |
 #=============================================================================================#
 
 from su2dataminer.config import Config_FGM
-import os 
+import os
 
 # Manifold bounds:
 
@@ -62,8 +62,8 @@ Config.SetConcatenationFileHeader("MLP_data")
 flamelet_data_dir = os.getcwd() + "/flamelet_data/"
 if not os.path.isdir(flamelet_data_dir):
     os.mkdir(flamelet_data_dir)
-Config.SetOutputDir(flamelet_data_dir) 
- 
+Config.SetOutputDir(flamelet_data_dir)
+
 # Display configuration info in terminal.
 Config.PrintBanner()
 Config.SaveConfig()

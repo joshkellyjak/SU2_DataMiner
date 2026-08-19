@@ -6,7 +6,7 @@ from su2dataminer.process_data import FlameletConcatenator
 from su2dataminer.manifold import TrainMLP_FGM
 
 alpha_expo = -2.6
-lr_decay = 0.999 
+lr_decay = 0.999
 activation_function="swish"
 N_H = [10,10,10,10]
 batch_expo = 2
@@ -15,14 +15,13 @@ config = Config_FGM()
 config.SetFuelDefinition(["H2"], [1.0])
 config.SetReactionMechanism("h2o2.yaml")
 config.SetTransportModel('multicomponent')
-config.SetNpConcatenation(200)
+config.SetNpConcatenation(244)
+config.DefineMixtureStatus(False)
 config.SetMixtureBounds(0.5, 0.6)
 config.SetNpMix(2)
 config.SetUnbTempBounds(300, 350)
 config.SetNpTemp(6)
-config.RunFreeFlames(True)
-config.RunBurnerFlames(False)
-config.RunEquilibrium(True)
+config.setFlameletTypes(["FREEFLAME","EQUILIBRIUM"])
 config.AddOutputGroup(['Temperature'])
 config.SetAlphaExpo(alpha_expo,0)
 config.SetLRDecay(lr_decay,0)
@@ -52,7 +51,7 @@ T.CommenceTraining()
 
 config.UpdateMLPHyperParams(T)
 config.PrintBanner()
-
+    
 if consistent_hp_params:
     sys.exit(0)
 else:
