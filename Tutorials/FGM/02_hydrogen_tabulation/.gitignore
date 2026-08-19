@@ -1,0 +1,7 @@
+*.csv
+*.vtu
+*.cfg
+*.dat
+*.su2
+*.drg
+*/*/*/.csv

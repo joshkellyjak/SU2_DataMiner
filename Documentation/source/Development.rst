@@ -27,6 +27,17 @@ Publish branch, push changes
 
 Open a pull request on the GitHub page, review PR checklist 
 
+Formatting
+----------
+
+Before commiting changes, run the command 
+
+.. code-block::
+
+    >>> pre-commit run --all
+
+in order to check the code for unused variables and modules and for trailing whitespaces.
+
 
 Regression Tests 
 ----------------

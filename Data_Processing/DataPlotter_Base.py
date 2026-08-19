@@ -19,19 +19,19 @@
 # Description:                                                                                |
 #  Class for generating fluid data for Flamelet-Generated Manifold data mining operations.    |
 #                                                                                             |
-# Version: 3.1.0                                                                              |
+# Version: 3.2.0                                                                              |
 #                                                                                             |
 #=============================================================================================#
 
 
-import matplotlib.pyplot as plt 
+import matplotlib.pyplot as plt
 from matplotlib import ticker
-import os 
+import os
 
-from Common.Config_base import Config 
+from Common.Config_base import Config
 
 class DataPlotter_Base:
-    _Config:Config = None 
+    _Config:Config = None
 
     __plot_title:str = ""
     _x_variable:str = ""
@@ -40,25 +40,25 @@ class DataPlotter_Base:
 
     _plot_label_default_x:str = ""
     __plot_label_custom_x:str = ""
-    _custom_plot_label_x_set:bool = False 
+    _custom_plot_label_x_set:bool = False
 
     _plot_label_default_y:str = ""
     __plot_label_custom_y:str = ""
-    _custom_plot_label_y_set:bool = False 
+    _custom_plot_label_y_set:bool = False
 
     _plot_label_default_z:str = ""
     __plot_label_custom_z:str = ""
-    _custom_plot_label_z_set:bool = False 
+    _custom_plot_label_z_set:bool = False
 
     __save_images:bool = False
     __fig_format:str = "png"
-    __fig_window:plt.figure = None 
+    __fig_window:plt.figure = None
     _ax:plt.axes = None
     __nDim_plot:int = 2
     _label_map = {}
 
     __val_pad:int = 20
-    
+
     def __init__(self, Config_in:Config=None):
         if Config_in is None:
             self._Config = Config()
@@ -66,41 +66,41 @@ class DataPlotter_Base:
             self._Config = Config_in
 
         return
-    
+
     def SetPlotTitle(self, title_in:str):
         self.__plot_title = title_in
         return
-    
+
     def SetPlotLabelX(self, input:str):
         """Set a custom x-axis label.
 
         :param input: custom x-axis label for the current plot.
         :type input: str
         """
-        self.__plot_label_custom_x = input 
-        self._custom_plot_label_x_set = True 
-        return 
-    
+        self.__plot_label_custom_x = input
+        self._custom_plot_label_x_set = True
+        return
+
     def SetPlotLabelY(self, input:str):
         """Set a custom y-axis label.
 
         :param input: custom y-axis label for the current plot.
         :type input: str
         """
-        self.__plot_label_custom_y = input 
-        self._custom_plot_label_y_set = True 
+        self.__plot_label_custom_y = input
+        self._custom_plot_label_y_set = True
         return
-    
+
     def SetPlotLabelZ(self, input:str):
         """Set a custom z-axis label.
 
         :param input: custom z-axis label for the current plot.
         :type input: str
         """
-        self.__plot_label_custom_z = input 
-        self._custom_plot_label_z_set = True 
+        self.__plot_label_custom_z = input
+        self._custom_plot_label_z_set = True
         return
-    
+
     def SaveImages(self, save:bool):
         """Save generated images.
 
@@ -113,28 +113,28 @@ class DataPlotter_Base:
     def SetFigFormat(self, fig_format:str="png"):
         self.__fig_format = fig_format
         return
-    
+
     def _PrepareOutputDir(self):
         if not os.path.isdir(self._Config.GetOutputDir()+"/Plots"):
             os.mkdir(self._Config.GetOutputDir()+"/Plots")
         return
-    
+
     def SetOutputDir(self, output_dir:str):
         self._Config.SetOutputDir(output_dir)
-        return 
-    
+        return
 
-    
+
+
     def _Initiate2DPlot(self):
         self.__fig_window= plt.figure(figsize=[10,10])
         self._ax = plt.axes()
-        return 
-    
+        return
+
     def _Initiate3DPlot(self):
         self.__fig_window= plt.figure(figsize=[10,10])
         self._ax = plt.axes(projection='3d')
-        return 
-    
+        return
+
     def _FinalizePlot(self, fig_title:str, show:bool=True):
         val_pad = self.__val_pad
         if self.__nDim_plot == 3:
@@ -155,7 +155,7 @@ class DataPlotter_Base:
                 self._ax.set_xlabel(self._label_map[self._x_variable], fontsize=20)
             except:
                 self._ax.set_xlabel(self._plot_label_default_x, fontsize=20)
-        
+
         self._ax.xaxis.set_major_formatter(ticker.StrMethodFormatter("{x:+.2e}"))
         self._ax.xaxis.labelpad=val_pad
         self._ax.yaxis.set_major_formatter(ticker.StrMethodFormatter("{x:+.2e}"))
@@ -180,16 +180,16 @@ class DataPlotter_Base:
             self.__fig_window.savefig(self._Config.GetOutputDir()+"/Plots/"+fig_title+"."+self.__fig_format, format=self.__fig_format, bbox_inches='tight')
         if show:
             plt.tight_layout()
-            plt.show() 
+            plt.show()
         else:
             plt.close(self.__fig_window)
-        return 
-    
+        return
+
     def _PlotBody(self, plot_variables:list[str]):
         plot_3D = (len(plot_variables) == 3)
         return plot_3D
-    
-    
+
+
     def Plot3D(self, x_variable:str, y_variable:str, z_variable:str, show:bool=True):
         self._x_variable = x_variable
         self._y_variable = y_variable
@@ -199,7 +199,7 @@ class DataPlotter_Base:
         if self.__save_images:
             self._PrepareOutputDir()
         self._Initiate3DPlot()
-        
+
         plot_data = self._PlotBody([x_variable, y_variable, z_variable])
         self._FinalizePlot("_".join((x_variable,y_variable,z_variable)) + "_3D", show)
         return plot_data

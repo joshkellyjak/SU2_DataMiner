@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 ###############################################################################################
-#       #      _____ __  _____      ____        __        __  ____                   #        #  
-#       #     / ___// / / /__ \    / __ \____ _/ /_____ _/  |/  (_)___  ___  _____   #        #  
-#       #     \__ \/ / / /__/ /   / / / / __ `/ __/ __ `/ /|_/ / / __ \/ _ \/ ___/   #        #      
-#       #    ___/ / /_/ // __/   / /_/ / /_/ / /_/ /_/ / /  / / / / / /  __/ /       #        #  
+#       #      _____ __  _____      ____        __        __  ____                   #        #
+#       #     / ___// / / /__ \    / __ \____ _/ /_____ _/  |/  (_)___  ___  _____   #        #
+#       #     \__ \/ / / /__/ /   / / / / __ `/ __/ __ `/ /|_/ / / __ \/ _ \/ ___/   #        #
+#       #    ___/ / /_/ // __/   / /_/ / /_/ / /_/ /_/ / /  / / / / / /  __/ /       #        #
 #       #   /____/\____//____/  /_____/\__,_/\__/\__,_/_/  /_/_/_/ /_/\___/_/        #        #
 #       #                                                                            #        #
 ###############################################################################################
@@ -19,13 +19,13 @@
 #                                                                                             |
 # Description:                                                                                |
 #  Generate flamelet data as per settings in the SU2 DataMiner configuration.                 |
-#                                                                                             |  
-# Version: 3.1.0                                                                              |
+#                                                                                             |
+# Version: 3.2.0                                                                              |
 #                                                                                             |
 #=============================================================================================#
 
-import argparse 
-import sys 
+import argparse
+import sys
 
 #---------------------------------------------------------------------------------------------#
 # Importing DataMiner classes and functions
@@ -38,7 +38,7 @@ from Common.DataDrivenConfig import *
 parser = argparse.ArgumentParser()
 parser.add_argument('--c', dest='config_name', type=str, help='Configuration file name.', default=DefaultProperties.config_name+".cfg")
 parser.add_argument('--t', dest='type', type=int, help='Data type to generate: (1:FGM, 2:NICFD)', default=1)
-args = parser.parse_args(args=None if sys.argv[1:] else ['--help']) 
+args = parser.parse_args(args=None if sys.argv[1:] else ['--help'])
 
 if args.type == 1:
     config = Config_FGM(args.config_name)

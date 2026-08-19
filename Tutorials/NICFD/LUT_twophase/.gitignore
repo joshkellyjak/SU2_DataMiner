@@ -1,0 +1,8 @@
+*.dat
+*.csv
+TURBOMACHINERY
+*.vtm
+*.vtk
+*.vtu
+*.su2
+*.drg 

@@ -23,10 +23,10 @@
 # Version: 2.0.0                                                                              |
 #                                                                                             |
 #=============================================================================================#
-import os 
+import os
 
 # Import EntropicAI configuration module
-from Common.DataDrivenConfig import EntropicAIConfig 
+from Common.DataDrivenConfig import EntropicAIConfig
 
 
 Config = EntropicAIConfig()
@@ -59,4 +59,3 @@ Config.PrintBanner()
 Config.SetConfigName("MM_config_SU2_2024")
 
 Config.SaveConfig()
- 

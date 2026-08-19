@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 ###############################################################################################
-#       #      _____ __  _____      ____        __        __  ____                   #        #  
-#       #     / ___// / / /__ \    / __ \____ _/ /_____ _/  |/  (_)___  ___  _____   #        #  
-#       #     \__ \/ / / /__/ /   / / / / __ `/ __/ __ `/ /|_/ / / __ \/ _ \/ ___/   #        #      
-#       #    ___/ / /_/ // __/   / /_/ / /_/ / /_/ /_/ / /  / / / / / /  __/ /       #        #  
+#       #      _____ __  _____      ____        __        __  ____                   #        #
+#       #     / ___// / / /__ \    / __ \____ _/ /_____ _/  |/  (_)___  ___  _____   #        #
+#       #     \__ \/ / / /__/ /   / / / / __ `/ __/ __ `/ /|_/ / / __ \/ _ \/ ___/   #        #
+#       #    ___/ / /_/ // __/   / /_/ / /_/ / /_/ /_/ / /  / / / / / /  __/ /       #        #
 #       #   /____/\____//____/  /_____/\__,_/\__/\__,_/_/  /_/_/_/ /_/\___/_/        #        #
 #       #                                                                            #        #
 ###############################################################################################
@@ -19,19 +19,19 @@
 #                                                                                             |
 # Description:                                                                                |
 #  Plot flamelet data trends.                                                                 |
-#                                                                                             |  
-# Version: 3.1.0                                                                              |
+#                                                                                             |
+# Version: 3.2.0                                                                              |
 #                                                                                             |
 #=============================================================================================#
 
-import argparse 
+import argparse
 import sys
 
 #---------------------------------------------------------------------------------------------#
 # Importing DataMiner classes and functions
 #---------------------------------------------------------------------------------------------#
 from Common.Properties import DefaultSettings_FGM
-from Common.DataDrivenConfig import Config_FGM 
+from Common.DataDrivenConfig import Config_FGM
 from Data_Processing.DataPlotters import DataPlotter_FGM
 
 #---------------------------------------------------------------------------------------------#
@@ -46,7 +46,7 @@ parser.add_argument('--z', dest='z_var', type=str, help="Z-variable", default=No
 parser.add_argument('--Mix', nargs='+',dest='mixture_status', help="Mixture status values for which to plot flamelet data.", default=[])
 parser.add_argument('--save',action='store_true',dest='save_images', help="Save generated images in flamelet data folder.")
 
-args = parser.parse_args(args=None if sys.argv[1:] else ['--help']) 
+args = parser.parse_args(args=None if sys.argv[1:] else ['--help'])
 
 #---------------------------------------------------------------------------------------------#
 # Load FlameletAI configuration

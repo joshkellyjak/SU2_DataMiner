@@ -1,5 +1,5 @@
 from Manifold_Generation.LUT.FlameletTableGeneration import SU2TableGenerator
-from Common.DataDrivenConfig import FlameletAIConfig 
+from Common.DataDrivenConfig import FlameletAIConfig
 
 # Loading configuration.
 Config = FlameletAIConfig("TableGeneration.cfg")
@@ -22,7 +22,7 @@ Tgen.VisualizeTableLevel(z_target, "ProdRateTot_PV")
 Tgen.VisualizeTableLevel(z_target)
 
 # Generate table connectivity and interpolate flamelet data.
-Tgen.GenerateTableNodes()
+Tgen.generateTableNodes()
 
 # Write SU2 .drg table file.
-Tgen.WriteTableFile()
+Tgen.writeSU2Table()
