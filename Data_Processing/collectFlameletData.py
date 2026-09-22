@@ -671,11 +671,9 @@ class FlameletConcatenator:
                 S_flamelet_norm = S_flamelet / (max(S_flamelet)+1e-32)
 
                 T_flamelet = D[:, variables.index(FGMVars.Temperature.name)]
-                # The T_threshold filter is meant to drop extinguished flamelets.
-                # Equilibrium data must be exempt: under __write_LUT_data only the
-                # first (coldest) row of each equilibrium file is read, which is
-                # always below T_threshold and would otherwise be silently dropped,
-                # removing the cold products anchor from the manifold.
+                # Drop extinguished flamelets, but exempt equilibrium data: only its
+                # coldest row is read for the LUT and it lies below T_threshold, so
+                # filtering it would remove the cold-products anchor from the manifold.
                 if (np.max(T_flamelet) < DefaultSettings_FGM.T_threshold) and not is_equilibrium:
                     BurningFlamelet = False
 

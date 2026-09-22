@@ -218,20 +218,16 @@ class DefaultSettings_FGM(DefaultProperties):
     boundary_file_header:str = "boundary_data"
     config_type:str = "FlameletAI"
 
-# Supported MLP hidden-layer activation functions. Values are the Keras activation
-# names; the actual tf.keras callables are resolved lazily via GetActivationFunction
-# so that importing this module does NOT require TensorFlow. Flamelet/LUT generation
-# has no TF dependency, and the x86_64 (Rosetta) su2dm-env cannot import the
-# AVX-compiled TF wheel -- an eager `import tensorflow` here aborts the interpreter.
-# Key order is preserved because optimizeHP.py indexes list(...keys()) positionally.
+# Supported MLP hidden-layer activation functions, stored by name so that importing
+# this module does not require TensorFlow (flamelet/LUT generation has no TF dependency).
+# The callables are resolved lazily through GetActivationFunction. Key order is
+# significant: optimizeHP.py indexes list(...keys()) positionally.
 ActivationFunctionOptions = {name: name for name in
                              ("linear", "elu", "relu", "tanh",
                               "exponential", "gelu", "sigmoid", "swish")}
 
 def GetActivationFunction(name:str):
-    """Lazily resolve a Keras activation callable by name, importing TensorFlow on
-    demand. Call this only from code paths that genuinely need TF (e.g. MLP training);
-    it will raise/abort in environments without a working TensorFlow.
+    """Resolve a Keras activation callable by name, importing TensorFlow on demand.
 
     :param name: activation function name, one of ActivationFunctionOptions.keys().
     :type name: str

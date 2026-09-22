@@ -809,18 +809,11 @@ class SU2TableGenerator_FGM:
         xgrid, ygrid = np.meshgrid(pv_range, h_range)
         zgrid = val_mix_frac*np.ones(np.shape(xgrid))
 
-        # 2: Locate nodes that are above the burner-stabilized enthalpy line
+        # 2: Keep the full pv-h grid (the burner-stabilized enthalpy-line culling is
+        #    disabled so the cold, low-enthalpy corner is retained in the manifold).
         CV_grid_init = np.column_stack((xgrid.flatten(), ygrid.flatten(), zgrid.flatten()))
-       # pv_grid = CV_grid_init[:,0]
-       # h_grid = CV_grid_init[:,1]
+        CV_grid = CV_grid_init
 
-       # h_limit = ((h_min_unb - h_min) * pv_grid + (h_min*pv_unb - h_min_unb*pv_b))/(pv_unb - pv_b)
-       # idx_keep = h_grid >= h_limit 
-
-       # CV_grid = CV_grid_init[idx_keep, :]
-        
-        CV_grid = CV_grid_init 
- 
         CV_grid_norm_init = self._scaler.transform(CV_grid_init)
         CV_grid_norm = self._scaler.transform(CV_grid)
 
