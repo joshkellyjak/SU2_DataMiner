@@ -62,8 +62,8 @@ class DataGenerator_Cantera(DataGenerator_Base):
     __reaction_mechanism:str = DefaultSettings_FGM.reaction_mechanism   # Cantera reaction mechanism
     __transport_model:str = DefaultSettings_FGM.transport_model
 
-    __initial_grid_length:float = 1e-2  # Flamelet grid width
-    __initial_grid_Np:int = 30          # Number of initial grid nodes.
+    __initial_grid_length:float = 1.5e-2  # Flamelet grid width
+    __initial_grid_Np:int = 1000          # Number of initial grid nodes.
 
     __define_equivalence_ratio:bool = not DefaultSettings_FGM.run_mixture_fraction # Define unburnt mixture via the equivalence ratio
     __unb_mixture_status:list[float] = [] 
@@ -360,7 +360,7 @@ class DataGenerator_Cantera(DataGenerator_Base):
             # First flame: create a new FreeFlame and place the flame front explicitly.
             initialgrid = np.linspace(0, self.__initial_grid_length, self.__initial_grid_Np)
             flame:ct.FreeFlame = ct.FreeFlame(self.gas, grid=initialgrid)
-            flame.set_refine_criteria(ratio=3, slope=0.05, curve=0.05, prune=0.01)
+            flame.set_refine_criteria(ratio=3, slope=0.008, curve=0.016, prune=0.001)
             flame.max_grid_points = 50000   # default 1000 fails for thin/lean H2 flames
             # Multi-component diffusion for differential diffusion effects.
             flame.transport_model = self.__transport_model

@@ -671,8 +671,13 @@ class FlameletConcatenator:
                 S_flamelet_norm = S_flamelet / (max(S_flamelet)+1e-32)
 
                 T_flamelet = D[:, variables.index(FGMVars.Temperature.name)]
-                if np.max(T_flamelet) < DefaultSettings_FGM.T_threshold:
-                    BurningFlamelet = False 
+                # The T_threshold filter is meant to drop extinguished flamelets.
+                # Equilibrium data must be exempt: under __write_LUT_data only the
+                # first (coldest) row of each equilibrium file is read, which is
+                # always below T_threshold and would otherwise be silently dropped,
+                # removing the cold products anchor from the manifold.
+                if (np.max(T_flamelet) < DefaultSettings_FGM.T_threshold) and not is_equilibrium:
+                    BurningFlamelet = False
 
                 sourceterm_zero_line_numbers = [0, -1]
 
@@ -768,10 +773,10 @@ class FlameletConcatenator:
                         # Define query controlling variable range
                         if is_equilibrium and self.__write_LUT_data:
                             CV_sampled = CV_flamelet*np.ones([self.__Np_per_flamelet, np.shape(CV_flamelet)[1]])
-                            TD_sampled = TD_data*np.ones([self.__Np_per_flamelet, np.shape(CV_flamelet)[1]])
+                            TD_sampled = TD_data*np.ones([self.__Np_per_flamelet, np.shape(TD_data)[1]])
                             if self.__Config.PreferentialDiffusion():
-                                PD_sampled = PD_data*np.ones([self.__Np_per_flamelet, np.shape(CV_flamelet)[1]])
-                            lookup_sampled = LookUp_data*np.ones([self.__Np_per_flamelet, np.shape(CV_flamelet)[1]])
+                                PD_sampled = PD_data*np.ones([self.__Np_per_flamelet, np.shape(PD_data)[1]])
+                            lookup_sampled = LookUp_data*np.ones([self.__Np_per_flamelet, np.shape(LookUp_data)[1]])
                             sources_sampled = np.zeros([self.__Np_per_flamelet, 1 + 4*len(self.__Species_in_FGM)])
                         else:
                             if is_equilibrium:

@@ -811,14 +811,16 @@ class SU2TableGenerator_FGM:
 
         # 2: Locate nodes that are above the burner-stabilized enthalpy line
         CV_grid_init = np.column_stack((xgrid.flatten(), ygrid.flatten(), zgrid.flatten()))
-        pv_grid = CV_grid_init[:,0]
-        h_grid = CV_grid_init[:,1]
+       # pv_grid = CV_grid_init[:,0]
+       # h_grid = CV_grid_init[:,1]
 
-        h_limit = ((h_min_unb - h_min) * pv_grid + (h_min*pv_unb - h_min_unb*pv_b))/(pv_unb - pv_b)
-        idx_keep = h_grid >= h_limit 
+       # h_limit = ((h_min_unb - h_min) * pv_grid + (h_min*pv_unb - h_min_unb*pv_b))/(pv_unb - pv_b)
+       # idx_keep = h_grid >= h_limit 
 
-        CV_grid = CV_grid_init[idx_keep, :]
+       # CV_grid = CV_grid_init[idx_keep, :]
         
+        CV_grid = CV_grid_init 
+ 
         CV_grid_norm_init = self._scaler.transform(CV_grid_init)
         CV_grid_norm = self._scaler.transform(CV_grid)
 
