@@ -20,6 +20,11 @@ Tgen.ConditionalRefinement("Temperature", lowerbound=600,upperbound=700, coef=0.
 Tgen.RefineReactants(0.1)
 # Tgen.ConditionalRefinement("Temperature", lowerbound=1000, coef=0.2)
 
+# Reaction rate and preferential diffusion closure sources are zeroed within thin dead
+# bands in normalized reaction progress at the unburnt and burnt ends of each table level
+# (defaults shown; applied automatically during GenerateTableNodes).
+Tgen.SetSourceDeadBands(c_unburnt=1e-3, c_burnt=1e-2)
+
 
 # Insert mixture fraction level at equivalence ratio of 0.5.
 cv_target = Config.GetUnburntScalars(equivalence_ratio=0.5, temperature=300.0)

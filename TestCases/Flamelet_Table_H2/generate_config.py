@@ -16,6 +16,19 @@ Config.SetNpTemp(100)
 # Enable preferential diffusion through selecting the "multicomponent" transport model.
 Config.SetTransportModel('multicomponent')
 
+# Preferential diffusion formulation. SOURCE_TERM selects model B2, which also switches the mixture
+# fraction to the elemental (hydrogen) definition of Eq. (11). BETA_CORRECTION keeps the legacy
+# beta-scalar path and Bilger's mixture fraction.
+Config.SetPreferentialDiffusionMethod("SOURCE_TERM")
+
+# Major species of FGM model B2 (Schepers & van Oijen, C&F 280 (2025) 114332). Their Eq. (14)
+# molecular and thermal flux coefficients are tabulated per species and summed by the CFD solver
+# against its own gradients; only the remaining species are gathered into the Eq. (16) closure
+# sources S_PV, S_Z and S_h. Leaving this unset puts every species into the closure sources, which
+# pre-contracts the summation against the 1D flamelet gradients and loses all curvature and
+# cross-diffusion response in the CFD.
+Config.SetPDMajorSpecies(["H2", "H2O", "H"])
+
 Config.SetConcatenationFileHeader("LUT_data")
 
 # Setting the progress variable definition.
